@@ -1,0 +1,28 @@
+şirketim için modern bir stok ve satın alma yönetim uygulaması oluştur.
+ Stokları tek ekrandan takip edeyim ve kritik seviyelerde otomatik uyarı alayım.
+ Uygulamada koyu ve açık tema seçenekleri olsun. 
+uygulama ismi NE LAZIMSA olsun.
+
+Kullanıcı girişi (login) olsun mu?
+Evet, e-posta/şifre ile giriş
+
+Hangi ana özellikler öncelikli olsun?
+Stok takibi + kritik seviye uyarısı + satın alma siparişleri; Sadece stok takibi + uyarılar; Yukarıdakiler + tedarikçi yönetimi + raporlar
+
+Kritik seviye uyarısı nasıl olsun?
+Sadece uygulama içi görsel uyarı
+
+Para birimi ve dil?
+Türk Lirası (₺) ve Türkçe arayüz
+
+Tasarım tercihiniz var mı? (renk, stil, örnek uygulama vb.)
+
+modern ve şık bir tasarım olsun sana bırakıyorum
+
+Excel Aktarımı: Stok ve sipariş listelerini Excel/CSV olarak indirebilmemi ekle
+
+Barkod Tarama: Ürün eklerken telefon kamerasıyla barkod okutup hızlı giriş yapmamı sağla
+
+Kritik Ürün Siparişi: Kritik stoktaki ürünü tek tıkla satın alma siparişine dönüştürmemi sağla
+
+Barkodla Stok Girişi: Depoda barkod okutunca ilgili ürünün stoğunu otomatik +1 artıran hızlı sayım modu ekle
