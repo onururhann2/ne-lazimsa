@@ -221,6 +221,88 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 
 /* ── MONO ── */
 .mono{font-family:'Courier New',monospace;font-size:12px;letter-spacing:.5px}
+
+/* ── MOBILE HEADER ── */
+.mobile-header{display:none;position:fixed;top:0;left:0;right:0;height:56px;background:var(--bg2);border-bottom:1px solid var(--border);z-index:150;align-items:center;padding:0 16px;gap:12px}
+[data-theme=dark] .mobile-header{background:rgba(10,15,28,.95);backdrop-filter:blur(20px)}
+.mob-logo{font-size:16px;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;flex:1}
+.mob-hamburger{width:38px;height:38px;border-radius:9px;background:var(--bg3);border:1px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt2);transition:all .2s}
+.mob-hamburger:hover{background:var(--border2);color:var(--txt)}
+
+/* ── SIDEBAR OVERLAY ── */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(3px);z-index:99}
+.sidebar-overlay.open{display:block}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:62px;background:var(--bg2);border-top:1px solid var(--border);z-index:150;align-items:center;justify-content:space-around;padding:0 4px}
+[data-theme=dark] .bottom-nav{background:rgba(10,15,28,.95);backdrop-filter:blur(20px)}
+.bnav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 10px;border-radius:10px;cursor:pointer;color:var(--txt3);font-size:10px;font-weight:600;transition:all .2s;flex:1;text-align:center;border:none;background:none;font-family:'Inter',sans-serif;position:relative}
+.bnav-item.active{color:var(--accent)}
+.bnav-item svg{flex-shrink:0}
+.bnav-dot{position:absolute;top:6px;right:calc(50% - 16px);width:7px;height:7px;background:var(--red);border-radius:50%;display:none}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:768px){
+  /* Show mobile header + bottom nav */
+  .mobile-header{display:flex}
+  .bottom-nav{display:flex}
+  /* Hide desktop sidebar */
+  .sidebar{transform:translateX(-260px);transition:transform .3s ease}
+  .sidebar.mob-open{transform:translateX(0)}
+  /* Main content */
+  .main{margin-left:0;padding:72px 14px 76px}
+  /* Page header */
+  .page-header{flex-direction:column;align-items:flex-start;gap:12px;margin-bottom:18px}
+  .page-title{font-size:20px}
+  .page-actions{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+  .page-actions .btn{flex:1;min-width:130px;justify-content:center;font-size:12px;padding:9px 12px}
+  /* Grids */
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+  .grid-2{grid-template-columns:1fr}
+  .page-2col{grid-template-columns:1fr}
+  .charts-grid{grid-template-columns:1fr}
+  .col-2{grid-column:span 1}
+  /* Stat cards */
+  .stat-card{padding:16px}
+  .stat-val{font-size:22px}
+  /* Table */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:560px}
+  th,td{padding:10px 14px;font-size:12px}
+  .tbl-head{flex-wrap:wrap;gap:10px;padding:14px 16px}
+  .search-box{max-width:100%!important;flex:1}
+  /* Cards */
+  .card{padding:16px}
+  .chart-card{padding:16px}
+  /* Login */
+  .login-card{padding:28px 22px}
+  /* Filter bar */
+  .filter-bar{gap:6px}
+  .filter-bar select{font-size:12px;padding:6px 10px}
+  /* FAB - move above bottom nav */
+  .fab{bottom:76px;right:16px;width:46px;height:46px;border-radius:14px}
+  /* Modal - bottom sheet on mobile */
+  .overlay{align-items:flex-end;padding:0}
+  .modal{border-radius:20px 20px 0 0;max-height:92vh;max-width:100%!important;width:100%!important}
+  .modal-lg{max-width:100%!important}
+  /* Alert banner */
+  .alert-banner{flex-wrap:wrap;gap:8px}
+  /* Scan frame */
+  #barcode-video,#qc-video,#stockin-video,#sales-video{max-height:220px}
+}
+@media(max-width:420px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat-card{padding:14px}
+  .stat-ico{width:36px;height:36px;font-size:16px;margin-bottom:10px}
+  .stat-val{font-size:19px}
+  .stat-lbl{font-size:11px}
+  .page-title{font-size:18px}
+  .btn{font-size:12px}
+  th,td{padding:8px 10px;font-size:11px}
+}
 </style>
 </head>
 <body>
@@ -247,6 +329,15 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 </div>
 
 <!-- ═══════════════ APP ═══════════════ -->
+<!-- MOBILE HEADER -->
+<div class="mobile-header" id="mobile-header">
+  <div class="mob-logo">NE LAZIMSA</div>
+  <button class="mob-hamburger" onclick="toggleSidebar()" id="mob-ham-btn">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+</div>
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <div id="app">
   <!-- SIDEBAR -->
   <aside class="sidebar">
@@ -528,6 +619,35 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   </button>
 </div>
 
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bnav-item active" id="bnav-dashboard" onclick="go('dashboard')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    Panel
+  </button>
+  <button class="bnav-item" id="bnav-products" onclick="go('products')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+    Stok
+  </button>
+  <button class="bnav-item" id="bnav-stockin" onclick="go('stockin')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+    Giriş
+  </button>
+  <button class="bnav-item" id="bnav-sales" onclick="go('sales')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    Satış
+  </button>
+  <button class="bnav-item" id="bnav-critical" onclick="go('critical')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Kritik
+    <div class="bnav-dot" id="bnav-dot"></div>
+  </button>
+  <button class="bnav-item" id="bnav-more" onclick="toggleSidebar()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    Menü
+  </button>
+</nav>
+
 <!-- ═══ MODALS ═══ -->
 
 <!-- Product -->
@@ -718,13 +838,36 @@ function go(page){
   const n=document.getElementById('nav-'+page),p=document.getElementById('page-'+page);
   if(n)n.classList.add('active');
   if(p)p.classList.add('active');
+  // Sync bottom nav
+  document.querySelectorAll('.bnav-item').forEach(e=>e.classList.remove('active'));
+  const bn=document.getElementById('bnav-'+page);
+  if(bn)bn.classList.add('active');
   ({dashboard:renderDash,products:renderProds,critical:renderCrit,orders:renderOrds,suppliers:renderSups,reports:renderRep,stockin:initStockin,sales:initSales}[page]||function(){})();
   updBadge();
+  closeSidebar();
+  window.scrollTo(0,0);
 }
 function updBadge(){
   const c=gp().filter(p=>sst(p)==='crit').length;
   const b=document.getElementById('crit-badge');
   b.style.display=c>0?'inline-block':'none';b.textContent=c;
+  // bottom nav dot
+  const dot=document.getElementById('bnav-dot');
+  if(dot)dot.style.display=c>0?'block':'none';
+}
+function toggleSidebar(){
+  const s=document.getElementById('app').querySelector('.sidebar');
+  const ov=document.getElementById('sidebar-overlay');
+  const open=s.classList.toggle('mob-open');
+  ov.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+function closeSidebar(){
+  const s=document.getElementById('app')?.querySelector('.sidebar');
+  if(s)s.classList.remove('mob-open');
+  const ov=document.getElementById('sidebar-overlay');
+  if(ov)ov.classList.remove('open');
+  document.body.style.overflow='';
 }
 
 // ══════════════ DASHBOARD ══════════════
