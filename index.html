@@ -574,12 +574,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
               <span><span style="color:var(--txt2)">Stok:</span> <strong id="sales-prod-stk"></strong></span>
               <span><span style="color:var(--txt2)">Fiyat:</span> <strong id="sales-prod-price"></strong></span>
             </div>
-            <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
-              <div class="fg" style="margin:0;flex:1"><label style="font-size:11px">Miktar</label><input type="number" id="sales-qty" min="1" value="1" style="padding:8px 12px"></div>
-              <button class="btn btn-success" style="margin-top:18px" onclick="addToCart()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Sepete Ekle
-              </button>
-            </div>
+            <div style="margin-top:8px" id="sales-prod-result"></div>
           </div>
           <div id="sales-notfound" style="display:none;margin-top:12px" class="prod-card">
             <div style="color:var(--yellow);font-weight:600">⚠️ Ürün bulunamadı</div>
@@ -1371,18 +1366,41 @@ function initSales(){
   });
 }
 function onSalesScan(code){
-  document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 Barkod: ${code}</span>`;
   const p=gp().find(x=>x.barc===code);
   if(p){
     salesScannedProdId=p.id;
+    document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 ${p.name} sepete eklendi</span>`;
     document.getElementById('sales-prod-name').textContent=p.name;
     document.getElementById('sales-prod-stk').textContent=p.stk+' '+p.unit;
     document.getElementById('sales-prod-price').textContent=tl(p.price);
-    document.getElementById('sales-qty').value=1;
     document.getElementById('sales-prod-card').style.display='block';
     document.getElementById('sales-notfound').style.display='none';
+    // ── Otomatik sepete ekle (qty=1) ──
+    const P=gp();
+    if(p.stk<1){
+      document.getElementById('sales-prod-result').innerHTML='<span class="badge b-danger">Stok tükenmiş!</span>';
+      document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--red);font-weight:600">\u274c ${p.name} — stok tükenmiş!</span>`;
+      toast('e','Yetersiz Stok',p.name+' için stok yok');
+      return;
+    }
+    const existing=salesCart.find(c=>c.prodId===p.id);
+    if(existing){
+      if(p.stk<=existing.qty){
+        document.getElementById('sales-prod-result').innerHTML='<span class="badge b-danger">Stok yetersiz!</span>';
+        toast('e','Yetersiz Stok',`Toplam ${p.stk} ${p.unit} mevcut`);
+        return;
+      }
+      existing.qty+=1;
+      existing.total=existing.qty*existing.price;
+    }else{
+      salesCart.push({prodId:p.id,name:p.name,unit:p.unit,price:p.price,qty:1,total:p.price});
+    }
+    const inCart=salesCart.find(c=>c.prodId===p.id);
+    document.getElementById('sales-prod-result').innerHTML=`<span class="badge b-ok">Sepette: ${inCart?inCart.qty:1} ${p.unit}</span>`;
+    renderCart();
   }else{
     salesScannedProdId=null;
+    document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--yellow);font-weight:600">\u26a0\ufe0f Barkod bulunamad\u0131: ${code}</span>`;
     document.getElementById('sales-prod-card').style.display='none';
     document.getElementById('sales-notfound').style.display='block';
   }
