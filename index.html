@@ -182,10 +182,19 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 
 /* ── SCANNER ── */
 .scan-frame{position:relative;border-radius:12px;overflow:hidden;background:#000}
-#barcode-video,#qc-video{width:100%;max-height:300px;object-fit:cover;display:block}
+#barcode-video,#qc-video,#stockin-video,#sales-video{width:100%;max-height:260px;object-fit:cover;display:block}
 .scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 .scan-guide{width:230px;height:150px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
 .scan-result{margin-top:14px;padding:11px 14px;background:var(--bg);border:1px solid var(--border2);border-radius:9px;font-size:13px;min-height:42px;display:flex;align-items:center}
+/* ── PRODUCT CARD ── */
+.prod-card{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-top:12px}
+.prod-card-name{font-size:15px;font-weight:700;margin-bottom:8px}
+.prod-card-meta{display:flex;gap:16px;font-size:13px;flex-wrap:wrap}
+/* ── SALES CART ── */
+.cart-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px}
+.cart-total-bar{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+/* ── TWO-COL LAYOUT ── */
+.page-2col{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
 
 /* ── CHARTS ── */
 .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -256,6 +265,12 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <div class="nav-item" id="nav-critical" onclick="go('critical')">
         <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>Kritik Ürünler
         <span class="nav-badge" id="crit-badge" style="display:none">0</span>
+      </div>
+      <div class="nav-item" id="nav-stockin" onclick="go('stockin')">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></span>Stok Girişi
+      </div>
+      <div class="nav-item" id="nav-sales" onclick="go('sales')">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>Satış Ekranı
       </div>
       <div class="nav-sec">Satın Alma</div>
       <div class="nav-item" id="nav-orders" onclick="go('orders')">
@@ -379,6 +394,132 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       </div>
     </div>
 
+    <!-- STOCK IN -->
+    <div class="page" id="page-stockin">
+      <div class="page-header">
+        <div><h1 class="page-title">Stok Girişi</h1><p class="page-sub">Barkod okutarak stok ekleyin</p></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost" onclick="resetStockin()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>Sıfırla</button>
+        </div>
+      </div>
+      <div class="page-2col">
+        <!-- LEFT: Camera + Result -->
+        <div>
+          <div class="card" style="padding:18px">
+            <div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:12px">📷 Kamera ile Barkod Okut</div>
+            <div class="scan-frame"><video id="stockin-video" autoplay playsinline muted></video><div class="scan-overlay"><div class="scan-guide"></div></div></div>
+            <div class="scan-result" id="stockin-scan-res"><span style="color:var(--txt3)">Ürün barkodunu okutun...</span></div>
+          </div>
+          <!-- Found product card -->
+          <div id="stockin-prod-card" style="display:none" class="prod-card">
+            <div class="prod-card-name" id="stockin-prod-name"></div>
+            <div class="prod-card-meta">
+              <span><span style="color:var(--txt2)">Mevcut Stok:</span> <strong id="stockin-prod-stk"></strong></span>
+              <span><span style="color:var(--txt2)">Min:</span> <span id="stockin-prod-min"></span></span>
+              <span><span style="color:var(--txt2)">Birim:</span> <span id="stockin-prod-unit"></span></span>
+            </div>
+            <div style="margin-top:10px" id="stockin-prod-badge"></div>
+          </div>
+          <!-- Not found -->
+          <div id="stockin-notfound" style="display:none;margin-top:12px" class="prod-card">
+            <div style="color:var(--yellow);font-weight:600;margin-bottom:4px">⚠️ Ürün bulunamadı</div>
+            <div style="color:var(--txt2);font-size:13px">Bu barkod sisteme kayıtlı değil.</div>
+            <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openProdModal()">➕ Yeni Ürün Olarak Ekle</button>
+          </div>
+        </div>
+        <!-- RIGHT: Add stock form -->
+        <div>
+          <div class="card" style="padding:22px">
+            <div style="font-size:14px;font-weight:700;margin-bottom:18px">Stok Ekle</div>
+            <div class="fg"><label>Ürün</label><input type="text" id="stockin-prod-display" readonly placeholder="Barkod okutun veya seçin..." style="opacity:.7"></div>
+            <div class="fg">
+              <label>Eklenecek Miktar *</label>
+              <input type="number" id="stockin-qty" min="1" value="1" placeholder="1">
+            </div>
+            <div class="fg"><label>Not (İsteğe Bağlı)</label><input type="text" id="stockin-note" placeholder="Örn: Depodan gelen"></div>
+            <input type="hidden" id="stockin-prod-id">
+            <button class="btn btn-success btn-full" onclick="confirmStockin()" style="margin-top:6px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Stoğa Ekle
+            </button>
+          </div>
+          <!-- Session log -->
+          <div class="card" style="padding:18px;margin-top:16px">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+              <span>Oturum Geçmişi</span>
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('stockin-log').innerHTML=''">Temizle</button>
+            </div>
+            <div id="stockin-log" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto">
+              <div style="color:var(--txt3);font-size:13px;text-align:center;padding:20px">Henüz işlem yok</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SALES -->
+    <div class="page" id="page-sales">
+      <div class="page-header">
+        <div><h1 class="page-title">Satış Ekranı</h1><p class="page-sub">Barkod okutarak stoktan düşün</p></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost" onclick="resetSales()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>Yeni Satış</button>
+        </div>
+      </div>
+      <div class="page-2col">
+        <!-- LEFT: Camera + Add to cart -->
+        <div>
+          <div class="card" style="padding:18px">
+            <div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:12px">📷 Ürün Barkodunu Okut</div>
+            <div class="scan-frame"><video id="sales-video" autoplay playsinline muted></video><div class="scan-overlay"><div class="scan-guide"></div></div></div>
+            <div class="scan-result" id="sales-scan-res"><span style="color:var(--txt3)">Ürün barkodunu okutun...</span></div>
+          </div>
+          <!-- Found product card for sales -->
+          <div id="sales-prod-card" style="display:none" class="prod-card">
+            <div class="prod-card-name" id="sales-prod-name"></div>
+            <div class="prod-card-meta">
+              <span><span style="color:var(--txt2)">Stok:</span> <strong id="sales-prod-stk"></strong></span>
+              <span><span style="color:var(--txt2)">Fiyat:</span> <strong id="sales-prod-price"></strong></span>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+              <div class="fg" style="margin:0;flex:1"><label style="font-size:11px">Miktar</label><input type="number" id="sales-qty" min="1" value="1" style="padding:8px 12px"></div>
+              <button class="btn btn-success" style="margin-top:18px" onclick="addToCart()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Sepete Ekle
+              </button>
+            </div>
+          </div>
+          <div id="sales-notfound" style="display:none;margin-top:12px" class="prod-card">
+            <div style="color:var(--yellow);font-weight:600">⚠️ Ürün bulunamadı</div>
+          </div>
+        </div>
+        <!-- RIGHT: Cart -->
+        <div>
+          <div class="card" style="padding:18px">
+            <div style="font-size:14px;font-weight:700;margin-bottom:14px">🛒 Sepet</div>
+            <div id="sales-cart" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto">
+              <div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px" id="sales-cart-empty">Sepet boş — ürün okutun</div>
+            </div>
+            <div class="cart-total-bar" id="sales-total-bar" style="display:none">
+              <div>
+                <div style="font-size:12px;color:var(--txt2)">Toplam Tutar</div>
+                <div style="font-size:22px;font-weight:800;color:var(--accent)" id="sales-total">₺0,00</div>
+              </div>
+              <button class="btn btn-danger" onclick="completeSale()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                Satışı Tamamla
+              </button>
+            </div>
+          </div>
+          <!-- Sales history -->
+          <div class="card" style="padding:18px;margin-top:16px">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px">Tamamlanan Satışlar</div>
+            <div id="sales-history" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">
+              <div style="color:var(--txt3);font-size:13px;text-align:center;padding:16px">Henüz tamamlanan satış yok</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- FAB -->
@@ -499,6 +640,10 @@ let currentUser=null;
 const charts={};
 const readers={};
 let scanMode=null,lastCode=null;
+// Sales cart state
+let salesCart=[];
+let stockinProdId=null;
+let salesScannedProdId=null;
 
 function initData(){
   if(!ls('nl_sup'))ls('nl_sup',JSON.stringify([
@@ -565,12 +710,15 @@ function showApp(){
 
 // ══════════════ NAVIGATION ══════════════
 function go(page){
+  // Stop cameras when leaving stockin/sales pages
+  if(page!=='stockin')stopCam('stockin');
+  if(page!=='sales')stopCam('sales');
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   const n=document.getElementById('nav-'+page),p=document.getElementById('page-'+page);
   if(n)n.classList.add('active');
   if(p)p.classList.add('active');
-  ({dashboard:renderDash,products:renderProds,critical:renderCrit,orders:renderOrds,suppliers:renderSups,reports:renderRep}[page]||function(){})();
+  ({dashboard:renderDash,products:renderProds,critical:renderCrit,orders:renderOrds,suppliers:renderSups,reports:renderRep,stockin:initStockin,sales:initSales}[page]||function(){})();
   updBadge();
 }
 function updBadge(){
@@ -914,6 +1062,211 @@ function applyTheme(t){
   document.getElementById('ico-moon').style.display=t==='dark'?'block':'none';
   document.getElementById('ico-sun').style.display=t==='light'?'block':'none';
   document.getElementById('theme-lbl').textContent=t==='dark'?'Açık Tema':'Koyu Tema';
+}
+
+// ══════════════ STOCK IN ══════════════
+function initStockin(){
+  stockinProdId=null;
+  document.getElementById('stockin-prod-display').value='';
+  document.getElementById('stockin-qty').value=1;
+  document.getElementById('stockin-note').value='';
+  document.getElementById('stockin-prod-id').value='';
+  document.getElementById('stockin-prod-card').style.display='none';
+  document.getElementById('stockin-notfound').style.display='none';
+  document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
+  // start camera with debounce
+  let lastSI=null,lastSIt=0;
+  startCam('stockin-video','stockin',(code)=>{
+    const now=Date.now();
+    if(code===lastSI&&now-lastSIt<2500)return;
+    lastSI=code;lastSIt=now;
+    onStockinScan(code);
+  });
+}
+function onStockinScan(code){
+  document.getElementById('stockin-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 Barkod: ${code}</span>`;
+  const p=gp().find(x=>x.barc===code);
+  if(p){
+    stockinProdId=p.id;
+    document.getElementById('stockin-prod-id').value=p.id;
+    document.getElementById('stockin-prod-display').value=p.name;
+    document.getElementById('stockin-prod-name').textContent=p.name;
+    document.getElementById('stockin-prod-stk').textContent=p.stk+' '+p.unit;
+    document.getElementById('stockin-prod-min').textContent=p.min+' '+p.unit;
+    document.getElementById('stockin-prod-unit').textContent=p.unit;
+    const st=sst(p);
+    document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'D\u00FC\u015f\u00FCk Stok':'Kritik Stok'}</span>`;
+    document.getElementById('stockin-prod-card').style.display='block';
+    document.getElementById('stockin-notfound').style.display='none';
+    document.getElementById('stockin-qty').focus();
+  }else{
+    stockinProdId=null;
+    document.getElementById('stockin-prod-card').style.display='none';
+    document.getElementById('stockin-notfound').style.display='block';
+  }
+}
+function confirmStockin(){
+  const id=parseInt(document.getElementById('stockin-prod-id').value);
+  const qty=parseInt(document.getElementById('stockin-qty').value)||0;
+  const note=document.getElementById('stockin-note').value.trim();
+  if(!id){toast('w','\u00dcr\u00fcn Se\u00e7ilmedi','L\u00fctfen \u00f6nce bir barkod okutun');return;}
+  if(qty<1){toast('w','Miktar Hatal\u0131','En az 1 giriniz');return;}
+  const P=gp(),pi=P.findIndex(p=>p.id===id);
+  if(pi<0){toast('e','Hata','\u00dcr\u00fcn bulunamad\u0131');return;}
+  P[pi].stk+=qty;
+  sp(P);
+  const p=P[pi];
+  toast('s','Stok Eklendi',`${p.name} +${qty} ${p.unit}`);
+  updBadge();
+  // update displayed stock
+  document.getElementById('stockin-prod-stk').textContent=p.stk+' '+p.unit;
+  const st=sst(p);
+  document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'D\u00fc\u015f\u00fck Stok':'Kritik Stok'}</span>`;
+  // log entry
+  const log=document.getElementById('stockin-log');
+  const empties=log.querySelectorAll('[data-empty]');
+  empties.forEach(e=>e.remove());
+  const item=document.createElement('div');
+  item.style.cssText='padding:9px 12px;border-radius:8px;font-size:12px;display:flex;align-items:center;gap:10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.18)';
+  item.innerHTML=`<span>\u2705</span><span style="flex:1;font-weight:600">${p.name}</span><span style="color:var(--green)">+${qty} ${p.unit}</span><span style="color:var(--txt3);font-size:11px">${note||''}</span>`;
+  log.prepend(item);
+  // reset qty
+  document.getElementById('stockin-qty').value=1;
+  document.getElementById('stockin-note').value='';
+}
+function resetStockin(){
+  stopCam('stockin');
+  stockinProdId=null;
+  document.getElementById('stockin-prod-card').style.display='none';
+  document.getElementById('stockin-notfound').style.display='none';
+  document.getElementById('stockin-prod-display').value='';
+  document.getElementById('stockin-qty').value=1;
+  document.getElementById('stockin-note').value='';
+  document.getElementById('stockin-prod-id').value='';
+  document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
+  initStockin();
+}
+
+// ══════════════ SALES ══════════════
+function initSales(){
+  salesScannedProdId=null;
+  document.getElementById('sales-prod-card').style.display='none';
+  document.getElementById('sales-notfound').style.display='none';
+  document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
+  renderCart();
+  // start camera with debounce
+  let lastSC=null,lastSCt=0;
+  startCam('sales-video','sales',(code)=>{
+    const now=Date.now();
+    if(code===lastSC&&now-lastSCt<2500)return;
+    lastSC=code;lastSCt=now;
+    onSalesScan(code);
+  });
+}
+function onSalesScan(code){
+  document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 Barkod: ${code}</span>`;
+  const p=gp().find(x=>x.barc===code);
+  if(p){
+    salesScannedProdId=p.id;
+    document.getElementById('sales-prod-name').textContent=p.name;
+    document.getElementById('sales-prod-stk').textContent=p.stk+' '+p.unit;
+    document.getElementById('sales-prod-price').textContent=tl(p.price);
+    document.getElementById('sales-qty').value=1;
+    document.getElementById('sales-prod-card').style.display='block';
+    document.getElementById('sales-notfound').style.display='none';
+  }else{
+    salesScannedProdId=null;
+    document.getElementById('sales-prod-card').style.display='none';
+    document.getElementById('sales-notfound').style.display='block';
+  }
+}
+function addToCart(){
+  if(!salesScannedProdId){toast('w','\u00dcr\u00fcn Se\u00e7ilmedi','\u00d6nce barkod okutun');return;}
+  const P=gp(),p=P.find(x=>x.id===salesScannedProdId);
+  if(!p)return;
+  const qty=parseInt(document.getElementById('sales-qty').value)||1;
+  if(qty<1){toast('w','Miktar Hatal\u0131','En az 1 giriniz');return;}
+  if(p.stk<qty){toast('e','Yetersiz Stok',`Sadece ${p.stk} ${p.unit} mevcut`);return;}
+  // merge if product already in cart
+  const existing=salesCart.find(c=>c.prodId===p.id);
+  if(existing){
+    if(p.stk<existing.qty+qty){toast('e','Yetersiz Stok',`Toplam ${p.stk} ${p.unit} mevcut`);return;}
+    existing.qty+=qty;
+    existing.total=existing.qty*existing.price;
+  }else{
+    salesCart.push({prodId:p.id,name:p.name,unit:p.unit,price:p.price,qty,total:qty*p.price});
+  }
+  renderCart();
+  toast('s','Sepete Eklendi',`${p.name} x${qty}`);
+}
+function removeFromCart(prodId){
+  salesCart=salesCart.filter(c=>c.prodId!==prodId);
+  renderCart();
+}
+function renderCart(){
+  const cart=document.getElementById('sales-cart');
+  const totalBar=document.getElementById('sales-total-bar');
+  const emptyEl=document.getElementById('sales-cart-empty');
+  if(salesCart.length===0){
+    cart.innerHTML='<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px" id="sales-cart-empty">Sepet bo\u015f \u2014 \u00fcr\u00fcn okutun</div>';
+    totalBar.style.display='none';
+    return;
+  }
+  cart.innerHTML=salesCart.map((c,i)=>`
+    <div class="cart-item">
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${c.name}</div>
+        <div style="font-size:12px;color:var(--txt2);margin-top:2px">${c.qty} ${c.unit} \u00d7 ${tl(c.price)}</div>
+      </div>
+      <div style="font-weight:700;color:var(--accent)">${tl(c.total)}</div>
+      <button class="btn btn-ghost btn-sm" onclick="removeFromCart(${c.prodId})" style="padding:5px 8px">\u2715</button>
+    </div>
+  `).join('');
+  const tot=salesCart.reduce((s,c)=>s+c.total,0);
+  document.getElementById('sales-total').textContent=tl(tot);
+  totalBar.style.display='flex';
+}
+function completeSale(){
+  if(salesCart.length===0){toast('w','Sepet Bo\u015f','\u00dcr\u00fcn ekleyin');return;}
+  const P=gp();
+  let ok=true;
+  salesCart.forEach(c=>{
+    const pi=P.findIndex(p=>p.id===c.prodId);
+    if(pi<0||P[pi].stk<c.qty){ok=false;toast('e','Yetersiz Stok',P[pi]?P[pi].name:c.name);}
+  });
+  if(!ok)return;
+  salesCart.forEach(c=>{
+    const pi=P.findIndex(p=>p.id===c.prodId);
+    P[pi].stk-=c.qty;
+  });
+  sp(P);
+  // save to history
+  const tot=salesCart.reduce((s,c)=>s+c.total,0);
+  const summary=salesCart.map(c=>`${c.name} x${c.qty}`).join(', ');
+  const hist=document.getElementById('sales-history');
+  hist.querySelectorAll('[data-hist-empty]').forEach(e=>e.remove());
+  const item=document.createElement('div');
+  item.style.cssText='padding:9px 12px;border-radius:8px;font-size:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18)';
+  item.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:600">${fd(new Date())}</span><span style="color:var(--red);font-weight:700">${tl(tot)}</span></div><div style="color:var(--txt2)">${summary}</div>`;
+  hist.prepend(item);
+  const items=salesCart.length;
+  salesCart=[];
+  renderCart();
+  salesScannedProdId=null;
+  document.getElementById('sales-prod-card').style.display='none';
+  document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
+  updBadge();
+  toast('s','Sat\u0131\u015f Tamamland\u0131',`${items} kalem, toplam ${tl(tot)}`);
+}
+function resetSales(){
+  salesCart=[];
+  salesScannedProdId=null;
+  stopCam('sales');
+  document.getElementById('sales-prod-card').style.display='none';
+  document.getElementById('sales-notfound').style.display='none';
+  document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
+  renderCart();
+  initSales();
 }
 
 // ══════════════ INIT ══════════════
