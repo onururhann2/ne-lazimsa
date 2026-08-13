@@ -7,6 +7,7 @@
 <meta name="description" content="Modern stok ve satın alma yönetim sistemi">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/umd/index.min.js"></script>
 <style>
 :root{--bg:hsl(222,47%,7%);--bg2:hsl(222,39%,11%);--bg3:hsl(222,32%,14%);--card:rgba(30,41,59,.75);--border:rgba(148,163,184,.08);--border2:rgba(148,163,184,.18);--txt:hsl(210,40%,95%);--txt2:hsl(215,20%,55%);--txt3:hsl(215,15%,38%);--accent:hsl(217,91%,60%);--accent2:hsl(217,91%,50%);--green:hsl(160,84%,39%);--yellow:hsl(38,92%,50%);--red:hsl(0,84%,60%);--sidebar:260px}
 [data-theme=light]{--bg:hsl(210,20%,94%);--bg2:#fff;--bg3:hsl(210,16%,88%);--card:rgba(255,255,255,.9);--border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.14);--txt:hsl(222,47%,11%);--txt2:hsl(215,19%,37%);--txt3:hsl(215,15%,60%)}
@@ -525,7 +526,9 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <div class="fg"><label>Ürün</label><input type="text" id="stockin-prod-display" readonly placeholder="Barkod okutun veya seçin..." style="opacity:.7"></div>
             <div class="fg">
               <label>Eklenecek Miktar *</label>
-              <input type="number" id="stockin-qty" min="1" value="1" placeholder="1">
+              <input type="number" id="stockin-qty" min="1" value="1" placeholder="1"
+                style="font-size:22px;font-weight:700;text-align:center;padding:14px"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();confirmStockin();}">
             </div>
             <div class="fg"><label>Not (İsteğe Bağlı)</label><input type="text" id="stockin-note" placeholder="Örn: Depodan gelen"></div>
             <input type="hidden" id="stockin-prod-id">
@@ -1118,35 +1121,93 @@ function addQCLog(name,stk,unit,ok){
 }
 
 // ══════════════ CAMERA ENGINE ══════════════
+// Result element map per video
+function resId(videoId){
+  const m={'qc-video':'qc-res','stockin-video':'stockin-scan-res','sales-video':'sales-scan-res','barcode-video':'scan-res'};
+  return m[videoId]||'scan-res';
+}
+function showCamMsg(videoId,html){
+  const el=document.getElementById(resId(videoId));
+  if(el)el.innerHTML=html;
+}
+
 async function startCam(videoId,key,cb){
+  // Stop any previous camera for this key
+  stopCam(key);
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    // iOS needs exact:false for facingMode
+    const constraints={video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}};
+    const stream=await navigator.mediaDevices.getUserMedia(constraints);
     const video=document.getElementById(videoId);
+    if(!video)return;
     video.srcObject=stream;
     readers[key]={stream,active:true};
+
     if('BarcodeDetector' in window){
-      const det=new BarcodeDetector({formats:['ean_13','ean_8','qr_code','code_128','code_39','upc_a','upc_e']});
-      async function scan(){
+      // ── Native BarcodeDetector (Android Chrome, desktop Chrome) ──
+      let fmts=['ean_13','ean_8','qr_code','code_128','code_39','upc_a','upc_e'];
+      try{const sup=await BarcodeDetector.getSupportedFormats();if(sup.length)fmts=fmts.filter(f=>sup.includes(f));}catch(e){}
+      const det=new BarcodeDetector({formats:fmts.length?fmts:['ean_13','code_128']});
+      const scan=async()=>{
         if(!readers[key]?.active)return;
-        try{if(video.readyState>=2){const r=await det.detect(video);if(r.length)cb(r[0].rawValue);}}catch(e){}
+        try{
+          if(video.readyState>=2){
+            const r=await det.detect(video);
+            if(r.length)cb(r[0].rawValue);
+          }
+        }catch(e){}
         if(readers[key]?.active)requestAnimationFrame(scan);
+      };
+      const start=()=>scan();
+      if(video.readyState>=2)start();
+      else video.addEventListener('loadeddata',start,{once:true});
+
+    }else if(typeof ZXingBrowser!=='undefined'){
+      // ── ZXing fallback (iOS Safari, Firefox, etc.) ──
+      const hints=new Map();
+      // Allow extra time between scans on iOS
+      const zxing=new ZXingBrowser.BrowserMultiFormatReader(hints,{delayBetweenScanAttempts:300,delayBetweenScanSuccess:1500});
+      readers[key].zxing=zxing;
+      // ZXing decodeFromStream attaches to the video element
+      try{
+        await zxing.decodeFromStream(stream,video,(result,err)=>{
+          if(result&&readers[key]?.active)cb(result.getText());
+        });
+      }catch(e){
+        // decodeFromStream may throw on iOS if stream already playing
+        try{
+          zxing.decodeFromVideoElement(video,(result,err)=>{
+            if(result&&readers[key]?.active)cb(result.getText());
+          });
+        }catch(e2){}
       }
-      video.onloadeddata=()=>scan();
-      if(video.readyState>=2)scan();
+
     }else{
-      const resId=videoId==='qc-video'?'qc-res':'scan-res';
-      document.getElementById(resId).innerHTML='<span style="color:var(--yellow)">⚠️ Bu tarayıcıda otomatik barkod tespiti desteklenmiyor. Barkod numarasını manuel girin.</span>';
+      showCamMsg(videoId,'<span style="color:var(--yellow)">⚠️ Barkod tarayıcı bu tarayıcıda desteklenmiyor. Lütfen Chrome kullanın.</span>');
     }
   }catch(err){
-    const resId=videoId==='qc-video'?'qc-res':'scan-res';
-    const el=document.getElementById(resId);
-    if(el)el.innerHTML='<span style="color:var(--red)">❌ Kamera erişimi reddedildi veya kamera bulunamadı.</span>';
+    const msg=err.name==='NotAllowedError'
+      ?'<span style="color:var(--red)">❌ Kamera izni reddedildi. Tarayıcı ayarlarından izin verin.</span>'
+      :'<span style="color:var(--red)">❌ Kamera açılamadı: '+err.message+'</span>';
+    showCamMsg(videoId,msg);
   }
 }
 function stopCam(key){
   if(!readers[key])return;
   readers[key].active=false;
-  if(readers[key].stream)readers[key].stream.getTracks().forEach(t=>t.stop());
+  // Stop ZXing reader
+  if(readers[key].zxing){
+    try{readers[key].zxing.reset();}catch(e){}
+  }
+  // Stop media stream tracks
+  if(readers[key].stream){
+    try{readers[key].stream.getTracks().forEach(t=>t.stop());}catch(e){}
+  }
+  // Clear video source
+  try{
+    const video=document.querySelector(`[id$="${key}-video"]`);
+    if(video){video.srcObject=null;}
+  }catch(e){}
   delete readers[key];
 }
 
@@ -1238,10 +1299,13 @@ function onStockinScan(code){
     document.getElementById('stockin-prod-min').textContent=p.min+' '+p.unit;
     document.getElementById('stockin-prod-unit').textContent=p.unit;
     const st=sst(p);
-    document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'D\u00FC\u015f\u00FCk Stok':'Kritik Stok'}</span>`;
+    document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'D\u00fc\u015f\u00fck Stok':'Kritik Stok'}</span>`;
     document.getElementById('stockin-prod-card').style.display='block';
     document.getElementById('stockin-notfound').style.display='none';
-    document.getElementById('stockin-qty').focus();
+    // ── Miktara odaklanıp seç, kullanıcı direkt yazıyor ──
+    const qtyEl=document.getElementById('stockin-qty');
+    qtyEl.value=1;
+    setTimeout(()=>{qtyEl.focus();qtyEl.select();},120);
   }else{
     stockinProdId=null;
     document.getElementById('stockin-prod-card').style.display='none';
