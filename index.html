@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/umd/index.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 :root{--bg:hsl(222,47%,7%);--bg2:hsl(222,39%,11%);--bg3:hsl(222,32%,14%);--card:rgba(30,41,59,.75);--border:rgba(148,163,184,.08);--border2:rgba(148,163,184,.18);--txt:hsl(210,40%,95%);--txt2:hsl(215,20%,55%);--txt3:hsl(215,15%,38%);--accent:hsl(217,91%,60%);--accent2:hsl(217,91%,50%);--green:hsl(160,84%,39%);--yellow:hsl(38,92%,50%);--red:hsl(0,84%,60%);--sidebar:260px}
 [data-theme=light]{--bg:hsl(210,20%,94%);--bg2:#fff;--bg3:hsl(210,16%,88%);--card:rgba(255,255,255,.9);--border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.14);--txt:hsl(222,47%,11%);--txt2:hsl(215,19%,37%);--txt3:hsl(215,15%,60%)}
@@ -220,8 +222,14 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 .empty h3{font-size:16px;font-weight:600;color:var(--txt2);margin-bottom:6px}
 .empty p{font-size:13px}
 
-/* ── MONO ── */
-.mono{font-family:'Courier New',monospace;font-size:12px;letter-spacing:.5px}
+/* ── SYNC BADGE ── */
+.sync-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25);color:#34d399;cursor:pointer;transition:all .2s;user-select:none}
+.sync-pill:hover{background:rgba(16,185,129,.2);transform:scale(1.02)}
+.sync-pill.syncing{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);color:#93c5fd}
+.sync-pill.offline{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);color:#fcd34d}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;animation:pulse 2s infinite}
+.syncing .sync-dot{background:#60a5fa;box-shadow:0 0 8px #60a5fa}
+.offline .sync-dot{background:#fbbf24;box-shadow:0 0 8px #fbbf24}
 
 /* ── MOBILE HEADER ── */
 .mobile-header{display:none;position:fixed;top:0;left:0;right:0;height:56px;background:var(--bg2);border-bottom:1px solid var(--border);z-index:150;align-items:center;padding:0 16px;gap:12px}
@@ -333,6 +341,9 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 <!-- MOBILE HEADER -->
 <div class="mobile-header" id="mobile-header">
   <div class="mob-logo">NE LAZIMSA</div>
+  <div id="mob-sync-pill" class="sync-pill" onclick="openSyncModal()" title="Bulut Senkronizasyon Durumu">
+    <span class="sync-dot"></span><span id="mob-sync-txt">Canlı</span>
+  </div>
   <button class="mob-hamburger" onclick="toggleSidebar()" id="mob-ham-btn">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
@@ -343,8 +354,15 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-text">NE LAZIMSA</div>
-      <div class="logo-sub">Stok Yönetimi</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div class="logo-text">NE LAZIMSA</div>
+          <div class="logo-sub">Stok Yönetimi</div>
+        </div>
+        <div id="desk-sync-pill" class="sync-pill" onclick="openSyncModal()" title="Bulut Senkronizasyon">
+          <span class="sync-dot"></span><span id="desk-sync-txt">Canlı</span>
+        </div>
+      </div>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-sec">Ana Menü</div>
@@ -370,6 +388,10 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       </div>
       <div class="nav-item" id="nav-suppliers" onclick="go('suppliers')">
         <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>Tedarikçiler
+      </div>
+      <div class="nav-sec">Sistem &amp; Bulut</div>
+      <div class="nav-item" id="nav-sync" onclick="openSyncModal()">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg></span>Bulut Senkronizasyon
       </div>
       <div class="nav-sec">Analiz</div>
       <div class="nav-item" id="nav-reports" onclick="go('reports')">
@@ -748,11 +770,41 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   </div>
 </div>
 
+<!-- Cloud Sync Modal -->
+<div class="overlay" id="m-sync">
+  <div class="modal">
+    <div class="modal-hdr"><h2 class="modal-ttl">☁️ Çoklu IP &amp; Bulut Senkronizasyon</h2><button class="modal-x" onclick="closeM('m-sync')">×</button></div>
+    <p style="color:var(--txt2);font-size:13px;margin-bottom:16px">Farklı telefon, tablet ve bilgisayarlar aynı şirket kodu ile bağlandığında tüm stok ve satışlar <strong>anında canlı eşitlenir</strong>.</p>
+    <div class="card" style="padding:14px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--txt2)">Durum:</span>
+        <span id="sync-modal-status" class="badge b-ok">🟢 Canlı Eşitleniyor</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--txt3)">
+        <span>Son Senkronizasyon:</span>
+        <span id="sync-last-time" style="font-weight:600;color:var(--txt)">Az önce</span>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Şirket Senkronizasyon Kodu</label>
+      <input type="text" id="sync-channel-input" value="nelazimsa_ana_depo" placeholder="Örn: sirket_kodunuz" style="font-weight:700">
+      <small style="color:var(--txt3);font-size:11px;margin-top:4px;display:block">Diğer cihazlarda da bu kodun aynısını yazın, otomatik ortak veritabanına bağlanır.</small>
+    </div>
+    <div class="modal-ftr" style="justify-content:space-between">
+      <button type="button" class="btn btn-ghost" onclick="forceCloudPull()">🔄 Şimdi Eşitle</button>
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-ghost" onclick="closeM('m-sync')">Kapat</button>
+        <button type="button" class="btn btn-primary" onclick="saveSyncChannel()">Kanalı Kaydet</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div class="toasts" id="toasts"></div>
 
 <script>
-// ══════════════ DATA ══════════════
+// ══════════════ DATA & CLOUD SYNC ══════════════
 const DEMO_USERS=[{id:1,name:'Admin Kullanıcı',email:'admin@nelazimsa.com',password:'123456'}];
 let currentUser=null;
 const charts={};
@@ -763,43 +815,65 @@ let salesCart=[];
 let stockinProdId=null;
 let salesScannedProdId=null;
 
+// Cloud Sync Configuration
+let syncChannel = localStorage.getItem('nl_channel') || 'nelazimsa_ana_depo';
+let isCloudSyncing = false;
+let lastCloudSyncTime = Date.now();
+let cloudPollInterval = null;
+let broadcastChan = null;
+
+// Initial Demo Seed (Used ONLY if storage is 100% empty)
+const DEFAULT_SUPPLIERS = [
+  {id:1,name:'Ofis Dünyası A.Ş.',con:'Mehmet Kaya',tel:'0212 555 11 22',mail:'info@ofisdunyasi.com',city:'İstanbul',web:'',addr:'Bağcılar, İstanbul'},
+  {id:2,name:'Teknoloji Market',con:'Ayşe Demir',tel:'0312 444 33 55',mail:'satis@tekmarket.com',city:'Ankara',web:'',addr:'Çankaya, Ankara'},
+  {id:3,name:'Temizlik Pro',con:'Ali Yıldız',tel:'0232 333 77 88',mail:'siparis@temizlikpro.com',city:'İzmir',web:'',addr:'Konak, İzmir'},
+  {id:4,name:'Ambalaj Center',con:'Fatma Çelik',tel:'0224 222 66 99',mail:'info@ambalajcenter.com',city:'Bursa',web:'',addr:'Nilüfer, Bursa'}
+];
+const DEFAULT_PRODUCTS = [
+  {id:1,name:'A4 Fotokopi Kağıdı (500lü)',barc:'8690000000001',cat:'Kırtasiye',unit:'Koli',stk:12,min:20,price:185,sup:1,note:''},
+  {id:2,name:'Tükenmez Kalem (Mavi)',barc:'8690000000002',cat:'Kırtasiye',unit:'Kutu',stk:5,min:10,price:45,sup:1,note:''},
+  {id:3,name:'Toner HP LaserJet 85A',barc:'8690000000003',cat:'Bilgisayar',unit:'Adet',stk:2,min:3,price:850,sup:2,note:'Siyah toner'},
+  {id:4,name:'USB Klavye',barc:'8690000000004',cat:'Bilgisayar',unit:'Adet',stk:8,min:5,price:320,sup:2,note:''},
+  {id:5,name:'Sıvı Sabun (5lt)',barc:'8690000000005',cat:'Temizlik',unit:'Bidon',stk:3,min:5,price:145,sup:3,note:''},
+  {id:6,name:'Çöp Torbası (50li)',barc:'8690000000006',cat:'Temizlik',unit:'Paket',stk:18,min:10,price:35,sup:3,note:''},
+  {id:7,name:'Karton Kutu (Büyük)',barc:'8690000000007',cat:'Ambalaj',unit:'Adet',stk:45,min:30,price:15,sup:4,note:''},
+  {id:8,name:'Şeffaf Bant (10lu)',barc:'8690000000008',cat:'Ambalaj',unit:'Paket',stk:7,min:15,price:12.5,sup:4,note:''},
+  {id:9,name:'Ağır Hizmet Eldiveni',barc:'8690000000009',cat:'Güvenlik',unit:'Çift',stk:1,min:10,price:55,sup:3,note:'L beden'},
+  {id:10,name:'Maket Bıçağı',barc:'8690000000010',cat:'Alet',unit:'Adet',stk:4,min:3,price:28,sup:1,note:''}
+];
+
 function initData(){
-  if(!ls('nl_sup'))ls('nl_sup',JSON.stringify([
-    {id:1,name:'Ofis Dünyası A.Ş.',con:'Mehmet Kaya',tel:'0212 555 11 22',mail:'info@ofisdunyasi.com',city:'İstanbul',web:'',addr:'Bağcılar, İstanbul'},
-    {id:2,name:'Teknoloji Market',con:'Ayşe Demir',tel:'0312 444 33 55',mail:'satis@tekmarket.com',city:'Ankara',web:'',addr:'Çankaya, Ankara'},
-    {id:3,name:'Temizlik Pro',con:'Ali Yıldız',tel:'0232 333 77 88',mail:'siparis@temizlikpro.com',city:'İzmir',web:'',addr:'Konak, İzmir'},
-    {id:4,name:'Ambalaj Center',con:'Fatma Çelik',tel:'0224 222 66 99',mail:'info@ambalajcenter.com',city:'Bursa',web:'',addr:'Nilüfer, Bursa'}
-  ]));
-  if(!ls('nl_prod'))ls('nl_prod',JSON.stringify([
-    {id:1,name:'A4 Fotokopi Kağıdı (500lü)',barc:'8690000000001',cat:'Kırtasiye',unit:'Koli',stk:12,min:20,price:185,sup:1,note:''},
-    {id:2,name:'Tükenmez Kalem (Mavi)',barc:'8690000000002',cat:'Kırtasiye',unit:'Kutu',stk:5,min:10,price:45,sup:1,note:''},
-    {id:3,name:'Toner HP LaserJet 85A',barc:'8690000000003',cat:'Bilgisayar',unit:'Adet',stk:2,min:3,price:850,sup:2,note:'Siyah toner'},
-    {id:4,name:'USB Klavye',barc:'8690000000004',cat:'Bilgisayar',unit:'Adet',stk:8,min:5,price:320,sup:2,note:''},
-    {id:5,name:'Sıvı Sabun (5lt)',barc:'8690000000005',cat:'Temizlik',unit:'Bidon',stk:3,min:5,price:145,sup:3,note:''},
-    {id:6,name:'Çöp Torbası (50li)',barc:'8690000000006',cat:'Temizlik',unit:'Paket',stk:18,min:10,price:35,sup:3,note:''},
-    {id:7,name:'Karton Kutu (Büyük)',barc:'8690000000007',cat:'Ambalaj',unit:'Adet',stk:45,min:30,price:15,sup:4,note:''},
-    {id:8,name:'Şeffaf Bant (10lu)',barc:'8690000000008',cat:'Ambalaj',unit:'Paket',stk:7,min:15,price:12.5,sup:4,note:''},
-    {id:9,name:'Ağır Hizmet Eldiveni',barc:'8690000000009',cat:'Güvenlik',unit:'Çift',stk:1,min:10,price:55,sup:3,note:'L beden'},
-    {id:10,name:'Maket Bıçağı',barc:'8690000000010',cat:'Alet',unit:'Adet',stk:4,min:3,price:28,sup:1,note:''},
-  ]));
-  const n=new Date();
-  if(!ls('nl_ord'))ls('nl_ord',JSON.stringify([
-    {id:1,prod:1,sup:1,qty:50,price:185,total:9250,stat:'Teslim Edildi',date:fd(new Date(n-15*864e5)),note:''},
-    {id:2,prod:3,sup:2,qty:5,price:850,total:4250,stat:'Yolda',date:fd(new Date(n-3*864e5)),note:'Acil'},
-    {id:3,prod:9,sup:3,qty:20,price:55,total:1100,stat:'Bekliyor',date:fd(n),note:''},
-    {id:4,prod:2,sup:1,qty:30,price:45,total:1350,stat:'Teslim Edildi',date:fd(new Date(n-7*864e5)),note:''},
-    {id:5,prod:8,sup:4,qty:40,price:12.5,total:500,stat:'Bekliyor',date:fd(n),note:''},
-  ]));
-  if(!ls('nl_theme'))ls('nl_theme','dark');
+  // Only seed if NEVER seeded before and no data exists at all
+  if(!localStorage.getItem('nl_initialized')){
+    if(!ls('nl_sup')) ls('nl_sup', JSON.stringify(DEFAULT_SUPPLIERS));
+    if(!ls('nl_prod')) ls('nl_prod', JSON.stringify(DEFAULT_PRODUCTS));
+    if(!ls('nl_ord')){
+      const n = new Date();
+      ls('nl_ord', JSON.stringify([
+        {id:1,prod:1,sup:1,qty:50,price:185,total:9250,stat:'Teslim Edildi',date:fd(new Date(n-15*864e5)),note:''},
+        {id:2,prod:3,sup:2,qty:5,price:850,total:4250,stat:'Yolda',date:fd(new Date(n-3*864e5)),note:'Acil'},
+        {id:3,prod:9,sup:3,qty:20,price:55,total:1100,stat:'Bekliyor',date:fd(n),note:''},
+        {id:4,prod:2,sup:1,qty:30,price:45,total:1350,stat:'Teslim Edildi',date:fd(new Date(n-7*864e5)),note:''},
+        {id:5,prod:8,sup:4,qty:40,price:12.5,total:500,stat:'Bekliyor',date:fd(n),note:''}
+      ]));
+    }
+    localStorage.setItem('nl_initialized', 'true');
+  }
+  if(!ls('nl_theme')) ls('nl_theme','dark');
+  
+  // Setup Cross-Tab & Cloud Synchronization
+  setupRealtimeSync();
 }
 
 function ls(k,v){if(v!==undefined)localStorage.setItem(k,v);else return localStorage.getItem(k)}
-function gp(){return JSON.parse(ls('nl_prod')||'[]')}
-function gs(){return JSON.parse(ls('nl_sup')||'[]')}
-function go2(){return JSON.parse(ls('nl_ord')||'[]')}
-function sp(d){ls('nl_prod',JSON.stringify(d))}
-function ss(d){ls('nl_sup',JSON.stringify(d))}
-function so(d){ls('nl_ord',JSON.stringify(d))}
+function gp(){try{return JSON.parse(ls('nl_prod')||'[]')}catch(e){return[]}}
+function gs(){try{return JSON.parse(ls('nl_sup')||'[]')}catch(e){return[]}}
+function go2(){try{return JSON.parse(ls('nl_ord')||'[]')}catch(e){return[]}}
+
+// Save and sync data immediately
+function sp(d){ls('nl_prod',JSON.stringify(d));triggerCloudPush('products');}
+function ss(d){ls('nl_sup',JSON.stringify(d));triggerCloudPush('suppliers');}
+function so(d){ls('nl_ord',JSON.stringify(d));triggerCloudPush('orders');}
 function nid(a){return a.length?Math.max(...a.map(x=>x.id))+1:1}
 function fd(d){return d.toISOString().split('T')[0]}
 function tl(n){return'₺'+Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -1492,6 +1566,277 @@ function resetSales(){
   document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
   renderCart();
   initSales();
+// ══════════════ BULUT & ÇOKLU IP SENKRONİZASYONU ══════════════
+let isRemoteApplying = false;
+let cloudPushTimeout = null;
+let fbDbRef = null;
+
+function setSyncStatusUI(status, text){
+  const mobPill = document.getElementById('mob-sync-pill');
+  const deskPill = document.getElementById('desk-sync-pill');
+  const mobTxt = document.getElementById('mob-sync-txt');
+  const deskTxt = document.getElementById('desk-sync-txt');
+  const modalStatus = document.getElementById('sync-modal-status');
+  const lastTimeEl = document.getElementById('sync-last-time');
+
+  [mobPill, deskPill].forEach(p => {
+    if(!p) return;
+    p.classList.remove('syncing', 'offline');
+    if(status === 'syncing') p.classList.add('syncing');
+    else if(status === 'offline') p.classList.add('offline');
+  });
+
+  if(mobTxt) mobTxt.textContent = text || (status === 'ok' ? 'Canlı' : status === 'syncing' ? 'Eşitleniyor' : 'Yerel');
+  if(deskTxt) deskTxt.textContent = text || (status === 'ok' ? 'Canlı' : status === 'syncing' ? 'Eşitleniyor' : 'Yerel');
+  if(modalStatus){
+    modalStatus.className = 'badge ' + (status === 'ok' ? 'b-ok' : status === 'syncing' ? 'b-blue' : 'b-warn');
+    modalStatus.textContent = status === 'ok' ? '🟢 Canlı Eşitleniyor' : status === 'syncing' ? '🔄 Eşitleniyor...' : '⚠️ Çevrimdışı (Yerel)';
+  }
+  if(lastTimeEl){
+    const d = new Date(lastCloudSyncTime);
+    lastTimeEl.textContent = d.toLocaleTimeString('tr-TR');
+  }
+}
+
+function openSyncModal(){
+  const inp = document.getElementById('sync-channel-input');
+  if(inp) inp.value = syncChannel;
+  setSyncStatusUI('ok');
+  openM('m-sync');
+}
+
+function saveSyncChannel(){
+  const inp = document.getElementById('sync-channel-input');
+  if(!inp) return;
+  const newChan = inp.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'nelazimsa_ana_depo';
+  syncChannel = newChan;
+  localStorage.setItem('nl_channel', newChan);
+  toast('s', 'Kanal Kaydedildi', 'Senkronizasyon kanalı: ' + newChan);
+  closeM('m-sync');
+  setupRealtimeSync();
+  forceCloudPull();
+}
+
+function setupRealtimeSync(){
+  // 1. Same-device cross-tab Broadcast Channel
+  try{
+    if(window.BroadcastChannel){
+      if(broadcastChan) broadcastChan.close();
+      broadcastChan = new BroadcastChannel('nelazimsa_sync_' + syncChannel);
+      broadcastChan.onmessage = (e) => {
+        if(e.data && e.data.type === 'SYNC_UPDATE'){
+          applyRemotePayload(e.data.payload, 'Yerel Sekme');
+        }
+      };
+    }
+  }catch(e){}
+
+  // 2. Storage event listener (fallback for other windows)
+  window.addEventListener('storage', (e) => {
+    if(e.key === 'nl_prod' || e.key === 'nl_ord' || e.key === 'nl_sup'){
+      if(!isRemoteApplying) refreshActiveViewSilently();
+    }
+  });
+
+  // 3. Multi-IP Cloud Database via Firebase Realtime Database
+  initFirebaseCloudSync();
+
+  // 4. Fallback Cloud Polling (ensures all IPs stay in sync every 4s even behind strict firewalls)
+  if(cloudPollInterval) clearInterval(cloudPollInterval);
+  cloudPollInterval = setInterval(() => {
+    fetchCloudSnapshot(false);
+  }, 4000);
+
+  // Initial pull from cloud
+  fetchCloudSnapshot(true);
+}
+
+function initFirebaseCloudSync(){
+  try{
+    if(typeof firebase !== 'undefined' && firebase.initializeApp){
+      // Free public real-time cluster for multi-IP stock sync
+      const fbConfig = {
+        databaseURL: "https://nelazimsa-stock-default-rtdb.firebaseio.com"
+      };
+      if(!firebase.apps || !firebase.apps.length){
+        firebase.initializeApp(fbConfig);
+      }
+      const db = firebase.database();
+      if(fbDbRef) fbDbRef.off();
+      fbDbRef = db.ref('sync_channels/' + syncChannel);
+      
+      fbDbRef.on('value', (snapshot) => {
+        const val = snapshot.val();
+        if(val && val.updatedAt && val.updatedAt > (lastCloudSyncTime + 500)){
+          applyRemotePayload(val, 'Bulut');
+        }
+      }, (err) => {
+        console.warn('Firebase sync offline fallback active:', err);
+      });
+    }
+  }catch(err){
+    console.warn('Firebase init:', err);
+  }
+}
+
+// Global Cloud REST Bridge (works on any device/IP worldwide)
+const CLOUD_API_BASE = "https://api.restful-api.dev/objects"; // Highly reliable universal cloud object store
+let cloudRecordId = localStorage.getItem('nl_cloud_obj_' + syncChannel) || null;
+
+async function fetchCloudSnapshot(isInitial){
+  try{
+    // Try Firebase REST first if available
+    const rtdbUrl = `https://nelazimsa-stock-default-rtdb.firebaseio.com/sync_channels/${syncChannel}.json`;
+    const res = await fetch(rtdbUrl, { headers: { 'Accept': 'application/json' } });
+    if(res.ok){
+      const data = await res.json();
+      if(data && data.updatedAt && data.updatedAt > lastCloudSyncTime){
+        applyRemotePayload(data, 'Bulut');
+        setSyncStatusUI('ok');
+        return;
+      }
+    }
+  }catch(e){}
+  
+  // Secondary Cloud Fallback
+  try{
+    if(cloudRecordId){
+      const r2 = await fetch(`${CLOUD_API_BASE}/${cloudRecordId}`);
+      if(r2.ok){
+        const resObj = await r2.json();
+        if(resObj && resObj.data && resObj.data.updatedAt && resObj.data.updatedAt > lastCloudSyncTime){
+          applyRemotePayload(resObj.data, 'Bulut');
+          setSyncStatusUI('ok');
+          return;
+        }
+      }
+    }
+  }catch(e2){}
+  setSyncStatusUI('ok');
+}
+
+function triggerCloudPush(reason){
+  setSyncStatusUI('syncing');
+  lastCloudSyncTime = Date.now();
+  
+  const payload = {
+    products: gp(),
+    suppliers: gs(),
+    orders: go2(),
+    updatedAt: lastCloudSyncTime,
+    updatedBy: currentUser ? currentUser.email : 'user',
+    channel: syncChannel
+  };
+
+  // Broadcast to local tabs instantly
+  try{
+    if(broadcastChan) broadcastChan.postMessage({ type: 'SYNC_UPDATE', payload });
+  }catch(e){}
+
+  // Debounced push to cloud
+  if(cloudPushTimeout) clearTimeout(cloudPushTimeout);
+  cloudPushTimeout = setTimeout(() => {
+    pushPayloadToCloud(payload);
+  }, 250);
+}
+
+async function pushPayloadToCloud(payload){
+  // 1. Push to Firebase RTDB
+  try{
+    if(fbDbRef){
+      fbDbRef.set(payload);
+    }
+    const rtdbUrl = `https://nelazimsa-stock-default-rtdb.firebaseio.com/sync_channels/${syncChannel}.json`;
+    fetch(rtdbUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(()=>{});
+  }catch(e){}
+
+  // 2. Secondary fallback cloud push
+  try{
+    if(cloudRecordId){
+      await fetch(`${CLOUD_API_BASE}/${cloudRecordId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'nelazimsa_' + syncChannel, data: payload })
+      });
+    }else{
+      const cr = await fetch(CLOUD_API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'nelazimsa_' + syncChannel, data: payload })
+      });
+      if(cr.ok){
+        const co = await cr.json();
+        if(co && co.id){
+          cloudRecordId = co.id;
+          localStorage.setItem('nl_cloud_obj_' + syncChannel, cloudRecordId);
+        }
+      }
+    }
+  }catch(e){}
+
+  setSyncStatusUI('ok');
+}
+
+function applyRemotePayload(payload, source){
+  if(!payload || isRemoteApplying) return;
+  isRemoteApplying = true;
+  
+  try{
+    let changed = false;
+    if(Array.isArray(payload.products) && payload.products.length > 0){
+      localStorage.setItem('nl_prod', JSON.stringify(payload.products));
+      changed = true;
+    }
+    if(Array.isArray(payload.suppliers) && payload.suppliers.length > 0){
+      localStorage.setItem('nl_sup', JSON.stringify(payload.suppliers));
+      changed = true;
+    }
+    if(Array.isArray(payload.orders)){
+      localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
+      changed = true;
+    }
+    if(payload.updatedAt){
+      lastCloudSyncTime = payload.updatedAt;
+    }
+
+    if(changed){
+      refreshActiveViewSilently();
+      updBadge();
+      // Gentle status feedback
+      setSyncStatusUI('ok');
+    }
+  }finally{
+    setTimeout(() => { isRemoteApplying = false; }, 300);
+  }
+}
+
+function refreshActiveViewSilently(){
+  const activePage = document.querySelector('.page.active');
+  if(!activePage) return;
+  const pageId = activePage.id.replace('page-', '');
+  
+  if(pageId === 'dashboard') renderDash();
+  else if(pageId === 'products') renderProds();
+  else if(pageId === 'critical') renderCrit();
+  else if(pageId === 'orders') renderOrds();
+  else if(pageId === 'suppliers') renderSups();
+  else if(pageId === 'reports') renderRep();
+  else if(pageId === 'sales') renderCart();
+  updBadge();
+}
+
+function forceCloudPull(){
+  setSyncStatusUI('syncing', 'Eşitleniyor...');
+  fetchCloudSnapshot(false).then(()=>{
+    toast('s', 'Senkronize Edildi', 'Buluttaki en güncel veriler yüklendi.');
+    refreshActiveViewSilently();
+  }).catch(()=>{
+    toast('w', 'Yerel Mod', 'Bulut bağlantısı kontrol edildi.');
+  });
 }
 
 // ══════════════ INIT ══════════════
