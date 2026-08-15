@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/umd/index.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:hsl(222,47%,7%);--bg2:hsl(222,39%,11%);--bg3:hsl(222,32%,14%);--card:rgba(30,41,59,.75);--border:rgba(148,163,184,.08);--border2:rgba(148,163,184,.18);--txt:hsl(210,40%,95%);--txt2:hsl(215,20%,55%);--txt3:hsl(215,15%,38%);--accent:hsl(217,91%,60%);--accent2:hsl(217,91%,50%);--green:hsl(160,84%,39%);--yellow:hsl(38,92%,50%);--red:hsl(0,84%,60%);--sidebar:260px}
 [data-theme=light]{--bg:hsl(210,20%,94%);--bg2:#fff;--bg3:hsl(210,16%,88%);--card:rgba(255,255,255,.9);--border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.14);--txt:hsl(222,47%,11%);--txt2:hsl(215,19%,37%);--txt3:hsl(215,15%,60%)}
@@ -770,11 +771,17 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   </div>
 </div>
 
-<!-- Cloud Sync Modal (Google Firebase) -->
+<!-- Cloud Sync Modal (Supabase & Firebase) -->
 <div class="overlay" id="m-sync">
   <div class="modal modal-lg">
-    <div class="modal-hdr"><h2 class="modal-ttl">🔥 Google Firebase Canlı Senkronizasyon</h2><button class="modal-x" onclick="closeM('m-sync')">×</button></div>
+    <div class="modal-hdr"><h2 class="modal-ttl">☁️ Canlı Bulut Senkronizasyon</h2><button class="modal-x" onclick="closeM('m-sync')">×</button></div>
     
+    <!-- Provider Switch Tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;background:var(--bg);padding:4px;border-radius:10px;border:1px solid var(--border2)">
+      <button type="button" class="btn btn-sm" id="tab-btn-supabase" onclick="switchSyncTab('supabase')" style="flex:1;justify-content:center;background:var(--accent);color:#fff">⚡ Supabase (PostgreSQL)</button>
+      <button type="button" class="btn btn-sm btn-ghost" id="tab-btn-firebase" onclick="switchSyncTab('firebase')" style="flex:1;justify-content:center">🔥 Google Firebase</button>
+    </div>
+
     <div class="card" style="padding:14px;margin-bottom:16px;background:var(--bg3)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:13px;font-weight:600">Bağlantı Durumu:</span>
@@ -790,34 +797,66 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       </div>
     </div>
 
-    <div class="fg">
-      <label>1. Firebase Realtime Database URL veya Config JSON</label>
-      <textarea id="firebase-config-input" rows="4" placeholder='Örn: https://proje-id-default-rtdb.firebaseio.com veya { "apiKey": "...", "databaseURL": "...", "projectId": "..." }' style="font-family:monospace;font-size:12px"></textarea>
-      <small style="color:var(--txt3);font-size:11px;margin-top:4px;display:block">Firebase konsolunuzdaki Realtime Database URL'sini veya Web App config objesini buraya yapıştırmanız yeterlidir.</small>
+    <!-- 1. SUPABASE PANEL -->
+    <div id="sync-panel-supabase">
+      <div class="form-row">
+        <div class="fg">
+          <label>Project URL</label>
+          <input type="text" id="sb-url-input" placeholder="https://xyzcompany.supabase.co">
+        </div>
+        <div class="fg">
+          <label>Anon Public Key</label>
+          <input type="password" id="sb-key-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Şirket / Depo Kanal Kodu</label>
+        <input type="text" id="sb-channel-input" value="ana_depo" placeholder="ana_depo" style="font-weight:700">
+      </div>
+
+      <!-- Supabase Quick SQL Guide -->
+      <details style="margin-top:10px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:12px">
+        <summary style="font-size:12px;font-weight:700;color:var(--green);cursor:pointer">📖 Supabase 1 Dakikada Kurulum (SQL Tablosu)</summary>
+        <p style="font-size:12px;color:var(--txt2);margin:8px 0 4px">Supabase panelinizde <strong>SQL Editor</strong> sayfasına girip şu kodu yapıştırıp <strong>RUN</strong>'a basın:</p>
+        <pre style="background:var(--bg);padding:10px;border-radius:8px;font-size:11px;color:#a7f3d0;overflow-x:auto;user-select:all"><code>create table if not exists public.company_inventory (
+  channel text primary key,
+  products jsonb default '[]'::jsonb,
+  suppliers jsonb default '[]'::jsonb,
+  orders jsonb default '[]'::jsonb,
+  updated_at bigint,
+  updated_by text
+);
+alter publication supabase_realtime add table public.company_inventory;
+alter table public.company_inventory enable row level security;
+create policy "Allow all" on public.company_inventory for all using (true) with check (true);</code></pre>
+      </details>
     </div>
 
-    <div class="fg">
-      <label>2. Şirket / Depo Kanal Kodu</label>
-      <input type="text" id="sync-channel-input" value="ana_depo" placeholder="Örn: ana_depo veya sube_1" style="font-weight:700">
-      <small style="color:var(--txt3);font-size:11px;margin-top:4px;display:block">Tüm telefon ve bilgisayarlarınızda bu kod aynı olduğunda tüm cihazlar tek bir ortak veritabanına bağlanır.</small>
+    <!-- 2. FIREBASE PANEL -->
+    <div id="sync-panel-firebase" style="display:none">
+      <div class="fg">
+        <label>Firebase Realtime Database URL veya Config</label>
+        <textarea id="firebase-config-input" rows="3" placeholder='https://proje-id-default-rtdb.firebaseio.com' style="font-family:monospace;font-size:12px"></textarea>
+      </div>
+      <div class="fg">
+        <label>Şirket / Depo Kanal Kodu</label>
+        <input type="text" id="fb-channel-input" value="ana_depo" placeholder="ana_depo" style="font-weight:700">
+      </div>
+      <details style="margin-top:10px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px">
+        <summary style="font-size:12px;font-weight:700;color:var(--accent);cursor:pointer">📖 Firebase Kurulum Adımları</summary>
+        <ol style="margin-top:8px;margin-left:18px;font-size:12px;color:var(--txt2);line-height:1.5">
+          <li><strong><a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">console.firebase.google.com</a></strong> &rarr; Realtime Database &rarr; Create Database.</li>
+          <li>Rules sekmesinde: <code>{ "rules": { ".read": true, ".write": true } }</code> yayınlayın.</li>
+          <li>URL'yi buraya yapıştırın.</li>
+        </ol>
+      </details>
     </div>
-
-    <!-- Hızlı Kurulum Rehberi -->
-    <details style="margin-top:14px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px">
-      <summary style="font-size:12px;font-weight:700;color:var(--accent);cursor:pointer">📖 2 Dakikada Ücretsiz Firebase Nasıl Kurulur? (Adım Adım)</summary>
-      <ol style="margin-top:10px;margin-left:18px;font-size:12px;color:var(--txt2);line-height:1.6">
-        <li><strong><a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">console.firebase.google.com</a></strong> adresine gidin ve <em>"Proje Oluştur"</em> deyin.</li>
-        <li>Sol menüden <strong>Build (Oluştur) &rarr; Realtime Database</strong> seçip <em>"Create Database"</em> butonuna tıklayın.</li>
-        <li>Kurallar (Rules) sekmesinde okuma/yazmayı açın: <code>{ "rules": { ".read": true, ".write": true } }</code> ve Yayınla deyin.</li>
-        <li>Veritabanının en üstünde yer alan <code>https://proje-id-default-rtdb.firebaseio.com</code> bağlantısını kopyalayıp yukarıdaki kutuya yapıştırın ve <strong>"Bağlan ve Senkronize Et"</strong> butonuna basın.</li>
-      </ol>
-    </details>
 
     <div class="modal-ftr" style="justify-content:space-between;margin-top:18px">
-      <button type="button" class="btn btn-ghost" onclick="testAndPullFirebase()">🔄 Şimdi Test Et &amp; Eşitle</button>
+      <button type="button" class="btn btn-ghost" onclick="testAndPullCloud()">🔄 Şimdi Test Et &amp; Eşitle</button>
       <div class="flex gap-2">
         <button type="button" class="btn btn-ghost" onclick="closeM('m-sync')">Kapat</button>
-        <button type="button" class="btn btn-primary" onclick="saveFirebaseConfig()">💾 Bağlan ve Kaydet</button>
+        <button type="button" class="btn btn-primary" onclick="saveCloudConfig()">💾 Bağlan ve Kaydet</button>
       </div>
     </div>
   </div>
@@ -1591,22 +1630,40 @@ function resetSales(){
   initSales();
 }
 
-// ══════════════ GOOGLE FIREBASE CANLI SENKRONİZASYONU ══════════════
+// ══════════════ CANLI BULUT SENKRONİZASYONU (SUPABASE & FIREBASE) ══════════════
+let syncProvider = localStorage.getItem('nl_sync_provider') || 'supabase';
 let isRemoteApplying = false;
 let cloudPushTimeout = null;
+
+// Supabase Handles
+let sbClient = null;
+let sbChannelSub = null;
+let isSupabaseConnected = false;
+
+// Firebase Handles
 let fbApp = null;
 let fbDb = null;
 let fbSyncRef = null;
 let isFirebaseConnected = false;
 
-function getSavedFirebaseConfig(){
-  const saved = localStorage.getItem('nl_firebase_config');
-  if(!saved) return null;
-  try{
-    if(saved.startsWith('{')) return JSON.parse(saved);
-    if(saved.startsWith('http')) return { databaseURL: saved };
-  }catch(e){}
-  return null;
+function switchSyncTab(provider){
+  syncProvider = provider;
+  const btnSb = document.getElementById('tab-btn-supabase');
+  const btnFb = document.getElementById('tab-btn-firebase');
+  const panSb = document.getElementById('sync-panel-supabase');
+  const panFb = document.getElementById('sync-panel-firebase');
+
+  if(provider === 'supabase'){
+    if(btnSb) { btnSb.style.background = 'var(--accent)'; btnSb.style.color = '#fff'; btnSb.classList.remove('btn-ghost'); }
+    if(btnFb) { btnFb.style.background = 'transparent'; btnFb.style.color = 'var(--txt2)'; btnFb.classList.add('btn-ghost'); }
+    if(panSb) panSb.style.display = 'block';
+    if(panFb) panFb.style.display = 'none';
+  } else {
+    if(btnFb) { btnFb.style.background = 'var(--accent)'; btnFb.style.color = '#fff'; btnFb.classList.remove('btn-ghost'); }
+    if(btnSb) { btnSb.style.background = 'transparent'; btnSb.style.color = 'var(--txt2)'; btnSb.classList.add('btn-ghost'); }
+    if(panFb) panFb.style.display = 'block';
+    if(panSb) panSb.style.display = 'none';
+  }
 }
 
 function setSyncStatusUI(status, text){
@@ -1618,7 +1675,7 @@ function setSyncStatusUI(status, text){
   const lastTimeEl = document.getElementById('sync-last-time');
   const activeChanEl = document.getElementById('sync-active-chan');
 
-  if(activeChanEl) activeChanEl.textContent = syncChannel;
+  if(activeChanEl) activeChanEl.textContent = syncChannel + ' (' + (syncProvider === 'supabase' ? 'Supabase' : 'Firebase') + ')';
 
   [mobPill, deskPill].forEach(p => {
     if(!p) return;
@@ -1632,7 +1689,8 @@ function setSyncStatusUI(status, text){
   if(deskTxt) deskTxt.textContent = displayTxt;
   if(modalStatus){
     modalStatus.className = 'badge ' + (status === 'ok' ? 'b-ok' : status === 'syncing' ? 'b-blue' : 'b-warn');
-    modalStatus.textContent = status === 'ok' ? '🟢 Canlı Eşitleniyor (Firebase)' : status === 'syncing' ? '🔄 Eşitleniyor...' : '⚠️ Firebase Yapılandırılmadı';
+    const provName = syncProvider === 'supabase' ? 'Supabase' : 'Firebase';
+    modalStatus.textContent = status === 'ok' ? `🟢 Canlı Eşitleniyor (${provName})` : status === 'syncing' ? '🔄 Eşitleniyor...' : `⚠️ ${provName} Yapılandırılmadı`;
   }
   if(lastTimeEl){
     const d = new Date(lastCloudSyncTime);
@@ -1641,35 +1699,55 @@ function setSyncStatusUI(status, text){
 }
 
 function openSyncModal(){
-  const inpChan = document.getElementById('sync-channel-input');
-  const inpConf = document.getElementById('firebase-config-input');
-  if(inpChan) inpChan.value = syncChannel;
-  if(inpConf){
-    const saved = localStorage.getItem('nl_firebase_config');
-    if(saved) inpConf.value = saved;
-  }
-  setSyncStatusUI(isFirebaseConnected ? 'ok' : 'offline');
+  switchSyncTab(syncProvider);
+  const sbUrl = document.getElementById('sb-url-input');
+  const sbKey = document.getElementById('sb-key-input');
+  const sbChan = document.getElementById('sb-channel-input');
+  const fbConf = document.getElementById('firebase-config-input');
+  const fbChan = document.getElementById('fb-channel-input');
+
+  if(sbUrl) sbUrl.value = localStorage.getItem('nl_sb_url') || '';
+  if(sbKey) sbKey.value = localStorage.getItem('nl_sb_key') || '';
+  if(sbChan) sbChan.value = syncChannel;
+  if(fbConf) fbConf.value = localStorage.getItem('nl_firebase_config') || '';
+  if(fbChan) fbChan.value = syncChannel;
+
+  const isConn = (syncProvider === 'supabase' && isSupabaseConnected) || (syncProvider === 'firebase' && isFirebaseConnected);
+  setSyncStatusUI(isConn ? 'ok' : 'offline');
   openM('m-sync');
 }
 
-function saveFirebaseConfig(){
-  const inpConf = document.getElementById('firebase-config-input');
-  const inpChan = document.getElementById('sync-channel-input');
-  
-  if(inpChan){
-    const c = inpChan.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'ana_depo';
-    syncChannel = c;
-    localStorage.setItem('nl_channel', c);
+function saveCloudConfig(){
+  localStorage.setItem('nl_sync_provider', syncProvider);
+
+  if(syncProvider === 'supabase'){
+    const url = (document.getElementById('sb-url-input')?.value || '').trim();
+    const key = (document.getElementById('sb-key-input')?.value || '').trim();
+    const chan = (document.getElementById('sb-channel-input')?.value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'ana_depo';
+
+    if(!url || !key){
+      toast('w', 'Bilgi Eksik', 'Lütfen Supabase Project URL ve Anon Key giriniz.');
+      return;
+    }
+    syncChannel = chan;
+    localStorage.setItem('nl_channel', chan);
+    localStorage.setItem('nl_sb_url', url);
+    localStorage.setItem('nl_sb_key', key);
+    toast('s', 'Supabase Kaydedildi', 'Supabase veritabanına bağlanılıyor...');
+  } else {
+    const conf = (document.getElementById('firebase-config-input')?.value || '').trim();
+    const chan = (document.getElementById('fb-channel-input')?.value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'ana_depo';
+
+    if(!conf){
+      toast('w', 'Bilgi Eksik', 'Lütfen Firebase Database URL giriniz.');
+      return;
+    }
+    syncChannel = chan;
+    localStorage.setItem('nl_channel', chan);
+    localStorage.setItem('nl_firebase_config', conf);
+    toast('s', 'Firebase Kaydedildi', 'Firebase veritabanına bağlanılıyor...');
   }
 
-  const raw = (inpConf?.value || '').trim();
-  if(!raw){
-    toast('w', 'Bilgi Eksik', 'Lütfen Firebase Database URL veya Config JSON giriniz.');
-    return;
-  }
-
-  localStorage.setItem('nl_firebase_config', raw);
-  toast('s', 'Yapılandırma Kaydedildi', 'Firebase bağlantısı kuruluyor...');
   closeM('m-sync');
   setupRealtimeSync();
 }
@@ -1682,7 +1760,7 @@ function setupRealtimeSync(){
       broadcastChan = new BroadcastChannel('nelazimsa_sync_' + syncChannel);
       broadcastChan.onmessage = (e) => {
         if(e.data && e.data.type === 'SYNC_UPDATE'){
-          applyRemotePayload(e.data.payload, 'Yerel');
+          applyRemotePayload(e.data.payload, 'Yerel Sekme');
         }
       };
     }
@@ -1695,40 +1773,129 @@ function setupRealtimeSync(){
     }
   });
 
-  // 3. Connect to Firebase
-  initFirebase();
+  // 3. Connect to chosen cloud provider
+  if(syncProvider === 'supabase'){
+    initSupabase();
+  } else {
+    initFirebase();
+  }
 }
 
+// ── SUPABASE ENGINE ──
+async function initSupabase(){
+  const url = localStorage.getItem('nl_sb_url');
+  const key = localStorage.getItem('nl_sb_key');
+
+  if(!url || !key){
+    setSyncStatusUI('offline', 'Supabase Pasif');
+    return;
+  }
+
+  try{
+    if(typeof supabase === 'undefined'){
+      console.warn('Supabase SDK yüklenemedi.');
+      setSyncStatusUI('offline');
+      return;
+    }
+
+    if(sbChannelSub){
+      try{ sbClient?.removeChannel(sbChannelSub); }catch(e){}
+    }
+
+    sbClient = supabase.createClient(url, key);
+    setSyncStatusUI('syncing', 'Bağlanıyor');
+
+    // Subscribe to realtime Postgres changes
+    sbChannelSub = sbClient
+      .channel('inventory_sync_' + syncChannel)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_inventory', filter: `channel=eq.${syncChannel}` }, payload => {
+        isSupabaseConnected = true;
+        if(payload.new && payload.new.updated_at && payload.new.updated_at > (lastCloudSyncTime + 400)){
+          applyRemotePayload({
+            products: payload.new.products,
+            suppliers: payload.new.suppliers,
+            orders: payload.new.orders,
+            updatedAt: payload.new.updated_at,
+            updatedBy: payload.new.updated_by
+          }, 'Supabase');
+        }
+        setSyncStatusUI('ok', 'Canlı');
+      })
+      .subscribe((status) => {
+        if(status === 'SUBSCRIBED'){
+          isSupabaseConnected = true;
+          setSyncStatusUI('ok', 'Canlı');
+        }
+      });
+
+    // Initial pull
+    const { data, error } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
+    if(error){
+      console.warn('Supabase initial fetch:', error);
+      if(error.code === '42P01'){
+        toast('w', 'Tablo Eksik', 'Lütfen Supabase SQL Editor üzerinden tablo oluşturun.');
+      }
+    } else if(data){
+      isSupabaseConnected = true;
+      if(data.updated_at && data.updated_at > lastCloudSyncTime){
+        applyRemotePayload({
+          products: data.products,
+          suppliers: data.suppliers,
+          orders: data.orders,
+          updatedAt: data.updated_at,
+          updatedBy: data.updated_by
+        }, 'Supabase');
+      }
+      setSyncStatusUI('ok', 'Canlı');
+    } else {
+      // Initialize remote table with local seed
+      isSupabaseConnected = true;
+      triggerCloudPush('supabase_initial');
+      setSyncStatusUI('ok', 'Canlı');
+    }
+
+  }catch(err){
+    console.error('Supabase Init Error:', err);
+    isSupabaseConnected = false;
+    setSyncStatusUI('offline', 'Hata');
+  }
+}
+
+// ── FIREBASE ENGINE ──
 function initFirebase(){
-  const config = getSavedFirebaseConfig();
+  const saved = localStorage.getItem('nl_firebase_config');
+  let config = null;
+  if(saved){
+    try{
+      if(saved.startsWith('{')) config = JSON.parse(saved);
+      else if(saved.startsWith('http')) config = { databaseURL: saved };
+    }catch(e){}
+  }
+
   if(!config || !config.databaseURL){
-    setSyncStatusUI('offline', 'Bulut Pasif');
+    setSyncStatusUI('offline', 'Firebase Pasif');
     return;
   }
 
   try{
     if(typeof firebase === 'undefined'){
-      console.warn('Firebase SDK yüklenemedi.');
       setSyncStatusUI('offline');
       return;
     }
 
-    // Clean existing app if any
     if(fbApp){
       try{ fbApp.delete(); }catch(e){}
     }
 
-    const appName = 'nelazimsa_app_' + Date.now();
+    const appName = 'nelazimsa_fb_' + Date.now();
     fbApp = firebase.initializeApp(config, appName);
     fbDb = firebase.database(fbApp);
     
-    // Connect to company inventory node
     if(fbSyncRef) fbSyncRef.off();
     fbSyncRef = fbDb.ref('company_inventory/' + syncChannel);
 
     setSyncStatusUI('syncing', 'Bağlanıyor');
 
-    // Realtime Listener
     fbSyncRef.on('value', (snapshot) => {
       isFirebaseConnected = true;
       const data = snapshot.val();
@@ -1737,15 +1904,13 @@ function initFirebase(){
           applyRemotePayload(data, 'Firebase');
         }
       } else {
-        // Cloud is empty, push our local initial data to initialize cloud
         triggerCloudPush('initial_seed');
       }
       setSyncStatusUI('ok', 'Canlı');
     }, (error) => {
-      console.error('Firebase Realtime Error:', error);
+      console.error('Firebase Error:', error);
       isFirebaseConnected = false;
       setSyncStatusUI('offline', 'Hata');
-      toast('e', 'Bağlantı Hatası', 'Firebase kurallarını veya URL adresini kontrol edin.');
     });
 
   }catch(err){
@@ -1772,20 +1937,37 @@ function triggerCloudPush(reason){
     if(broadcastChan) broadcastChan.postMessage({ type: 'SYNC_UPDATE', payload });
   }catch(e){}
 
-  if(!isFirebaseConnected && !fbSyncRef) return;
-
   setSyncStatusUI('syncing');
 
-  // Debounced push to Firebase
   if(cloudPushTimeout) clearTimeout(cloudPushTimeout);
-  cloudPushTimeout = setTimeout(() => {
-    if(fbSyncRef){
-      fbSyncRef.set(payload)
-        .then(() => { setSyncStatusUI('ok'); })
-        .catch(err => {
-          console.error('Push error:', err);
-          setSyncStatusUI('offline', 'Yazma Hatası');
-        });
+  cloudPushTimeout = setTimeout(async () => {
+    // 1. Supabase Push
+    if(syncProvider === 'supabase' && sbClient){
+      try{
+        await sbClient.from('company_inventory').upsert({
+          channel: syncChannel,
+          products: payload.products,
+          suppliers: payload.suppliers,
+          orders: payload.orders,
+          updated_at: payload.updatedAt,
+          updated_by: payload.updatedBy
+        }, { onConflict: 'channel' });
+        setSyncStatusUI('ok');
+      }catch(err){
+        console.error('Supabase push error:', err);
+        setSyncStatusUI('offline', 'Yazma Hatası');
+      }
+    }
+
+    // 2. Firebase Push
+    if(syncProvider === 'firebase' && fbSyncRef){
+      try{
+        await fbSyncRef.set(payload);
+        setSyncStatusUI('ok');
+      }catch(err){
+        console.error('Firebase push error:', err);
+        setSyncStatusUI('offline', 'Yazma Hatası');
+      }
     }
   }, 200);
 }
@@ -1808,8 +1990,8 @@ function applyRemotePayload(payload, source){
       localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
       changed = true;
     }
-    if(payload.updatedAt){
-      lastCloudSyncTime = payload.updatedAt;
+    if(payload.updatedAt || payload.updated_at){
+      lastCloudSyncTime = payload.updatedAt || payload.updated_at;
     }
 
     if(changed){
@@ -1837,28 +2019,58 @@ function refreshActiveViewSilently(){
   updBadge();
 }
 
-function testAndPullFirebase(){
-  const conf = getSavedFirebaseConfig();
-  if(!conf || !conf.databaseURL){
-    toast('w', 'Ayar Yok', 'Önce Firebase Database URL girip kaydedin.');
-    return;
-  }
+async function testAndPullCloud(){
   setSyncStatusUI('syncing', 'Eşitleniyor...');
-  initFirebase();
-  if(fbSyncRef){
-    fbSyncRef.once('value').then(snap => {
-      const v = snap.val();
-      if(v){
-        applyRemotePayload(v, 'Manual');
-        toast('s', 'Bağlantı Başarılı', 'Firebase veritabanı başarıyla eşitlendi.');
+  
+  if(syncProvider === 'supabase'){
+    const url = localStorage.getItem('nl_sb_url');
+    const key = localStorage.getItem('nl_sb_key');
+    if(!url || !key){
+      toast('w', 'Ayar Yok', 'Önce Supabase URL ve Key giriniz.');
+      return;
+    }
+    await initSupabase();
+    if(sbClient){
+      const { data, error } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
+      if(error){
+        toast('e', 'Supabase Hatası', error.message);
+      } else if(data){
+        applyRemotePayload({
+          products: data.products,
+          suppliers: data.suppliers,
+          orders: data.orders,
+          updatedAt: data.updated_at,
+          updatedBy: data.updated_by
+        }, 'Supabase');
+        toast('s', 'Supabase Bağlandı', 'Veritabanı başarıyla senkronize edildi.');
       } else {
-        triggerCloudPush('manual_init');
-        toast('s', 'Bağlantı Başarılı', 'Veritabanı bağlandı ve yerel veriler buluta yüklendi.');
+        triggerCloudPush('init');
+        toast('s', 'Supabase Bağlandı', 'Tablo bağlandı ve ilk veriler yüklendi.');
       }
       setSyncStatusUI('ok');
-    }).catch(err => {
-      toast('e', 'Bağlantı Başarısız', err.message || 'Firebase erişimi engellendi.');
-    });
+    }
+  } else {
+    const saved = localStorage.getItem('nl_firebase_config');
+    if(!saved){
+      toast('w', 'Ayar Yok', 'Önce Firebase Database URL giriniz.');
+      return;
+    }
+    initFirebase();
+    if(fbSyncRef){
+      fbSyncRef.once('value').then(snap => {
+        const v = snap.val();
+        if(v){
+          applyRemotePayload(v, 'Firebase');
+          toast('s', 'Firebase Bağlandı', 'Veritabanı başarıyla eşitlendi.');
+        } else {
+          triggerCloudPush('init');
+          toast('s', 'Firebase Bağlandı', 'Veritabanı bağlandı ve ilk veriler yüklendi.');
+        }
+        setSyncStatusUI('ok');
+      }).catch(err => {
+        toast('e', 'Firebase Hatası', err.message);
+      });
+    }
   }
 }
 
