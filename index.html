@@ -459,7 +459,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <select id="p-cat" onchange="renderProds()"><option value="">Tüm Kategoriler</option></select>
         <select id="p-status" onchange="renderProds()"><option value="">Tüm Durumlar</option><option value="ok">Normal</option><option value="warn">Düşük</option><option value="crit">Kritik</option></select>
       </div>
-      <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Barkod</th><th>Kategori</th><th>Tedarikçi</th><th>Stok</th><th>Birim Fiyat</th><th>İşlemler</th></tr></thead><tbody id="prods-tbody"></tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Barkod</th><th>Kategori</th><th>Tedarikçi</th><th>Stok</th><th>Alış Fiyatı</th><th>Satış Fiyatı</th><th>İşlemler</th></tr></thead><tbody id="prods-tbody"></tbody></table></div>
     </div>
 
     <!-- CRITICAL -->
@@ -530,7 +530,8 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <div class="prod-card-name" id="stockin-prod-name"></div>
             <div class="prod-card-meta">
               <span><span style="color:var(--txt2)">Mevcut Stok:</span> <strong id="stockin-prod-stk"></strong></span>
-              <span><span style="color:var(--txt2)">Min:</span> <span id="stockin-prod-min"></span></span>
+              <span><span style="color:var(--txt2)">Alış Fiyatı:</span> <strong id="stockin-prod-price"></strong></span>
+              <span><span style="color:var(--txt2)">Satış Fiyatı:</span> <strong id="stockin-prod-sellprice" style="color:var(--accent)"></strong></span>
               <span><span style="color:var(--txt2)">Birim:</span> <span id="stockin-prod-unit"></span></span>
             </div>
             <div style="margin-top:10px" id="stockin-prod-badge"></div>
@@ -595,7 +596,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <div class="prod-card-name" id="sales-prod-name"></div>
             <div class="prod-card-meta">
               <span><span style="color:var(--txt2)">Stok:</span> <strong id="sales-prod-stk"></strong></span>
-              <span><span style="color:var(--txt2)">Fiyat:</span> <strong id="sales-prod-price"></strong></span>
+              <span><span style="color:var(--txt2)">Satış Fiyatı:</span> <strong id="sales-prod-price" style="color:var(--accent)"></strong></span>
             </div>
             <div style="margin-top:8px" id="sales-prod-result"></div>
           </div>
@@ -689,9 +690,10 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <div class="fg"><label>Kritik Seviye *</label><input type="number" id="p-min" required min="0" placeholder="10"></div>
       </div>
       <div class="form-row">
-        <div class="fg"><label>Birim Fiyat (₺)</label><input type="number" id="p-price" min="0" step="0.01" placeholder="0.00"></div>
-        <div class="fg"><label>Tedarikçi</label><select id="p-sup"><option value="">Seçiniz</option></select></div>
+        <div class="fg"><label>Alış Birim Fiyatı (₺)</label><input type="number" id="p-price" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="fg"><label>Satış Birim Fiyatı (₺)</label><input type="number" id="p-sell-price" min="0" step="0.01" placeholder="0.00"></div>
       </div>
+      <div class="fg"><label>Tedarikçi</label><select id="p-sup"><option value="">Seçiniz</option></select></div>
       <div class="fg"><label>Not</label><textarea id="p-note" rows="2" placeholder="İsteğe bağlı..."></textarea></div>
       <input type="hidden" id="p-id">
       <div class="modal-ftr"><button type="button" class="btn btn-ghost" onclick="closeM('m-prod')">İptal</button><button type="submit" class="btn btn-primary">Kaydet</button></div>
@@ -892,16 +894,16 @@ const DEFAULT_SUPPLIERS = [
   {id:4,name:'Ambalaj Center',con:'Fatma Çelik',tel:'0224 222 66 99',mail:'info@ambalajcenter.com',city:'Bursa',web:'',addr:'Nilüfer, Bursa'}
 ];
 const DEFAULT_PRODUCTS = [
-  {id:1,name:'A4 Fotokopi Kağıdı (500lü)',barc:'8690000000001',cat:'Kırtasiye',unit:'Koli',stk:12,min:20,price:185,sup:1,note:''},
-  {id:2,name:'Tükenmez Kalem (Mavi)',barc:'8690000000002',cat:'Kırtasiye',unit:'Kutu',stk:5,min:10,price:45,sup:1,note:''},
-  {id:3,name:'Toner HP LaserJet 85A',barc:'8690000000003',cat:'Bilgisayar',unit:'Adet',stk:2,min:3,price:850,sup:2,note:'Siyah toner'},
-  {id:4,name:'USB Klavye',barc:'8690000000004',cat:'Bilgisayar',unit:'Adet',stk:8,min:5,price:320,sup:2,note:''},
-  {id:5,name:'Sıvı Sabun (5lt)',barc:'8690000000005',cat:'Temizlik',unit:'Bidon',stk:3,min:5,price:145,sup:3,note:''},
-  {id:6,name:'Çöp Torbası (50li)',barc:'8690000000006',cat:'Temizlik',unit:'Paket',stk:18,min:10,price:35,sup:3,note:''},
-  {id:7,name:'Karton Kutu (Büyük)',barc:'8690000000007',cat:'Ambalaj',unit:'Adet',stk:45,min:30,price:15,sup:4,note:''},
-  {id:8,name:'Şeffaf Bant (10lu)',barc:'8690000000008',cat:'Ambalaj',unit:'Paket',stk:7,min:15,price:12.5,sup:4,note:''},
-  {id:9,name:'Ağır Hizmet Eldiveni',barc:'8690000000009',cat:'Güvenlik',unit:'Çift',stk:1,min:10,price:55,sup:3,note:'L beden'},
-  {id:10,name:'Maket Bıçağı',barc:'8690000000010',cat:'Alet',unit:'Adet',stk:4,min:3,price:28,sup:1,note:''}
+  {id:1,name:'A4 Fotokopi Kağıdı (500lü)',barc:'8690000000001',cat:'Kırtasiye',unit:'Koli',stk:12,min:20,price:185,sellPrice:240,sup:1,note:''},
+  {id:2,name:'Tükenmez Kalem (Mavi)',barc:'8690000000002',cat:'Kırtasiye',unit:'Kutu',stk:5,min:10,price:45,sellPrice:65,sup:1,note:''},
+  {id:3,name:'Toner HP LaserJet 85A',barc:'8690000000003',cat:'Bilgisayar',unit:'Adet',stk:2,min:3,price:850,sellPrice:1150,sup:2,note:'Siyah toner'},
+  {id:4,name:'USB Klavye',barc:'8690000000004',cat:'Bilgisayar',unit:'Adet',stk:8,min:5,price:320,sellPrice:450,sup:2,note:''},
+  {id:5,name:'Sıvı Sabun (5lt)',barc:'8690000000005',cat:'Temizlik',unit:'Bidon',stk:3,min:5,price:145,sellPrice:195,sup:3,note:''},
+  {id:6,name:'Çöp Torbası (50li)',barc:'8690000000006',cat:'Temizlik',unit:'Paket',stk:18,min:10,price:35,sellPrice:50,sup:3,note:''},
+  {id:7,name:'Karton Kutu (Büyük)',barc:'8690000000007',cat:'Ambalaj',unit:'Adet',stk:45,min:30,price:15,sellPrice:22,sup:4,note:''},
+  {id:8,name:'Şeffaf Bant (10lu)',barc:'8690000000008',cat:'Ambalaj',unit:'Paket',stk:7,min:15,price:12.5,sellPrice:20,sup:4,note:''},
+  {id:9,name:'Ağır Hizmet Eldiveni',barc:'8690000000009',cat:'Güvenlik',unit:'Çift',stk:1,min:10,price:55,sellPrice:80,sup:3,note:'L beden'},
+  {id:10,name:'Maket Bıçağı',barc:'8690000000010',cat:'Alet',unit:'Adet',stk:4,min:3,price:28,sellPrice:42,sup:1,note:''}
 ];
 
 function initData(){
@@ -1046,13 +1048,15 @@ function renderProds(){
   tb.innerHTML=P.map(p=>{
     const st=sst(p),pct=Math.min(100,Math.round(p.stk/(p.min*2||1)*100));
     const sup=S.find(s=>s.id===p.sup);
+    const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? p.sellPrice : p.price;
     return`<tr class="${st==='crit'?'crit-row':''}">
       <td><div style="font-weight:600">${p.name}</div>${p.note?`<div style="font-size:11px;color:var(--txt3)">${p.note}</div>`:''}</td>
       <td class="mono">${p.barc||'—'}</td>
       <td><span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px">${p.cat}</span></td>
       <td style="color:var(--txt2)">${sup?sup.name:'—'}</td>
       <td><div class="sbar"><div class="sbar-track"><div class="sbar-fill ${st}" style="width:${pct}%"></div></div><span style="font-size:12px;font-weight:600;min-width:55px">${p.stk} ${p.unit}</span></div><div style="font-size:10px;color:var(--txt3);margin-top:2px">Min: ${p.min}</div></td>
-      <td style="font-weight:600">${tl(p.price)}</td>
+      <td style="font-weight:600;color:var(--txt2)">${tl(p.price)}</td>
+      <td style="font-weight:700;color:var(--accent)">${tl(sellP)}</td>
       <td><div class="flex gap-2"><button class="btn btn-ghost btn-sm" onclick="openProdModal(${p.id})">✏️</button><button class="btn btn-warning btn-sm" onclick="critToOrder(${p.id})">🛒</button><button class="btn btn-danger btn-sm" onclick="delProd(${p.id})">🗑️</button></div></td>
     </tr>`;
   }).join('');
@@ -1070,6 +1074,7 @@ function openProdModal(id){
     document.getElementById('p-stk').value=p.stk;
     document.getElementById('p-min').value=p.min;
     document.getElementById('p-price').value=p.price||'';
+    document.getElementById('p-sell-price').value=p.sellPrice!==undefined&&p.sellPrice!==null?p.sellPrice:'';
     document.getElementById('p-sup').value=p.sup||'';
     document.getElementById('p-note').value=p.note||'';
   }else{
@@ -1083,7 +1088,21 @@ function openProdModal(id){
 function saveProd(e){
   e.preventDefault();
   const P=gp(),id=document.getElementById('p-id').value;
-  const d={name:document.getElementById('p-name').value.trim(),barc:document.getElementById('p-barc').value.trim(),cat:document.getElementById('p-cat2').value.trim(),unit:document.getElementById('p-unit').value,stk:parseInt(document.getElementById('p-stk').value)||0,min:parseInt(document.getElementById('p-min').value)||0,price:parseFloat(document.getElementById('p-price').value)||0,sup:parseInt(document.getElementById('p-sup').value)||null,note:document.getElementById('p-note').value.trim()};
+  const buyP=parseFloat(document.getElementById('p-price').value)||0;
+  const sellPInput=document.getElementById('p-sell-price').value;
+  const sellP=sellPInput!==''?parseFloat(sellPInput)||0:buyP;
+  const d={
+    name:document.getElementById('p-name').value.trim(),
+    barc:document.getElementById('p-barc').value.trim(),
+    cat:document.getElementById('p-cat2').value.trim(),
+    unit:document.getElementById('p-unit').value,
+    stk:parseInt(document.getElementById('p-stk').value)||0,
+    min:parseInt(document.getElementById('p-min').value)||0,
+    price:buyP,
+    sellPrice:sellP,
+    sup:parseInt(document.getElementById('p-sup').value)||null,
+    note:document.getElementById('p-note').value.trim()
+  };
   if(id){const i=P.findIndex(p=>p.id===parseInt(id));P[i]={...P[i],...d};toast('s','Güncellendi','Ürün kaydedildi');}
   else{d.id=nid(P);P.push(d);toast('s','Eklendi','Yeni ürün oluşturuldu');}
   sp(P);closeM('m-prod');renderProds();updBadge();
@@ -1370,8 +1389,12 @@ function dlCSV(fn,headers,rows){
 }
 function csvProducts(){
   const P=gp(),S=gs();
-  dlCSV('stok_listesi.csv',['Ürün','Barkod','Kategori','Tedarikçi','Stok','Birim','Min Seviye','Birim Fiyat','Toplam Değer'],
-    P.map(p=>{const sup=S.find(s=>s.id===p.sup);return[p.name,p.barc,p.cat,sup?.name||'',p.stk,p.unit,p.min,p.price,(p.stk*p.price).toFixed(2)];}));
+  dlCSV('stok_listesi.csv',['Ürün','Barkod','Kategori','Tedarikçi','Stok','Birim','Min Seviye','Alış Fiyatı','Satış Fiyatı','Toplam Alış Değeri','Toplam Satış Değeri'],
+    P.map(p=>{
+      const sup=S.find(s=>s.id===p.sup);
+      const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? p.sellPrice : p.price;
+      return[p.name,p.barc,p.cat,sup?.name||'',p.stk,p.unit,p.min,p.price,sellP,(p.stk*p.price).toFixed(2),(p.stk*sellP).toFixed(2)];
+    }));
 }
 function csvOrders(){
   const O=go2(),P=gp(),S=gs();
@@ -1428,7 +1451,9 @@ function onStockinScan(code){
     document.getElementById('stockin-prod-display').value=p.name;
     document.getElementById('stockin-prod-name').textContent=p.name;
     document.getElementById('stockin-prod-stk').textContent=p.stk+' '+p.unit;
-    document.getElementById('stockin-prod-min').textContent=p.min+' '+p.unit;
+    const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? p.sellPrice : p.price;
+    document.getElementById('stockin-prod-price').textContent=tl(p.price);
+    document.getElementById('stockin-prod-sellprice').textContent=tl(sellP);
     document.getElementById('stockin-prod-unit').textContent=p.unit;
     const st=sst(p);
     document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'D\u00fc\u015f\u00fck Stok':'Kritik Stok'}</span>`;
@@ -1506,13 +1531,14 @@ function onSalesScan(code){
   const p=gp().find(x=>x.barc===code);
   if(p){
     salesScannedProdId=p.id;
+    const sellPrice = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : parseFloat(p.price)||0;
     document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 ${p.name} sepete eklendi</span>`;
     document.getElementById('sales-prod-name').textContent=p.name;
     document.getElementById('sales-prod-stk').textContent=p.stk+' '+p.unit;
-    document.getElementById('sales-prod-price').textContent=tl(p.price);
+    document.getElementById('sales-prod-price').textContent=tl(sellPrice);
     document.getElementById('sales-prod-card').style.display='block';
     document.getElementById('sales-notfound').style.display='none';
-    // ── Otomatik sepete ekle (qty=1) ──
+    // ── Otomatik sepete ekle (qty=1, satış fiyatı üzerinden) ──
     const P=gp();
     if(p.stk<1){
       document.getElementById('sales-prod-result').innerHTML='<span class="badge b-danger">Stok tükenmiş!</span>';
@@ -1530,10 +1556,10 @@ function onSalesScan(code){
       existing.qty+=1;
       existing.total=existing.qty*existing.price;
     }else{
-      salesCart.push({prodId:p.id,name:p.name,unit:p.unit,price:p.price,qty:1,total:p.price});
+      salesCart.push({prodId:p.id,name:p.name,unit:p.unit,price:sellPrice,qty:1,total:sellPrice});
     }
     const inCart=salesCart.find(c=>c.prodId===p.id);
-    document.getElementById('sales-prod-result').innerHTML=`<span class="badge b-ok">Sepette: ${inCart?inCart.qty:1} ${p.unit}</span>`;
+    document.getElementById('sales-prod-result').innerHTML=`<span class="badge b-ok">Sepette: ${inCart?inCart.qty:1} ${p.unit} (${tl(inCart?inCart.total:sellPrice)})</span>`;
     renderCart();
   }else{
     salesScannedProdId=null;
