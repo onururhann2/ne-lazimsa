@@ -959,6 +959,7 @@ function showApp(){
   document.getElementById('u-name').textContent=currentUser.name;
   document.getElementById('u-email').textContent=currentUser.email;
   applyTheme(ls('nl_theme')||'dark');
+  setupRealtimeSync();
   go('dashboard');
 }
 
@@ -1783,7 +1784,7 @@ function setupRealtimeSync(){
 
 // ── SUPABASE CONFIG & ENGINE ──
 const DEFAULT_SB_URL = "https://jvnuziiboysvisrifzii.supabase.co";
-const DEFAULT_SB_KEY = "";
+const DEFAULT_SB_KEY = "sb_publishable_0PfH5bsIvZWBT0gOBDOHnQ_tMFjEh9N";
 
 async function initSupabase(){
   let url = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
