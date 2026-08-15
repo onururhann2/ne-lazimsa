@@ -1706,8 +1706,8 @@ function openSyncModal(){
   const fbConf = document.getElementById('firebase-config-input');
   const fbChan = document.getElementById('fb-channel-input');
 
-  if(sbUrl) sbUrl.value = localStorage.getItem('nl_sb_url') || '';
-  if(sbKey) sbKey.value = localStorage.getItem('nl_sb_key') || '';
+  if(sbUrl) sbUrl.value = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
+  if(sbKey) sbKey.value = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
   if(sbChan) sbChan.value = syncChannel;
   if(fbConf) fbConf.value = localStorage.getItem('nl_firebase_config') || '';
   if(fbChan) fbChan.value = syncChannel;
@@ -1781,10 +1781,16 @@ function setupRealtimeSync(){
   }
 }
 
-// ── SUPABASE ENGINE ──
+// ── SUPABASE CONFIG & ENGINE ──
+const DEFAULT_SB_URL = "https://jvnuziiboysvisrifzii.supabase.co";
+const DEFAULT_SB_KEY = "";
+
 async function initSupabase(){
-  const url = localStorage.getItem('nl_sb_url');
-  const key = localStorage.getItem('nl_sb_key');
+  let url = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
+  let key = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
+
+  // Clean trailing /rest/v1 if present
+  url = url.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
 
   if(!url || !key){
     setSyncStatusUI('offline', 'Supabase Pasif');
