@@ -1812,19 +1812,19 @@ async function initSupabase(){
     sbClient = supabase.createClient(url, key);
     setSyncStatusUI('syncing', 'Bağlanıyor');
 
-    // Subscribe to realtime Postgres changes
+    // 1. Realtime WebSockets Listener
     sbChannelSub = sbClient
       .channel('inventory_sync_' + syncChannel)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_inventory', filter: `channel=eq.${syncChannel}` }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_inventory' }, payload => {
         isSupabaseConnected = true;
-        if(payload.new && payload.new.updated_at && payload.new.updated_at > (lastCloudSyncTime + 400)){
+        if(payload.new && payload.new.channel === syncChannel){
           applyRemotePayload({
             products: payload.new.products,
             suppliers: payload.new.suppliers,
             orders: payload.new.orders,
             updatedAt: payload.new.updated_at,
             updatedBy: payload.new.updated_by
-          }, 'Supabase');
+          }, 'Supabase Realtime');
         }
         setSyncStatusUI('ok', 'Canlı');
       })
@@ -1835,29 +1835,47 @@ async function initSupabase(){
         }
       });
 
-    // Initial pull
+    // 2. High-Frequency Fallback Poller (every 2.5s guarantees sync even if WebSocket reconnects)
+    if(cloudPollInterval) clearInterval(cloudPollInterval);
+    cloudPollInterval = setInterval(async () => {
+      if(syncProvider === 'supabase' && sbClient && !isRemoteApplying){
+        try{
+          const { data } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
+          if(data){
+            applyRemotePayload({
+              products: data.products,
+              suppliers: data.suppliers,
+              orders: data.orders,
+              updatedAt: data.updated_at,
+              updatedBy: data.updated_by
+            }, 'Supabase Poll');
+            isSupabaseConnected = true;
+          }
+        }catch(e){}
+      }
+    }, 2500);
+
+    // 3. Initial Pull
     const { data, error } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
     if(error){
       console.warn('Supabase initial fetch:', error);
       if(error.code === '42P01'){
-        toast('w', 'Tablo Eksik', 'Lütfen Supabase SQL Editor üzerinden tablo oluşturun.');
+        toast('w', 'Tablo Eksik', 'Lütfen Supabase SQL Editor üzerinden tabloyu oluşturun.');
       }
     } else if(data){
       isSupabaseConnected = true;
-      if(data.updated_at && data.updated_at > lastCloudSyncTime){
-        applyRemotePayload({
-          products: data.products,
-          suppliers: data.suppliers,
-          orders: data.orders,
-          updatedAt: data.updated_at,
-          updatedBy: data.updated_by
-        }, 'Supabase');
-      }
+      applyRemotePayload({
+        products: data.products,
+        suppliers: data.suppliers,
+        orders: data.orders,
+        updatedAt: data.updated_at,
+        updatedBy: data.updated_by
+      }, 'Supabase Initial');
       setSyncStatusUI('ok', 'Canlı');
     } else {
-      // Initialize remote table with local seed
+      // Remote table is empty for this channel, seed it with local data
       isSupabaseConnected = true;
-      triggerCloudPush('supabase_initial');
+      triggerCloudPush('supabase_initial', true);
       setSyncStatusUI('ok', 'Canlı');
     }
 
@@ -1907,11 +1925,9 @@ function initFirebase(){
       isFirebaseConnected = true;
       const data = snapshot.val();
       if(data){
-        if(data.updatedAt && data.updatedAt > (lastCloudSyncTime + 400)){
-          applyRemotePayload(data, 'Firebase');
-        }
+        applyRemotePayload(data, 'Firebase');
       } else {
-        triggerCloudPush('initial_seed');
+        triggerCloudPush('initial_seed', true);
       }
       setSyncStatusUI('ok', 'Canlı');
     }, (error) => {
@@ -1927,7 +1943,7 @@ function initFirebase(){
   }
 }
 
-function triggerCloudPush(reason){
+function triggerCloudPush(reason, immediate = false){
   lastCloudSyncTime = Date.now();
   
   const payload = {
@@ -1946,8 +1962,7 @@ function triggerCloudPush(reason){
 
   setSyncStatusUI('syncing');
 
-  if(cloudPushTimeout) clearTimeout(cloudPushTimeout);
-  cloudPushTimeout = setTimeout(async () => {
+  const doPush = async () => {
     // 1. Supabase Push
     if(syncProvider === 'supabase' && sbClient){
       try{
@@ -1976,38 +1991,56 @@ function triggerCloudPush(reason){
         setSyncStatusUI('offline', 'Yazma Hatası');
       }
     }
-  }, 200);
+  };
+
+  if(immediate){
+    doPush();
+  } else {
+    if(cloudPushTimeout) clearTimeout(cloudPushTimeout);
+    cloudPushTimeout = setTimeout(doPush, 100);
+  }
 }
 
 function applyRemotePayload(payload, source){
   if(!payload || isRemoteApplying) return;
+
+  const currentProds = ls('nl_prod') || '[]';
+  const remoteProds = JSON.stringify(payload.products || []);
+  const currentSups = ls('nl_sup') || '[]';
+  const remoteSups = JSON.stringify(payload.suppliers || []);
+  const currentOrds = ls('nl_ord') || '[]';
+  const remoteOrds = JSON.stringify(payload.orders || []);
+
+  const hasChanged = (currentProds !== remoteProds) || (currentSups !== remoteSups) || (currentOrds !== remoteOrds);
+
+  if(!hasChanged){
+    if(payload.updatedAt || payload.updated_at){
+      lastCloudSyncTime = Math.max(lastCloudSyncTime, payload.updatedAt || payload.updated_at);
+    }
+    return;
+  }
+
   isRemoteApplying = true;
   
   try{
-    let changed = false;
     if(Array.isArray(payload.products)){
-      localStorage.setItem('nl_prod', JSON.stringify(payload.products));
-      changed = true;
+      localStorage.setItem('nl_prod', remoteProds);
     }
     if(Array.isArray(payload.suppliers)){
-      localStorage.setItem('nl_sup', JSON.stringify(payload.suppliers));
-      changed = true;
+      localStorage.setItem('nl_sup', remoteSups);
     }
     if(Array.isArray(payload.orders)){
-      localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
-      changed = true;
+      localStorage.setItem('nl_ord', remoteOrds);
     }
     if(payload.updatedAt || payload.updated_at){
-      lastCloudSyncTime = payload.updatedAt || payload.updated_at;
+      lastCloudSyncTime = Math.max(lastCloudSyncTime, payload.updatedAt || payload.updated_at);
     }
 
-    if(changed){
-      refreshActiveViewSilently();
-      updBadge();
-      setSyncStatusUI('ok');
-    }
+    refreshActiveViewSilently();
+    updBadge();
+    setSyncStatusUI('ok');
   }finally{
-    setTimeout(() => { isRemoteApplying = false; }, 250);
+    setTimeout(() => { isRemoteApplying = false; }, 100);
   }
 }
 
