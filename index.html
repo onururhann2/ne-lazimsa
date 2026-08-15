@@ -1707,8 +1707,14 @@ function openSyncModal(){
   const fbConf = document.getElementById('firebase-config-input');
   const fbChan = document.getElementById('fb-channel-input');
 
+  let curKey = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
+  if(curKey && curKey.startsWith('sb_secret_')){
+    curKey = DEFAULT_SB_KEY;
+    localStorage.setItem('nl_sb_key', DEFAULT_SB_KEY);
+  }
+
   if(sbUrl) sbUrl.value = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
-  if(sbKey) sbKey.value = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
+  if(sbKey) sbKey.value = curKey;
   if(sbChan) sbChan.value = syncChannel;
   if(fbConf) fbConf.value = localStorage.getItem('nl_firebase_config') || '';
   if(fbChan) fbChan.value = syncChannel;
@@ -1792,6 +1798,12 @@ async function initSupabase(){
 
   // Clean trailing /rest/v1 if present
   url = url.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+
+  // Auto-clean any legacy secret key from browser localStorage
+  if(key && key.startsWith('sb_secret_')){
+    key = DEFAULT_SB_KEY;
+    localStorage.setItem('nl_sb_key', DEFAULT_SB_KEY);
+  }
 
   if(!url || !key){
     setSyncStatusUI('offline', 'Supabase Pasif');
@@ -2063,8 +2075,12 @@ async function testAndPullCloud(){
   setSyncStatusUI('syncing', 'Eşitleniyor...');
   
   if(syncProvider === 'supabase'){
-    const url = localStorage.getItem('nl_sb_url');
-    const key = localStorage.getItem('nl_sb_key');
+    let url = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
+    let key = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
+    if(key && key.startsWith('sb_secret_')){
+      key = DEFAULT_SB_KEY;
+      localStorage.setItem('nl_sb_key', DEFAULT_SB_KEY);
+    }
     if(!url || !key){
       toast('w', 'Ayar Yok', 'Önce Supabase URL ve Key giriniz.');
       return;
