@@ -7,7 +7,7 @@
 <meta name="description" content="Modern stok ve satın alma yönetim sistemi">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -521,9 +521,13 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <!-- LEFT: Camera + Result -->
         <div>
           <div class="card" style="padding:18px">
-            <div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:12px">📷 Kamera ile Barkod Okut</div>
+            <div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:12px">📷 Kamera / Barkod Okuyucu</div>
             <div class="scan-frame"><video id="stockin-video" autoplay playsinline muted></video><div class="scan-overlay"><div class="scan-guide"></div></div></div>
-            <div class="scan-result" id="stockin-scan-res"><span style="color:var(--txt3)">Ürün barkodunu okutun...</span></div>
+            <div class="scan-result" id="stockin-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
+            <div style="display:flex;gap:7px;margin-top:10px">
+              <input type="text" id="stockin-manual-barc" placeholder="Barkod no yazın veya okutun..." style="flex:1;padding:8px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12px;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();if(this.value.trim()){onStockinScan(this.value.trim());this.value='';}}">
+              <button class="btn btn-primary btn-sm" onclick="const v=document.getElementById('stockin-manual-barc').value.trim();if(v){onStockinScan(v);document.getElementById('stockin-manual-barc').value='';}">Bul</button>
+            </div>
           </div>
           <!-- Found product card -->
           <div id="stockin-prod-card" style="display:none" class="prod-card">
@@ -587,9 +591,13 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <!-- LEFT: Camera + Add to cart -->
         <div>
           <div class="card" style="padding:18px">
-            <div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:12px">📷 Ürün Barkodunu Okut</div>
+            <div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:12px">📷 Kamera / Barkod Okuyucu</div>
             <div class="scan-frame"><video id="sales-video" autoplay playsinline muted></video><div class="scan-overlay"><div class="scan-guide"></div></div></div>
-            <div class="scan-result" id="sales-scan-res"><span style="color:var(--txt3)">Ürün barkodunu okutun...</span></div>
+            <div class="scan-result" id="sales-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
+            <div style="display:flex;gap:7px;margin-top:10px">
+              <input type="text" id="sales-manual-barc" placeholder="Barkod no yazın veya okutun..." style="flex:1;padding:8px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12px;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();if(this.value.trim()){onSalesScan(this.value.trim());this.value='';}}">
+              <button class="btn btn-primary btn-sm" onclick="const v=document.getElementById('sales-manual-barc').value.trim();if(v){onSalesScan(v);document.getElementById('sales-manual-barc').value='';}">Ekle</button>
+            </div>
           </div>
           <!-- Found product card for sales -->
           <div id="sales-prod-card" style="display:none" class="prod-card">
@@ -753,7 +761,11 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   <div class="modal modal-lg">
     <div class="modal-hdr"><h2 class="modal-ttl" id="scan-ttl">Barkod Tara</h2><button class="modal-x" onclick="closeScanner()">×</button></div>
     <div class="scan-frame"><video id="barcode-video" autoplay playsinline muted></video><div class="scan-overlay"><div class="scan-guide"></div></div></div>
-    <div class="scan-result" id="scan-res"><span style="color:var(--txt3)">Barkodu kamera önüne tutun...</span></div>
+    <div class="scan-result" id="scan-res"><span style="color:var(--txt3)">Barkodu kameraya tutun veya aşağıya yazın...</span></div>
+    <div style="display:flex;gap:7px;margin-top:10px">
+      <input type="text" id="m-scan-manual" placeholder="Barkod no yazın..." style="flex:1;padding:8px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();if(this.value.trim()){onScan(this.value.trim());this.value='';}}">
+      <button class="btn btn-primary btn-sm" onclick="const v=document.getElementById('m-scan-manual').value.trim();if(v){onScan(v);document.getElementById('m-scan-manual').value='';}">Okut</button>
+    </div>
     <div id="scan-info" style="margin-top:12px;display:none"></div>
     <div class="modal-ftr">
       <button class="btn btn-ghost" onclick="closeScanner()">Kapat</button>
@@ -1298,7 +1310,6 @@ function addQCLog(name,stk,unit,ok){
 }
 
 // ══════════════ CAMERA ENGINE ══════════════
-// Result element map per video
 function resId(videoId){
   const m={'qc-video':'qc-res','stockin-video':'stockin-scan-res','sales-video':'sales-scan-res','barcode-video':'scan-res'};
   return m[videoId]||'scan-res';
@@ -1309,84 +1320,142 @@ function showCamMsg(videoId,html){
 }
 
 async function startCam(videoId,key,cb){
-  // Stop any previous camera for this key
   stopCam(key);
+  const video=document.getElementById(videoId);
+  if(!video)return;
+
   try{
-    // iOS needs exact:false for facingMode
-    const constraints={video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}};
-    const stream=await navigator.mediaDevices.getUserMedia(constraints);
-    const video=document.getElementById(videoId);
-    if(!video)return;
+    readers[key]={active:true,videoId};
+
+    // 1. Primary Engine: ZXing Browser Multi Format Reader (Works 100% on Windows Chrome, Mac, iOS, Android)
+    const ZXingLib = (typeof ZXing !== 'undefined') ? ZXing : (typeof ZXingBrowser !== 'undefined' ? ZXingBrowser : null);
+    if(ZXingLib && (ZXingLib.BrowserMultiFormatReader || ZXingLib.BrowserBarcodeReader)){
+      const ReaderClass = ZXingLib.BrowserMultiFormatReader || ZXingLib.BrowserBarcodeReader;
+      const codeReader = new ReaderClass();
+      readers[key].zxing = codeReader;
+
+      let selectedDeviceId = undefined;
+      try{
+        const devices = await codeReader.listVideoInputDevices();
+        if(devices && devices.length > 0){
+          const backCam = devices.find(d => /back|rear|environment|ark/i.test(d.label));
+          selectedDeviceId = backCam ? backCam.deviceId : devices[0].deviceId;
+        }
+      }catch(e){}
+
+      try{
+        await codeReader.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+          if(!readers[key]?.active) return;
+          if(result){
+            const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
+            if(text){
+              showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${text}</span>`);
+              cb(text);
+            }
+          }
+        });
+        return;
+      }catch(zxingErr){
+        console.warn('ZXing decodeFromVideoDevice error, falling back to getUserMedia:', zxingErr);
+      }
+    }
+
+    // 2. Secondary Engine: getUserMedia + Native BarcodeDetector (Android Chrome & supported platforms)
+    const constraints={video:{facingMode:{ideal:'environment'},width:{ideal:1280,min:640},height:{ideal:720,min:480}}};
+    let stream=null;
+    try{
+      stream=await navigator.mediaDevices.getUserMedia(constraints);
+    }catch(e){
+      stream=await navigator.mediaDevices.getUserMedia({video:true});
+    }
+    
     video.srcObject=stream;
-    readers[key]={stream,active:true};
+    await video.play().catch(()=>{});
+    readers[key].stream=stream;
 
     if('BarcodeDetector' in window){
-      // ── Native BarcodeDetector (Android Chrome, desktop Chrome) ──
-      let fmts=['ean_13','ean_8','qr_code','code_128','code_39','upc_a','upc_e'];
-      try{const sup=await BarcodeDetector.getSupportedFormats();if(sup.length)fmts=fmts.filter(f=>sup.includes(f));}catch(e){}
-      const det=new BarcodeDetector({formats:fmts.length?fmts:['ean_13','code_128']});
-      const scan=async()=>{
-        if(!readers[key]?.active)return;
-        try{
-          if(video.readyState>=2){
-            const r=await det.detect(video);
-            if(r.length)cb(r[0].rawValue);
-          }
-        }catch(e){}
-        if(readers[key]?.active)requestAnimationFrame(scan);
-      };
-      const start=()=>scan();
-      if(video.readyState>=2)start();
-      else video.addEventListener('loadeddata',start,{once:true});
-
-    }else if(typeof ZXingBrowser!=='undefined'){
-      // ── ZXing fallback (iOS Safari, Firefox, etc.) ──
-      const hints=new Map();
-      // Allow extra time between scans on iOS
-      const zxing=new ZXingBrowser.BrowserMultiFormatReader(hints,{delayBetweenScanAttempts:300,delayBetweenScanSuccess:1500});
-      readers[key].zxing=zxing;
-      // ZXing decodeFromStream attaches to the video element
       try{
-        await zxing.decodeFromStream(stream,video,(result,err)=>{
-          if(result&&readers[key]?.active)cb(result.getText());
-        });
-      }catch(e){
-        // decodeFromStream may throw on iOS if stream already playing
-        try{
-          zxing.decodeFromVideoElement(video,(result,err)=>{
-            if(result&&readers[key]?.active)cb(result.getText());
-          });
-        }catch(e2){}
-      }
-
-    }else{
-      showCamMsg(videoId,'<span style="color:var(--yellow)">⚠️ Barkod tarayıcı bu tarayıcıda desteklenmiyor. Lütfen Chrome kullanın.</span>');
+        const sup = await BarcodeDetector.getSupportedFormats();
+        if(sup && sup.length > 0){
+          const det = new BarcodeDetector({ formats: sup });
+          const scanNative = async () => {
+            if(!readers[key]?.active) return;
+            try{
+              if(video.readyState >= 2){
+                const r = await det.detect(video);
+                if(r && r.length > 0 && r[0].rawValue){
+                  cb(r[0].rawValue);
+                }
+              }
+            }catch(e){}
+            if(readers[key]?.active) requestAnimationFrame(scanNative);
+          };
+          if(video.readyState >= 2) scanNative();
+          else video.addEventListener('loadeddata', scanNative, { once: true });
+          return;
+        }
+      }catch(e){}
     }
+
   }catch(err){
-    const msg=err.name==='NotAllowedError'
-      ?'<span style="color:var(--red)">❌ Kamera izni reddedildi. Tarayıcı ayarlarından izin verin.</span>'
-      :'<span style="color:var(--red)">❌ Kamera açılamadı: '+err.message+'</span>';
+    console.error('Camera Init Error:', err);
+    const msg = (err.name==='NotAllowedError'||err.name==='PermissionDeniedError')
+      ? '<span style="color:var(--red)">❌ Kamera izni verilmedi. Chrome adres çubuğundaki kilit simgesinden kameraya izin verin.</span>'
+      : '<span style="color:var(--red)">❌ Kamera başlatılamadı: '+(err.message||err.name)+'</span>';
     showCamMsg(videoId,msg);
   }
 }
+
 function stopCam(key){
   if(!readers[key])return;
   readers[key].active=false;
-  // Stop ZXing reader
   if(readers[key].zxing){
     try{readers[key].zxing.reset();}catch(e){}
   }
-  // Stop media stream tracks
   if(readers[key].stream){
     try{readers[key].stream.getTracks().forEach(t=>t.stop());}catch(e){}
   }
-  // Clear video source
   try{
-    const video=document.querySelector(`[id$="${key}-video"]`);
-    if(video){video.srcObject=null;}
+    const video=document.getElementById(readers[key].videoId || (key+'-video'));
+    if(video)video.srcObject=null;
   }catch(e){}
   delete readers[key];
 }
+
+// ── GLOBAL USB BARCODE SCANNER / KEYBOARD LISTENER ──
+let globalBarcodeBuffer = '';
+let lastKeyTime = 0;
+document.addEventListener('keydown', (e) => {
+  const target = e.target;
+  const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') && !target.id.includes('barc');
+  if(isInput) return;
+
+  const now = Date.now();
+  if(now - lastKeyTime > 120){
+    globalBarcodeBuffer = '';
+  }
+  lastKeyTime = now;
+
+  if(e.key === 'Enter'){
+    if(globalBarcodeBuffer.length >= 3){
+      const scannedCode = globalBarcodeBuffer;
+      globalBarcodeBuffer = '';
+      
+      const activePage = document.querySelector('.page.active');
+      const pageId = activePage ? activePage.id.replace('page-', '') : '';
+
+      if(pageId === 'sales'){
+        onSalesScan(scannedCode);
+      } else if(pageId === 'stockin'){
+        onStockinScan(scannedCode);
+      } else if(document.getElementById('m-scan')?.classList.contains('open')){
+        onScan(scannedCode);
+      }
+    }
+  } else if(e.key.length === 1){
+    globalBarcodeBuffer += e.key;
+  }
+});
 
 // ══════════════ MODALS ══════════════
 function openM(id){document.getElementById(id).classList.add('open');}
