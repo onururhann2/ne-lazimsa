@@ -459,7 +459,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <select id="p-cat" onchange="renderProds()"><option value="">Tüm Kategoriler</option></select>
         <select id="p-status" onchange="renderProds()"><option value="">Tüm Durumlar</option><option value="ok">Normal</option><option value="warn">Düşük</option><option value="crit">Kritik</option></select>
       </div>
-      <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Barkod</th><th>Kategori</th><th>Tedarikçi</th><th>Stok</th><th>Alış Fiyatı</th><th>Satış Fiyatı</th><th>İşlemler</th></tr></thead><tbody id="prods-tbody"></tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Barkod</th><th>Kategori</th><th>Tedarikçi</th><th>Stok</th><th>Alış Fiyatı</th><th>Satış Fiyatı</th><th>Kâr (₺)</th><th>Kâr Marjı (%)</th><th>İşlemler</th></tr></thead><tbody id="prods-tbody"></tbody></table></div>
     </div>
 
     <!-- CRITICAL -->
@@ -690,9 +690,10 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <div class="fg"><label>Kritik Seviye *</label><input type="number" id="p-min" required min="0" placeholder="10"></div>
       </div>
       <div class="form-row">
-        <div class="fg"><label>Alış Birim Fiyatı (₺)</label><input type="number" id="p-price" min="0" step="0.01" placeholder="0.00"></div>
-        <div class="fg"><label>Satış Birim Fiyatı (₺)</label><input type="number" id="p-sell-price" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="fg"><label>Alış Birim Fiyatı (₺)</label><input type="number" id="p-price" min="0" step="0.01" placeholder="0.00" oninput="calcProdProfit()"></div>
+        <div class="fg"><label>Satış Birim Fiyatı (₺)</label><input type="number" id="p-sell-price" min="0" step="0.01" placeholder="0.00" oninput="calcProdProfit()"></div>
       </div>
+      <div id="p-profit-hint" style="font-size:12px;font-weight:600;margin:-4px 0 14px;padding:8px 12px;border-radius:8px;background:rgba(16,185,129,.1);color:var(--green);display:none"></div>
       <div class="fg"><label>Tedarikçi</label><select id="p-sup"><option value="">Seçiniz</option></select></div>
       <div class="fg"><label>Not</label><textarea id="p-note" rows="2" placeholder="İsteğe bağlı..."></textarea></div>
       <input type="hidden" id="p-id">
@@ -1048,18 +1049,41 @@ function renderProds(){
   tb.innerHTML=P.map(p=>{
     const st=sst(p),pct=Math.min(100,Math.round(p.stk/(p.min*2||1)*100));
     const sup=S.find(s=>s.id===p.sup);
-    const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? p.sellPrice : p.price;
+    const buyP = parseFloat(p.price) || 0;
+    const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : buyP;
+    const profitTL = sellP - buyP;
+    const profitMargin = buyP > 0 ? ((profitTL / buyP) * 100) : (sellP > 0 ? 100 : 0);
+    const profitColor = profitTL > 0 ? 'var(--green)' : profitTL < 0 ? 'var(--red)' : 'var(--txt2)';
+    const marginBadge = profitMargin > 0 ? 'b-ok' : profitMargin < 0 ? 'b-danger' : 'b-blue';
     return`<tr class="${st==='crit'?'crit-row':''}">
       <td><div style="font-weight:600">${p.name}</div>${p.note?`<div style="font-size:11px;color:var(--txt3)">${p.note}</div>`:''}</td>
       <td class="mono">${p.barc||'—'}</td>
       <td><span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px">${p.cat}</span></td>
       <td style="color:var(--txt2)">${sup?sup.name:'—'}</td>
       <td><div class="sbar"><div class="sbar-track"><div class="sbar-fill ${st}" style="width:${pct}%"></div></div><span style="font-size:12px;font-weight:600;min-width:55px">${p.stk} ${p.unit}</span></div><div style="font-size:10px;color:var(--txt3);margin-top:2px">Min: ${p.min}</div></td>
-      <td style="font-weight:600;color:var(--txt2)">${tl(p.price)}</td>
+      <td style="font-weight:600;color:var(--txt2)">${tl(buyP)}</td>
       <td style="font-weight:700;color:var(--accent)">${tl(sellP)}</td>
+      <td style="font-weight:700;color:${profitColor}">${profitTL > 0 ? '+' : ''}${tl(profitTL)}</td>
+      <td><span class="badge ${marginBadge}">${profitMargin > 0 ? '+' : ''}%${profitMargin.toFixed(1)}</span></td>
       <td><div class="flex gap-2"><button class="btn btn-ghost btn-sm" onclick="openProdModal(${p.id})">✏️</button><button class="btn btn-warning btn-sm" onclick="critToOrder(${p.id})">🛒</button><button class="btn btn-danger btn-sm" onclick="delProd(${p.id})">🗑️</button></div></td>
     </tr>`;
   }).join('');
+}
+function calcProdProfit(){
+  const buyP = parseFloat(document.getElementById('p-price')?.value) || 0;
+  const sellP = parseFloat(document.getElementById('p-sell-price')?.value) || 0;
+  const hintEl = document.getElementById('p-profit-hint');
+  if(!hintEl) return;
+  if(buyP > 0 || sellP > 0){
+    const profit = sellP - buyP;
+    const margin = buyP > 0 ? ((profit / buyP) * 100) : (sellP > 0 ? 100 : 0);
+    hintEl.style.display = 'block';
+    hintEl.style.background = profit >= 0 ? 'rgba(16,185,129,.1)' : 'rgba(239,68,68,.1)';
+    hintEl.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+    hintEl.innerHTML = `💡 Birim Kâr: <strong>${profit >= 0 ? '+' : ''}${tl(profit)}</strong> &nbsp; | &nbsp; Kâr Marjı: <strong>%${margin.toFixed(1)}</strong>`;
+  } else {
+    hintEl.style.display = 'none';
+  }
 }
 function openProdModal(id){
   const S=gs();
@@ -1077,10 +1101,12 @@ function openProdModal(id){
     document.getElementById('p-sell-price').value=p.sellPrice!==undefined&&p.sellPrice!==null?p.sellPrice:'';
     document.getElementById('p-sup').value=p.sup||'';
     document.getElementById('p-note').value=p.note||'';
+    calcProdProfit();
   }else{
     document.getElementById('prod-ttl').textContent='Ürün Ekle';
     document.querySelector('#m-prod form').reset();
     document.getElementById('p-id').value='';
+    calcProdProfit();
     if(lastCode){document.getElementById('p-barc').value=lastCode;lastCode=null;}
   }
   openM('m-prod');
@@ -1389,11 +1415,14 @@ function dlCSV(fn,headers,rows){
 }
 function csvProducts(){
   const P=gp(),S=gs();
-  dlCSV('stok_listesi.csv',['Ürün','Barkod','Kategori','Tedarikçi','Stok','Birim','Min Seviye','Alış Fiyatı','Satış Fiyatı','Toplam Alış Değeri','Toplam Satış Değeri'],
+  dlCSV('stok_listesi.csv',['Ürün','Barkod','Kategori','Tedarikçi','Stok','Birim','Min Seviye','Alış Fiyatı','Satış Fiyatı','Birim Kâr (₺)','Kâr Marjı (%)','Toplam Alış Değeri','Toplam Satış Değeri'],
     P.map(p=>{
       const sup=S.find(s=>s.id===p.sup);
-      const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? p.sellPrice : p.price;
-      return[p.name,p.barc,p.cat,sup?.name||'',p.stk,p.unit,p.min,p.price,sellP,(p.stk*p.price).toFixed(2),(p.stk*sellP).toFixed(2)];
+      const buyP = parseFloat(p.price) || 0;
+      const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : buyP;
+      const profitTL = sellP - buyP;
+      const margin = buyP > 0 ? ((profitTL / buyP) * 100) : (sellP > 0 ? 100 : 0);
+      return[p.name,p.barc,p.cat,sup?.name||'',p.stk,p.unit,p.min,buyP,sellP,profitTL.toFixed(2),'%'+margin.toFixed(1),(p.stk*buyP).toFixed(2),(p.stk*sellP).toFixed(2)];
     }));
 }
 function csvOrders(){
