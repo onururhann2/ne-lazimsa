@@ -1012,7 +1012,14 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
     <form onsubmit="saveProd(event)">
       <div class="form-row">
         <div class="fg"><label>Ürün Adı *</label><input type="text" id="p-name" required placeholder="Örn: A4 Kağıt"></div>
-        <div class="fg"><label>Barkod</label><input type="text" id="p-barc" placeholder="8691234567890"></div>
+        <div class="fg"><label>Ana Barkod</label><input type="text" id="p-barc" placeholder="8691234567890"></div>
+      </div>
+      <div class="fg">
+        <label style="display:flex;justify-content:space-between;align-items:center">
+          <span>Alt Barkodlar / Ek Barkodlar</span>
+          <span style="font-size:11px;color:var(--txt3)">Virgülle veya boşlukla ayırarak ekleyin</span>
+        </label>
+        <input type="text" id="p-alt-barc" placeholder="Örn: 869000000002, 869000000003">
       </div>
       <div class="form-row">
         <div class="fg"><label>Kategori *</label><input type="text" id="p-cat2" list="catlist" required placeholder="Örn: Kırtasiye"><datalist id="catlist"></datalist></div>
@@ -1427,6 +1434,23 @@ function renderDash(){
 }
 
 // ══════════════ PRODUCTS ══════════════
+function findProductByBarcode(code){
+  if(!code) return null;
+  const clean = String(code).trim().toLowerCase();
+  if(!clean) return null;
+  const P = gp();
+  return P.find(p => {
+    if((p.barc || '').trim().toLowerCase() === clean) return true;
+    if(Array.isArray(p.altBarcodes)){
+      return p.altBarcodes.some(b => String(b).trim().toLowerCase() === clean);
+    }
+    if(typeof p.altBarcodes === 'string' && p.altBarcodes.trim()){
+      return p.altBarcodes.split(',').some(b => b.trim().toLowerCase() === clean);
+    }
+    return false;
+  }) || null;
+}
+
 function renderProds(){
   const search=(document.getElementById('p-search')?.value||'').toLowerCase();
   const catF=document.getElementById('p-cat')?.value||'';
@@ -1436,12 +1460,20 @@ function renderProds(){
   const catEl=document.getElementById('p-cat');
   if(catEl){const prev=catEl.value;catEl.innerHTML='<option value="">Tüm Kategoriler</option>'+cats.map(c=>`<option value="${c}" ${c===prev?'selected':''}>${c}</option>`).join('');}
   const dl=document.getElementById('catlist');if(dl)dl.innerHTML=cats.map(c=>`<option value="${c}">`).join('');
-  if(search)P=P.filter(p=>p.name.toLowerCase().includes(search)||p.barc?.includes(search)||p.cat.toLowerCase().includes(search));
+  if(search){
+    P=P.filter(p => {
+      const altStr = Array.isArray(p.altBarcodes) ? p.altBarcodes.join(' ') : (p.altBarcodes || '');
+      return p.name.toLowerCase().includes(search) ||
+        (p.barc || '').toLowerCase().includes(search) ||
+        altStr.toLowerCase().includes(search) ||
+        p.cat.toLowerCase().includes(search);
+    });
+  }
   if(catF)P=P.filter(p=>p.cat===catF);
   if(stF)P=P.filter(p=>sst(p)===stF);
   const S=gs();
   const tb=document.getElementById('prods-tbody');
-  if(!P.length){tb.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-icon">📦</div><h3>Ürün bulunamadı</h3><p>Filtrelerinizi değiştirin veya yeni ürün ekleyin</p></div></td></tr>';return;}
+  if(!P.length){tb.innerHTML='<tr><td colspan="10"><div class="empty"><div class="empty-icon">📦</div><h3>Ürün bulunamadı</h3><p>Filtrelerinizi değiştirin veya yeni ürün ekleyin</p></div></td></tr>';return;}
   tb.innerHTML=P.map(p=>{
     const st=sst(p),pct=Math.min(100,Math.round(p.stk/(p.min*2||1)*100));
     const sup=S.find(s=>s.id===p.sup);
@@ -1451,9 +1483,15 @@ function renderProds(){
     const profitMargin = buyP > 0 ? ((profitTL / buyP) * 100) : (sellP > 0 ? 100 : 0);
     const profitColor = profitTL > 0 ? 'var(--green)' : profitTL < 0 ? 'var(--red)' : 'var(--txt2)';
     const marginBadge = profitMargin > 0 ? 'b-ok' : profitMargin < 0 ? 'b-danger' : 'b-blue';
+    const altArr = Array.isArray(p.altBarcodes) ? p.altBarcodes : (typeof p.altBarcodes === 'string' ? p.altBarcodes.split(',') : []);
+    const altBadges = altArr.map(x => x.trim()).filter(Boolean).map(b => `<span style="background:rgba(59,130,246,.12);color:var(--accent);font-size:10px;padding:1px 5px;border-radius:4px" title="Alt Barkod">${b}</span>`).join('');
+    
     return`<tr class="${st==='crit'?'crit-row':''}">
       <td><div style="font-weight:600">${p.name}</div>${p.note?`<div style="font-size:11px;color:var(--txt3)">${p.note}</div>`:''}</td>
-      <td class="mono">${p.barc||'—'}</td>
+      <td class="mono">
+        ${p.barc ? `<div style="font-weight:600">${p.barc}</div>` : '<span style="color:var(--txt3)">—</span>'}
+        ${altBadges ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${altBadges}</div>` : ''}
+      </td>
       <td><span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px">${p.cat}</span></td>
       <td style="color:var(--txt2)">${sup?sup.name:'—'}</td>
       <td><div class="sbar"><div class="sbar-track"><div class="sbar-fill ${st}" style="width:${pct}%"></div></div><span style="font-size:12px;font-weight:600;min-width:55px">${p.stk} ${p.unit}</span></div><div style="font-size:10px;color:var(--txt3);margin-top:2px">Min: ${p.min}</div></td>
@@ -1461,7 +1499,7 @@ function renderProds(){
       <td style="font-weight:700;color:var(--accent)">${tl(sellP)}</td>
       <td style="font-weight:700;color:${profitColor}">${profitTL > 0 ? '+' : ''}${tl(profitTL)}</td>
       <td><span class="badge ${marginBadge}">${profitMargin > 0 ? '+' : ''}%${profitMargin.toFixed(1)}</span></td>
-      <td><div class="flex gap-2"><button class="btn btn-ghost btn-sm" onclick="openProdModal(${p.id})">✏️</button><button class="btn btn-warning btn-sm" onclick="critToOrder(${p.id})">🛒</button><button class="btn btn-danger btn-sm" onclick="delProd(${p.id})">🗑️</button></div></td>
+      <td><div class="flex gap-2"><button class="btn btn-ghost btn-sm" onclick="openProdModal(${p.id})">✏️</button><button class="btn btn-danger btn-sm" onclick="delProd(${p.id})">🗑️</button></div></td>
     </tr>`;
   }).join('');
 }
@@ -1489,6 +1527,8 @@ function openProdModal(id){
     document.getElementById('p-id').value=p.id;
     document.getElementById('p-name').value=p.name;
     document.getElementById('p-barc').value=p.barc||'';
+    const altArr = Array.isArray(p.altBarcodes) ? p.altBarcodes : (typeof p.altBarcodes === 'string' ? p.altBarcodes.split(',') : []);
+    document.getElementById('p-alt-barc').value = altArr.map(x => x.trim()).filter(Boolean).join(', ');
     document.getElementById('p-cat2').value=p.cat;
     document.getElementById('p-unit').value=p.unit;
     document.getElementById('p-stk').value=p.stk;
@@ -1502,6 +1542,7 @@ function openProdModal(id){
     document.getElementById('prod-ttl').textContent='Ürün Ekle';
     document.querySelector('#m-prod form').reset();
     document.getElementById('p-id').value='';
+    document.getElementById('p-alt-barc').value='';
     calcProdProfit();
     if(lastCode){document.getElementById('p-barc').value=lastCode;lastCode=null;}
   }
@@ -1513,9 +1554,12 @@ function saveProd(e){
   const buyP=parseFloat(document.getElementById('p-price').value)||0;
   const sellPInput=document.getElementById('p-sell-price').value;
   const sellP=sellPInput!==''?parseFloat(sellPInput)||0:buyP;
+  const altRaw = document.getElementById('p-alt-barc').value.trim();
+  const altBarcodes = altRaw ? altRaw.split(/[,;\n]+/).map(b => b.trim()).filter(Boolean) : [];
   const d={
     name:document.getElementById('p-name').value.trim(),
     barc:document.getElementById('p-barc').value.trim(),
+    altBarcodes: altBarcodes,
     cat:document.getElementById('p-cat2').value.trim(),
     unit:document.getElementById('p-unit').value,
     stk:parseInt(document.getElementById('p-stk').value)||0,
@@ -1879,7 +1923,7 @@ function closeScanner(){stopCam('scan');closeM('m-scan');}
 function onScan(code){
   lastCode=code;
   document.getElementById('scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">✅ Barkod: ${code}</span>`;
-  const p=gp().find(x=>x.barc===code);
+  const p=findProductByBarcode(code);
   const info=document.getElementById('scan-info');
   const btn=document.getElementById('scan-act-btn');
   if(p){
@@ -1893,7 +1937,7 @@ function onScan(code){
   info.style.display='block';btn.style.display='inline-flex';
 }
 function doScanAction(){
-  const p=gp().find(x=>x.barc===lastCode);
+  const p=findProductByBarcode(lastCode);
   closeScanner();
   if(p)openProdModal(p.id);else openProdModal();
 }
@@ -1908,10 +1952,14 @@ async function openQC(){
     const now=Date.now();
     if(code===lastQC&&now-lastQCt<2000)return;
     lastQC=code;lastQCt=now;
-    const P=gp(),pi=P.findIndex(p=>p.barc===code);
-    if(pi>=0){P[pi].stk+=1;sp(P);const p=P[pi];
-      document.getElementById('qc-res').innerHTML=`<span style="color:var(--green);font-weight:600">✅ ${p.name} → Stok: ${p.stk} ${p.unit}</span>`;
-      addQCLog(p.name,p.stk,p.unit,true);updBadge();
+    const p=findProductByBarcode(code);
+    if(p){
+      const P=gp(),pi=P.findIndex(x=>x.id===p.id);
+      if(pi>=0){
+        P[pi].stk+=1;sp(P);
+        document.getElementById('qc-res').innerHTML=`<span style="color:var(--green);font-weight:600">✅ ${P[pi].name} → Stok: ${P[pi].stk} ${P[pi].unit}</span>`;
+        addQCLog(P[pi].name,P[pi].stk,P[pi].unit,true);updBadge();
+      }
     }else{
       document.getElementById('qc-res').innerHTML=`<span style="color:var(--yellow)">⚠️ Bulunamadı: ${code}</span>`;
       addQCLog(code,null,null,false);
@@ -2496,14 +2544,15 @@ function dlCSV(fn,headers,rows){
 }
 function csvProducts(){
   const P=gp(),S=gs();
-  dlCSV('stok_listesi.csv',['Ürün','Barkod','Kategori','Tedarikçi','Stok','Birim','Min Seviye','Alış Fiyatı','Satış Fiyatı','Birim Kâr (₺)','Kâr Marjı (%)','Toplam Alış Değeri','Toplam Satış Değeri'],
+  dlCSV('stok_listesi.csv',['Ürün','Ana Barkod','Alt Barkodlar','Kategori','Tedarikçi','Stok','Birim','Min Seviye','Alış Fiyatı','Satış Fiyatı','Birim Kâr (₺)','Kâr Marjı (%)','Toplam Alış Değeri','Toplam Satış Değeri'],
     P.map(p=>{
       const sup=S.find(s=>s.id===p.sup);
       const buyP = parseFloat(p.price) || 0;
       const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : buyP;
       const profitTL = sellP - buyP;
       const margin = buyP > 0 ? ((profitTL / buyP) * 100) : (sellP > 0 ? 100 : 0);
-      return[p.name,p.barc,p.cat,sup?.name||'',p.stk,p.unit,p.min,buyP,sellP,profitTL.toFixed(2),'%'+margin.toFixed(1),(p.stk*buyP).toFixed(2),(p.stk*sellP).toFixed(2)];
+      const altStr = Array.isArray(p.altBarcodes) ? p.altBarcodes.join(', ') : (p.altBarcodes || '');
+      return[p.name,p.barc,altStr,p.cat,sup?.name||'',p.stk,p.unit,p.min,buyP,sellP,profitTL.toFixed(2),'%'+margin.toFixed(1),(p.stk*buyP).toFixed(2),(p.stk*sellP).toFixed(2)];
     }));
 }
 function csvOrders(){
@@ -2887,7 +2936,7 @@ function parseInvoiceText(rawText){
         // Match with existing products
         let matchedProd = null;
         if(barc){
-          matchedProd = products.find(p => p.barc === barc);
+          matchedProd = findProductByBarcode(barc);
         }
         if(!matchedProd){
           const normName = name.toLowerCase().replace(/[^a-z0-9ğüşıöç]/g, '');
@@ -3123,7 +3172,7 @@ function confirmBulkInvoiceStockin(){
       targetProd = P.find(p => p.id === entry.prodId);
     }
     if(!targetProd && entry.barc){
-      targetProd = P.find(p => p.barc === entry.barc);
+      targetProd = findProductByBarcode(entry.barc);
     }
     if(!targetProd){
       targetProd = P.find(p => p.name.toLowerCase() === entry.name.toLowerCase());
@@ -3210,7 +3259,7 @@ function loadSampleInvoice(){
 
 function onStockinScan(code){
   document.getElementById('stockin-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 Barkod: ${code}</span>`;
-  const p=gp().find(x=>x.barc===code);
+  const p=findProductByBarcode(code);
   if(p){
     stockinProdId=p.id;
     document.getElementById('stockin-prod-id').value=p.id;
@@ -3574,7 +3623,7 @@ function onSalesScan(code, fromRemote = false){
     broadcastRemoteScan(cleanCode);
   }
 
-  const p = gp().find(x => x.barc === cleanCode);
+  const p = findProductByBarcode(cleanCode);
   if(p){
     salesScannedProdId = p.id;
     const sellPrice = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : parseFloat(p.price)||0;
