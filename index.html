@@ -395,10 +395,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <div class="nav-item" id="nav-sales" onclick="go('sales')">
         <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>Satış Ekranı
       </div>
-      <div class="nav-sec">Satın Alma</div>
-      <div class="nav-item" id="nav-orders" onclick="go('orders')">
-        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>Satın Alma Siparişleri
-      </div>
+      <div class="nav-sec">Tedarik</div>
       <div class="nav-item" id="nav-suppliers" onclick="go('suppliers')">
         <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>Tedarikçiler
       </div>
@@ -446,8 +443,8 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <div class="stats-grid" id="dash-stats"></div>
       <div class="grid-2">
         <div class="tbl-wrap">
-          <div class="tbl-head"><span class="tbl-title">Son Siparişler</span><button class="btn btn-ghost btn-sm" onclick="go('orders')">Tümü →</button></div>
-          <table><thead><tr><th>No</th><th>Ürün</th><th>Durum</th></tr></thead><tbody id="dash-orders"></tbody></table>
+          <div class="tbl-head"><span class="tbl-title">Son Satışlar</span><button class="btn btn-ghost btn-sm" onclick="go('sales')">Satış Ekranı →</button></div>
+          <table><thead><tr><th>Fiş No</th><th>Tutar</th><th>Zaman</th></tr></thead><tbody id="dash-sales"></tbody></table>
         </div>
         <div class="tbl-wrap">
           <div class="tbl-head"><span class="tbl-title">Kritik Stok</span><button class="btn btn-ghost btn-sm" onclick="go('critical')">Tümü →</button></div>
@@ -480,21 +477,6 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <div><h1 class="page-title">Kritik Ürünler</h1><p class="page-sub">Minimum seviyenin altındaki ürünler</p></div>
       </div>
       <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Kategori</th><th>Mevcut</th><th>Min. Seviye</th><th>Eksik</th><th>Tedarikçi</th><th>İşlem</th></tr></thead><tbody id="crit-tbody"></tbody></table></div>
-    </div>
-
-    <!-- ORDERS -->
-    <div class="page" id="page-orders">
-      <div class="page-header">
-        <div><h1 class="page-title">Satın Alma Siparişleri</h1><p class="page-sub">Siparişleri takip edin ve yönetin</p></div>
-        <div class="page-actions">
-          <button class="btn btn-ghost" onclick="csvOrders()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>CSV İndir</button>
-          <button class="btn btn-primary" onclick="openOrdModal()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Yeni Sipariş</button>
-        </div>
-      </div>
-      <div class="filter-bar">
-        <select id="o-filter" onchange="renderOrds()"><option value="">Tüm Durumlar</option><option>Bekliyor</option><option>Yolda</option><option>Teslim Edildi</option><option>İptal</option></select>
-      </div>
-      <div class="tbl-wrap"><table><thead><tr><th>No</th><th>Ürün</th><th>Tedarikçi</th><th>Miktar</th><th>Toplam</th><th>Tarih</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody id="ords-tbody"></tbody></table></div>
     </div>
 
     <!-- SUPPLIERS -->
@@ -988,28 +970,6 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   </div>
 </div>
 
-<!-- Order -->
-<div class="overlay" id="m-ord">
-  <div class="modal">
-    <div class="modal-hdr"><h2 class="modal-ttl" id="ord-ttl">Yeni Sipariş</h2><button class="modal-x" onclick="closeM('m-ord')">×</button></div>
-    <form onsubmit="saveOrd(event)">
-      <div class="fg"><label>Ürün *</label><select id="o-prod" required onchange="fillOrdSup()"><option value="">Ürün Seçin</option></select></div>
-      <div class="form-row">
-        <div class="fg"><label>Miktar *</label><input type="number" id="o-qty" required min="1" placeholder="1" oninput="calcOrdTot()"></div>
-        <div class="fg"><label>Birim Fiyat (₺)</label><input type="number" id="o-price" min="0" step="0.01" placeholder="0.00" oninput="calcOrdTot()"></div>
-      </div>
-      <div class="form-row">
-        <div class="fg"><label>Tedarikçi</label><select id="o-sup"><option value="">Seçiniz</option></select></div>
-        <div class="fg"><label>Durum</label><select id="o-stat"><option>Bekliyor</option><option>Yolda</option><option>Teslim Edildi</option><option>İptal</option></select></div>
-      </div>
-      <div class="fg"><label>Toplam Tutar</label><input type="text" id="o-tot" readonly style="opacity:.65" placeholder="Otomatik hesaplanır"></div>
-      <div class="fg"><label>Not</label><textarea id="o-note" rows="2" placeholder="Sipariş notu..."></textarea></div>
-      <input type="hidden" id="o-id">
-      <div class="modal-ftr"><button type="button" class="btn btn-ghost" onclick="closeM('m-ord')">İptal</button><button type="submit" class="btn btn-primary">Kaydet</button></div>
-    </form>
-  </div>
-</div>
-
 <!-- Supplier -->
 <div class="overlay" id="m-sup">
   <div class="modal">
@@ -1333,7 +1293,7 @@ function go(page){
   document.querySelectorAll('.bnav-item').forEach(e=>e.classList.remove('active'));
   const bn=document.getElementById('bnav-'+page);
   if(bn)bn.classList.add('active');
-  ({dashboard:renderDash,products:renderProds,critical:renderCrit,orders:renderOrds,suppliers:renderSups,reports:renderRep,stockin:initStockin,sales:initSales}[page]||function(){})();
+  ({dashboard:renderDash,products:renderProds,critical:renderCrit,suppliers:renderSups,reports:renderRep,stockin:initStockin,sales:initSales}[page]||function(){})();
   updBadge();
   closeSidebar();
   window.scrollTo(0,0);
@@ -1363,24 +1323,42 @@ function closeSidebar(){
 
 // ══════════════ DASHBOARD ══════════════
 function renderDash(){
-  const P=gp(),O=go2(),S=gs();
+  const P=gp(), S=gs(), sHist=gsh();
   const crits=P.filter(p=>sst(p)==='crit');
-  const pend=O.filter(o=>o.stat==='Bekliyor'||o.stat==='Yolda').length;
-  const spent=O.filter(o=>o.stat==='Teslim Edildi').reduce((s,o)=>s+(o.total||0),0);
+  const totalSalesRevenue = sHist.reduce((s, x) => s + (x.totalAmount || 0), 0);
+  const totalSalesProfit = sHist.reduce((s, x) => s + (x.totalProfit || 0), 0);
   const val=P.reduce((s,p)=>s+(p.stk*(p.price||0)),0);
+
   document.getElementById('dash-stats').innerHTML=`
     <div class="stat-card s-blue"><div class="stat-ico">📦</div><div class="stat-val">${P.length}</div><div class="stat-lbl">Toplam Ürün</div><div class="stat-meta">${tl(val)} stok değeri</div></div>
     <div class="stat-card s-red"><div class="stat-ico">⚠️</div><div class="stat-val">${crits.length}</div><div class="stat-lbl">Kritik Stok</div><div class="stat-meta">${crits.length>0?'Dikkat gerektiriyor!':'Tüm stoklar normal'}</div></div>
-    <div class="stat-card s-yellow"><div class="stat-ico">🛒</div><div class="stat-val">${pend}</div><div class="stat-lbl">Bekleyen Sipariş</div><div class="stat-meta">${O.length} toplam sipariş</div></div>
-    <div class="stat-card s-green"><div class="stat-ico">💰</div><div class="stat-val">${tl(spent)}</div><div class="stat-lbl">Toplam Harcama</div><div class="stat-meta">${S.length} tedarikçi</div></div>
+    <div class="stat-card s-green"><div class="stat-ico">🛍️</div><div class="stat-val">${sHist.length}</div><div class="stat-lbl">Tamamlanan Satış</div><div class="stat-meta">Ciro: ${tl(totalSalesRevenue)}</div></div>
+    <div class="stat-card s-yellow"><div class="stat-ico">💰</div><div class="stat-val">${tl(totalSalesProfit)}</div><div class="stat-lbl">Toplam Kâr</div><div class="stat-meta">${S.length} tedarikçi</div></div>
   `;
+
   const banner=document.getElementById('dash-banner');
   banner.innerHTML=crits.length?`<div class="alert-banner"><span style="font-size:20px">🔴</span><div style="flex:1"><div class="alert-banner-title">Kritik Stok Uyarısı — ${crits.length} ürün minimum seviyenin altında!</div><div class="alert-banner-sub">${crits.slice(0,3).map(p=>p.name).join(', ')}${crits.length>3?' ve daha fazlası...':''}</div></div><button class="btn btn-danger btn-sm" onclick="go('critical')">Görüntüle</button></div>`:'';
-  // recent orders
-  const ord5=[...O].sort((a,b)=>b.id-a.id).slice(0,5);
-  document.getElementById('dash-orders').innerHTML=ord5.length?ord5.map(o=>{const pr=P.find(p=>p.id===o.prod);return`<tr><td class="mono">#${String(o.id).padStart(4,'0')}</td><td style="font-weight:500">${pr?pr.name:'?'}</td><td>${obadge(o.stat)}</td></tr>`}).join(''):'<tr><td colspan="3"><div class="empty" style="padding:24px">Henüz sipariş yok</div></td></tr>';
-  // critical short
-  document.getElementById('dash-crits').innerHTML=crits.length?crits.slice(0,5).map(p=>`<tr class="crit-row"><td style="font-weight:500">${p.name}</td><td><span class="badge b-danger">${p.stk} ${p.unit}</span></td><td><button class="btn btn-warning btn-sm" onclick="critToOrder(${p.id})">Sipariş</button></td></tr>`).join(''):'<tr><td colspan="3"><div class="empty" style="padding:24px">✅ Kritik ürün yok</div></td></tr>';
+
+  // Recent Sales Table
+  const sales5=[...sHist].slice(0, 5);
+  const salesTbody = document.getElementById('dash-sales');
+  if(salesTbody){
+    salesTbody.innerHTML = sales5.length ? sales5.map(s => {
+      return `<tr><td class="mono" style="font-weight:600">${s.receiptNo || '#'}</td><td style="font-weight:700;color:var(--accent)">${tl(s.totalAmount || 0)}</td><td style="color:var(--txt2);font-size:12px">${s.time || ''}</td></tr>`;
+    }).join('') : '<tr><td colspan="3"><div class="empty" style="padding:20px">Henüz tamamlanan satış yok</div></td></tr>';
+  }
+
+  // Critical items table
+  const critsTbody = document.getElementById('dash-crits');
+  if(critsTbody){
+    critsTbody.innerHTML = crits.length ? crits.slice(0, 5).map(p => `
+      <tr class="crit-row">
+        <td style="font-weight:500">${p.name}</td>
+        <td><span class="badge b-danger">${p.stk} ${p.unit}</span></td>
+        <td><button class="btn btn-warning btn-sm" onclick="go('stockin')">➕ Stok Ekle</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="3"><div class="empty" style="padding:20px">✅ Kritik ürün yok</div></td></tr>';
+  }
 }
 
 // ══════════════ PRODUCTS ══════════════
@@ -1493,50 +1471,8 @@ function renderCrit(){
   const P=gp().filter(p=>sst(p)==='crit'),S=gs();
   const tb=document.getElementById('crit-tbody');
   if(!P.length){tb.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-icon">✅</div><h3>Harika! Kritik ürün yok</h3><p>Tüm stok seviyeleri normal.</p></div></td></tr>';return;}
-  tb.innerHTML=P.map(p=>{const sup=S.find(s=>s.id===p.sup),miss=Math.max(0,p.min-p.stk);return`<tr class="crit-row"><td style="font-weight:600">${p.name}</td><td><span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px">${p.cat}</span></td><td><span class="badge b-danger">${p.stk} ${p.unit}</span></td><td style="color:var(--txt2)">${p.min} ${p.unit}</td><td style="color:var(--yellow);font-weight:700">+${miss} ${p.unit}</td><td>${sup?sup.name:'—'}</td><td><button class="btn btn-warning btn-sm" onclick="critToOrder(${p.id})">🛒 Sipariş Ver</button></td></tr>`;}).join('');
+  tb.innerHTML=P.map(p=>{const sup=S.find(s=>s.id===p.sup),miss=Math.max(0,p.min-p.stk);return`<tr class="crit-row"><td style="font-weight:600">${p.name}</td><td><span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px">${p.cat}</span></td><td><span class="badge b-danger">${p.stk} ${p.unit}</span></td><td style="color:var(--txt2)">${p.min} ${p.unit}</td><td style="color:var(--yellow);font-weight:700">+${miss} ${p.unit}</td><td>${sup?sup.name:'—'}</td><td><button class="btn btn-warning btn-sm" onclick="go('stockin')">➕ Stok Girişi</button></td></tr>`;}).join('');
 }
-
-// ══════════════ ORDERS ══════════════
-function renderOrds(){
-  let O=go2();const f=document.getElementById('o-filter')?.value||'';
-  if(f)O=O.filter(o=>o.stat===f);
-  O=[...O].sort((a,b)=>b.id-a.id);
-  const P=gp(),S=gs();
-  const tb=document.getElementById('ords-tbody');
-  if(!O.length){tb.innerHTML='<tr><td colspan="8"><div class="empty"><div class="empty-icon">🛒</div><h3>Sipariş bulunamadı</h3><p>Yeni sipariş oluşturmak için butona tıklayın</p></div></td></tr>';return;}
-  tb.innerHTML=O.map(o=>{const pr=P.find(p=>p.id===o.prod),sup=S.find(s=>s.id===o.sup);return`<tr><td class="mono">#${String(o.id).padStart(4,'0')}</td><td style="font-weight:500">${pr?pr.name:'?'}</td><td style="color:var(--txt2)">${sup?sup.name:'—'}</td><td>${o.qty} ${pr?pr.unit:'Adet'}</td><td style="font-weight:600">${tl(o.total)}</td><td style="color:var(--txt2);font-size:12px">${o.date}</td><td>${obadge(o.stat)}</td><td><div class="flex gap-2"><button class="btn btn-ghost btn-sm" onclick="openOrdModal(${o.id})">✏️</button><button class="btn btn-danger btn-sm" onclick="delOrd(${o.id})">🗑️</button></div></td></tr>`;}).join('');
-}
-function obadge(s){const m={Bekliyor:'b-warn',Yolda:'b-blue','Teslim Edildi':'b-ok','İptal':'b-danger'};return`<span class="badge ${m[s]||'b-blue'}">${s}</span>`;}
-function openOrdModal(id,prefProd){
-  const P=gp(),S=gs();
-  document.getElementById('o-prod').innerHTML='<option value="">Ürün Seçin</option>'+P.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  document.getElementById('o-sup').innerHTML='<option value="">Seçiniz</option>'+S.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-  if(id){const o=go2().find(x=>x.id===id);if(!o)return;
-    document.getElementById('ord-ttl').textContent='Siparişi Düzenle';
-    document.getElementById('o-id').value=o.id;document.getElementById('o-prod').value=o.prod;document.getElementById('o-qty').value=o.qty;document.getElementById('o-price').value=o.price||'';document.getElementById('o-sup').value=o.sup||'';document.getElementById('o-stat').value=o.stat;document.getElementById('o-note').value=o.note||'';document.getElementById('o-tot').value=tl(o.total);
-  }else{
-    document.getElementById('ord-ttl').textContent='Yeni Sipariş';
-    document.querySelector('#m-ord form').reset();document.getElementById('o-id').value='';document.getElementById('o-tot').value='';
-    if(prefProd){document.getElementById('o-prod').value=prefProd;fillOrdSup();}
-  }
-  openM('m-ord');
-}
-function fillOrdSup(){const p=gp().find(x=>x.id===parseInt(document.getElementById('o-prod').value));if(p){if(p.sup)document.getElementById('o-sup').value=p.sup;if(p.price){document.getElementById('o-price').value=p.price;calcOrdTot();}}}
-function calcOrdTot(){const q=parseFloat(document.getElementById('o-qty').value)||0,pr=parseFloat(document.getElementById('o-price').value)||0;document.getElementById('o-tot').value=q&&pr?tl(q*pr):'';}
-function saveOrd(e){
-  e.preventDefault();
-  const O=go2(),id=document.getElementById('o-id').value;
-  const qty=parseInt(document.getElementById('o-qty').value)||0,price=parseFloat(document.getElementById('o-price').value)||0;
-  const d={prod:parseInt(document.getElementById('o-prod').value),sup:parseInt(document.getElementById('o-sup').value)||null,qty,price,total:qty*price,stat:document.getElementById('o-stat').value,date:fd(new Date()),note:document.getElementById('o-note').value.trim()};
-  if(id){
-    const i=O.findIndex(o=>o.id===parseInt(id));
-    if(d.stat==='Teslim Edildi'&&O[i].stat!=='Teslim Edildi'){const P=gp(),pi=P.findIndex(p=>p.id===d.prod);if(pi>=0){P[pi].stk+=d.qty;sp(P);toast('i','Stok Güncellendi',`${P[pi].name} stoğu +${d.qty} arttı`);}}
-    O[i]={...O[i],...d};toast('s','Güncellendi','Sipariş güncellendi');
-  }else{d.id=nid(O);O.push(d);toast('s','Sipariş Oluşturuldu','Yeni sipariş eklendi');}
-  so(O);closeM('m-ord');renderOrds();
-}
-function delOrd(id){if(!confirm('Bu siparişi silmek istediğinize emin misiniz?'))return;so(go2().filter(o=>o.id!==id));renderOrds();toast('s','Silindi','Sipariş silindi');}
-function critToOrder(pid){go('orders');openOrdModal(null,pid);}
 
 // ══════════════ SUPPLIERS ══════════════
 function renderSups(){
@@ -4262,7 +4198,6 @@ function refreshActiveViewSilently(){
   if(pageId === 'dashboard') renderDash();
   else if(pageId === 'products') renderProds();
   else if(pageId === 'critical') renderCrit();
-  else if(pageId === 'orders') renderOrds();
   else if(pageId === 'suppliers') renderSups();
   else if(pageId === 'reports') renderRep();
   else if(pageId === 'sales'){
