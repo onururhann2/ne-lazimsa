@@ -1284,11 +1284,11 @@ function gsh(){try{return JSON.parse(ls('nl_sales_hist')||'[]')}catch(e){return[
 function gih(){try{return JSON.parse(ls('nl_stockin_hist')||'[]')}catch(e){return[]}}
 
 // Save and sync data immediately
-function sp(d){ls('nl_prod',JSON.stringify(d));triggerCloudPush('products');}
-function ss(d){ls('nl_sup',JSON.stringify(d));triggerCloudPush('suppliers');}
-function so(d){ls('nl_ord',JSON.stringify(d));triggerCloudPush('orders');}
-function ssh(d){ls('nl_sales_hist',JSON.stringify(d));triggerCloudPush('sales_history');}
-function sih(d){ls('nl_stockin_hist',JSON.stringify(d));triggerCloudPush('stockin_history');}
+function sp(d){localStorage.setItem('nl_prod',JSON.stringify(d));triggerCloudPush('products', true);}
+function ss(d){localStorage.setItem('nl_sup',JSON.stringify(d));triggerCloudPush('suppliers', true);}
+function so(d){localStorage.setItem('nl_ord',JSON.stringify(d));triggerCloudPush('orders', true);}
+function ssh(d){localStorage.setItem('nl_sales_hist',JSON.stringify(d));triggerCloudPush('sales_history', true);}
+function sih(d){localStorage.setItem('nl_stockin_hist',JSON.stringify(d));triggerCloudPush('stockin_history', true);}
 function nid(a){return a.length?Math.max(...a.map(x=>x.id))+1:1}
 function fd(d){return d.toISOString().split('T')[0]}
 function tl(n){return'₺'+Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -4168,17 +4168,24 @@ function triggerCloudPush(reason, immediate = false){
 function applyRemotePayload(payload, source){
   if(!payload || isRemoteApplying) return;
 
+  const remoteTime = Number(payload.updatedAt || payload.updated_at || 0);
+
+  // If remote payload is older than our latest local modification, do not overwrite products/suppliers/orders
+  const isStale = (remoteTime > 0 && lastCloudSyncTime > 0 && remoteTime < lastCloudSyncTime);
+
   isRemoteApplying = true;
   
   try{
-    if(Array.isArray(payload.products)){
-      localStorage.setItem('nl_prod', JSON.stringify(payload.products));
-    }
-    if(Array.isArray(payload.suppliers)){
-      localStorage.setItem('nl_sup', JSON.stringify(payload.suppliers));
-    }
-    if(Array.isArray(payload.orders)){
-      localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
+    if(!isStale){
+      if(Array.isArray(payload.products)){
+        localStorage.setItem('nl_prod', JSON.stringify(payload.products));
+      }
+      if(Array.isArray(payload.suppliers)){
+        localStorage.setItem('nl_sup', JSON.stringify(payload.suppliers));
+      }
+      if(Array.isArray(payload.orders)){
+        localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
+      }
     }
 
     // Lossless Merge for Sales History (prevents any sale from ever being overwritten or lost)
@@ -4215,8 +4222,8 @@ function applyRemotePayload(payload, source){
       localStorage.setItem('nl_stockin_hist', JSON.stringify(mergedIn));
     }
 
-    if(payload.updatedAt || payload.updated_at){
-      lastCloudSyncTime = Math.max(lastCloudSyncTime, payload.updatedAt || payload.updated_at);
+    if(remoteTime > 0){
+      lastCloudSyncTime = Math.max(lastCloudSyncTime, remoteTime);
     }
 
     refreshActiveViewSilently();
