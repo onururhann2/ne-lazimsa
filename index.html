@@ -1226,18 +1226,43 @@ function getTimeStr(d = new Date()){
 }
 
 function initData(){
-  // Clean legacy demo test mock data if present
-  if(!localStorage.getItem('nl_cleaned_mock_v2')){
-    const curP = ls('nl_prod') || '';
-    if(curP.includes('A4 Fotokopi') || curP.includes('Tükenmez Kalem')){
-      localStorage.setItem('nl_prod', '[]');
-      localStorage.setItem('nl_sup', '[]');
-      localStorage.setItem('nl_ord', '[]');
-      localStorage.setItem('nl_sales_hist', '[]');
-      localStorage.setItem('nl_stockin_hist', '[]');
+  // Sanitize data: Purge all demo/test mock records, keep ONLY user-created products & data
+  const mockBarcodes = new Set(['8690000000001','8690000000002','8690000000003','8690000000004','8690000000005','8690000000006','8690000000007','8690000000008','8690000000009','8690000000010']);
+  const mockNames = new Set(['A4 Fotokopi Kağıdı (500lü)', 'Tükenmez Kalem (Mavi)', 'Toner HP LaserJet 85A', 'USB Klavye', 'Sıvı Sabun (5lt)', 'Çöp Torbası (50li)', 'Karton Kutu (Büyük)', 'Şeffaf Bant (10lu)', 'Ağır Hizmet Eldiveni', 'Maket Bıçağı']);
+  const mockSupNames = new Set(['Ofis Dünyası A.Ş.', 'Teknoloji Market', 'Temizlik Pro', 'Ambalaj Center']);
+  const mockReceipts = new Set(['#948201', '#948202', '#948190']);
+
+  try{
+    let curProds = gp();
+    if(Array.isArray(curProds)){
+      curProds = curProds.filter(p => !mockBarcodes.has(p.barc) && !mockNames.has(p.name));
+      localStorage.setItem('nl_prod', JSON.stringify(curProds));
     }
-    localStorage.setItem('nl_cleaned_mock_v2', 'true');
-  }
+
+    let curSups = gs();
+    if(Array.isArray(curSups)){
+      curSups = curSups.filter(s => !mockSupNames.has(s.name));
+      localStorage.setItem('nl_sup', JSON.stringify(curSups));
+    }
+
+    let curOrds = go2();
+    if(Array.isArray(curOrds)){
+      curOrds = curOrds.filter(o => o.id > 10 || (o.note !== 'Acil' && o.total !== 9250 && o.total !== 4250 && o.total !== 1100 && o.total !== 1350 && o.total !== 500));
+      localStorage.setItem('nl_ord', JSON.stringify(curOrds));
+    }
+
+    let curSales = gsh();
+    if(Array.isArray(curSales)){
+      curSales = curSales.filter(s => !mockReceipts.has(s.receiptNo) && s.id !== 101 && s.id !== 102 && s.id !== 103);
+      localStorage.setItem('nl_sales_hist', JSON.stringify(curSales));
+    }
+
+    let curStockin = gih();
+    if(Array.isArray(curStockin)){
+      curStockin = curStockin.filter(s => s.id !== 201 && s.id !== 202 && s.id !== 203);
+      localStorage.setItem('nl_stockin_hist', JSON.stringify(curStockin));
+    }
+  }catch(e){}
 
   if(!ls('nl_sup')) ls('nl_sup', '[]');
   if(!ls('nl_prod')) ls('nl_prod', '[]');
@@ -1247,6 +1272,7 @@ function initData(){
   if(!ls('nl_theme')) ls('nl_theme','dark');
   
   setupRealtimeSync();
+  setTimeout(() => triggerCloudPush('purge_mock_data', true), 500);
 }
 
 function ls(k,v){if(v!==undefined)localStorage.setItem(k,v);else return localStorage.getItem(k)}
