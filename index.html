@@ -577,51 +577,88 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
     <div class="page" id="page-reports">
       <div class="page-header">
         <div>
-          <h1 class="page-title">Günlük Raporlar ve Analiz</h1>
-          <p class="page-sub">Seçilen güne ait satış, kâr ve stok hareketleri</p>
+          <h1 class="page-title">Raporlar ve Detaylı Analiz</h1>
+          <p class="page-sub">Tarih aralığı, kategori ve ürün bazında tüm hareketler</p>
         </div>
         <div class="page-actions">
-          <button class="btn btn-ghost" onclick="csvDailyReport()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Günlük Rapor CSV</button>
+          <button class="btn btn-ghost" onclick="csvDailyReport()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Raporu CSV İndir</button>
           <button class="btn btn-ghost" onclick="window.print()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Yazdır</button>
         </div>
       </div>
 
-      <!-- Date Filter Bar -->
-      <div class="card" style="padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <label style="font-size:11px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.5px">📅 Rapor Tarihi:</label>
-          <input type="date" id="rep-date" onchange="currentRepMode = this.value ? 'custom' : 'all'; renderRep();" style="padding:6px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;font-family:'Inter',sans-serif;outline:none;cursor:pointer">
-          <div style="display:flex;gap:5px">
-            <button class="btn btn-sm" id="btn-rep-today" style="background:var(--accent);color:#fff" onclick="setRepDate('today')">Bugün</button>
-            <button class="btn btn-sm btn-ghost" id="btn-rep-yesterday" onclick="setRepDate('yesterday')">Dün</button>
-            <button class="btn btn-sm btn-ghost" id="btn-rep-all" onclick="setRepDate('all')">Tüm Zamanlar</button>
-            <button class="btn btn-sm btn-danger" style="margin-left:8px;font-size:11px;padding:4px 9px" onclick="resetAllSalesHistory()" title="Stoklarınızı koruyarak tüm satışları sıfırlar">🗑️ Satışları Sıfırla</button>
+      <!-- Date Range Filter Bar -->
+      <div class="card" style="padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:11px;font-weight:700;color:var(--txt2);text-transform:uppercase">📅 Başlangıç:</label>
+            <input type="date" id="rep-date-start" onchange="onRepDateRangeChange()" style="padding:6px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;outline:none;cursor:pointer">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:11px;font-weight:700;color:var(--txt2);text-transform:uppercase">Bitiş:</label>
+            <input type="date" id="rep-date-end" onchange="onRepDateRangeChange()" style="padding:6px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;outline:none;cursor:pointer">
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button class="btn btn-sm" id="btn-rep-today" style="background:var(--accent);color:#fff" onclick="setRepRangePreset('today')">Bugün</button>
+            <button class="btn btn-sm btn-ghost" id="btn-rep-yesterday" onclick="setRepRangePreset('yesterday')">Dün</button>
+            <button class="btn btn-sm btn-ghost" id="btn-rep-thisweek" onclick="setRepRangePreset('thisweek')">Bu Hafta</button>
+            <button class="btn btn-sm btn-ghost" id="btn-rep-thismonth" onclick="setRepRangePreset('thismonth')">Bu Ay</button>
+            <button class="btn btn-sm btn-ghost" id="btn-rep-all" onclick="setRepRangePreset('all')">Tüm Zamanlar</button>
           </div>
         </div>
-        <div id="rep-date-badge" style="font-size:12px;font-weight:600;color:var(--accent)"></div>
+        <div id="rep-date-badge" style="font-size:12px;font-weight:700;color:var(--accent)"></div>
       </div>
 
-      <!-- Dynamic Metric Cards for Selected Date -->
-      <div class="stats-grid" id="rep-stats" style="grid-template-columns:repeat(4,1fr)"></div>
+      <!-- Dynamic Metric Cards for Selected Date Range -->
+      <div class="stats-grid" id="rep-stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px"></div>
 
-      <!-- Two Main Tables: Sales on Selected Day & Stock-In on Selected Day -->
+      <!-- 1. KATEGORİ BAZINDA RAPOR TABLOSU -->
+      <div class="tbl-wrap" style="margin-bottom:20px">
+        <div class="tbl-head" style="background:rgba(139,92,246,.06)">
+          <div>
+            <span class="tbl-title" style="display:flex;align-items:center;gap:6px">📊 Kategori Bazında Satış & Stok Analizi</span>
+            <div style="font-size:11px;color:var(--txt2);margin-top:2px">Seçilen tarih aralığında kategorilerin performansı ve anlık stok değerleri</div>
+          </div>
+          <span class="badge b-purple" id="rep-cat-count">0 Kategori</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Kategori</th>
+                <th>Ürün Çeşidi</th>
+                <th>Satılan Miktar</th>
+                <th>Satış Cirosu (₺)</th>
+                <th>Elde Edilen Kâr (₺)</th>
+                <th>Kâr Marjı (%)</th>
+                <th>Stoğa Eklenen</th>
+                <th>Mevcut Stok</th>
+                <th>Mevcut Stok Değeri</th>
+              </tr>
+            </thead>
+            <tbody id="rep-cats-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. İKİ ANA TABLO: SATILAN ÜRÜNLER & STOK GİRİŞLERİ -->
       <div class="grid-2" style="margin-bottom:20px">
-        <!-- Günlük Satışlar -->
+        <!-- Satılan Ürünler -->
         <div class="tbl-wrap">
           <div class="tbl-head" style="background:rgba(59,130,246,.04)">
             <div>
-              <span class="tbl-title" style="display:flex;align-items:center;gap:6px">🛒 Günlük Satılan Ürünler</span>
-              <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-sales-sub">Seçilen günde yapılan satışlar</div>
+              <span class="tbl-title" style="display:flex;align-items:center;gap:6px">🛒 Satılan Ürünler Listesi</span>
+              <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-sales-sub">Seçilen aralıktaki satış hareketleri</div>
             </div>
             <span class="badge b-blue" id="rep-sales-count">0 Satış</span>
           </div>
-          <div style="max-height:340px;overflow-y:auto">
+          <div style="max-height:380px;overflow-y:auto">
             <table>
               <thead>
                 <tr>
-                  <th>Saat</th>
+                  <th>Tarih / Saat</th>
                   <th>Fiş No</th>
                   <th>Ürün</th>
+                  <th>Kategori</th>
                   <th>Miktar</th>
                   <th>Satış Fiyatı</th>
                   <th>Toplam</th>
@@ -633,21 +670,22 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
           </div>
         </div>
 
-        <!-- Günlük Stok Girişleri -->
+        <!-- Stok Girişleri -->
         <div class="tbl-wrap">
           <div class="tbl-head" style="background:rgba(16,185,129,.04)">
             <div>
-              <span class="tbl-title" style="display:flex;align-items:center;gap:6px">📥 Günlük Eklenen Ürünler</span>
-              <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-stockin-sub">Seçilen günde stoğa giren ürünler</div>
+              <span class="tbl-title" style="display:flex;align-items:center;gap:6px">📥 Eklenen Stoklar Listesi</span>
+              <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-stockin-sub">Seçilen aralıktaki stok girişleri</div>
             </div>
             <span class="badge b-ok" id="rep-stockin-count">0 Giriş</span>
           </div>
-          <div style="max-height:340px;overflow-y:auto">
+          <div style="max-height:380px;overflow-y:auto">
             <table>
               <thead>
                 <tr>
-                  <th>Saat</th>
+                  <th>Tarih / Saat</th>
                   <th>Ürün</th>
+                  <th>Kategori</th>
                   <th>Miktar</th>
                   <th>Alış Fiyatı</th>
                   <th>Satış Fiyatı</th>
@@ -1667,31 +1705,69 @@ function saveSup(e){
 }
 function delSup(id){if(!confirm('Bu tedarikçiyi silmek istediğinize emin misiniz?'))return;ss(gs().filter(s=>s.id!==id));renderSups();toast('s','Silindi','Tedarikçi silindi');}
 
-// ══════════════ REPORTS & DAILY ANALYTICS ══════════════
-let currentRepMode = 'today';
+// ══════════════ REPORTS & DETAILED ANALYTICS ══════════════
+function getStartOfWeekStr(){
+  const d = new Date();
+  const day = d.getDay(); // 0 is Sunday
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  const monday = new Date(d.setDate(diff));
+  const year = monday.getFullYear();
+  const month = String(monday.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(monday.getDate()).padStart(2, '0');
+  return `${year}-${month}-${dayStr}`;
+}
 
-function setRepDate(preset){
-  currentRepMode = preset;
-  const el = document.getElementById('rep-date');
-  if(el){
-    if(preset === 'today'){
-      el.value = getTodayStr();
-    } else if(preset === 'yesterday'){
-      el.value = getYesterdayStr();
-    } else if(preset === 'all'){
-      el.value = '';
-    }
+function getStartOfMonthStr(){
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}-01`;
+}
+
+let currentRepRangeMode = 'today';
+
+function setRepRangePreset(mode){
+  currentRepRangeMode = mode;
+  const startEl = document.getElementById('rep-date-start');
+  const endEl = document.getElementById('rep-date-end');
+  const today = getTodayStr();
+
+  if(mode === 'today'){
+    if(startEl) startEl.value = today;
+    if(endEl) endEl.value = today;
+  } else if(mode === 'yesterday'){
+    const yest = getYesterdayStr();
+    if(startEl) startEl.value = yest;
+    if(endEl) endEl.value = yest;
+  } else if(mode === 'thisweek'){
+    if(startEl) startEl.value = getStartOfWeekStr();
+    if(endEl) endEl.value = today;
+  } else if(mode === 'thismonth'){
+    if(startEl) startEl.value = getStartOfMonthStr();
+    if(endEl) endEl.value = today;
+  } else if(mode === 'all'){
+    if(startEl) startEl.value = '';
+    if(endEl) endEl.value = '';
   }
-  updateRepPresetButtons();
+
+  updateRepRangeButtons();
   renderRep();
 }
 
-function updateRepPresetButtons(){
+function onRepDateRangeChange(){
+  currentRepRangeMode = 'custom';
+  updateRepRangeButtons();
+  renderRep();
+}
+
+function updateRepRangeButtons(){
   const btnToday = document.getElementById('btn-rep-today');
   const btnYest = document.getElementById('btn-rep-yesterday');
+  const btnWeek = document.getElementById('btn-rep-thisweek');
+  const btnMonth = document.getElementById('btn-rep-thismonth');
   const btnAll = document.getElementById('btn-rep-all');
 
-  [btnToday, btnYest, btnAll].forEach(b => {
+  [btnToday, btnYest, btnWeek, btnMonth, btnAll].forEach(b => {
     if(!b) return;
     b.classList.remove('btn-primary');
     b.classList.add('btn-ghost');
@@ -1699,52 +1775,66 @@ function updateRepPresetButtons(){
     b.style.color = 'var(--txt)';
   });
 
-  if(currentRepMode === 'today' && btnToday){
-    btnToday.style.background = 'var(--accent)';
-    btnToday.style.color = '#fff';
-  } else if(currentRepMode === 'yesterday' && btnYest){
-    btnYest.style.background = 'var(--accent)';
-    btnYest.style.color = '#fff';
-  } else if(currentRepMode === 'all' && btnAll){
-    btnAll.style.background = 'var(--accent)';
-    btnAll.style.color = '#fff';
+  const activeBtnMap = {
+    'today': btnToday,
+    'yesterday': btnYest,
+    'thisweek': btnWeek,
+    'thismonth': btnMonth,
+    'all': btnAll
+  };
+  const activeBtn = activeBtnMap[currentRepRangeMode];
+  if(activeBtn){
+    activeBtn.style.background = 'var(--accent)';
+    activeBtn.style.color = '#fff';
   }
 }
 
 function renderRep(){
-  const dateInput = document.getElementById('rep-date');
-  let selDate = '';
-  let isAll = false;
+  const startEl = document.getElementById('rep-date-start');
+  const endEl = document.getElementById('rep-date-end');
 
-  if(currentRepMode === 'all'){
-    selDate = '';
-    isAll = true;
-    if(dateInput) dateInput.value = '';
-  } else if(dateInput && dateInput.value){
-    selDate = dateInput.value;
-    isAll = false;
-  } else {
-    selDate = getTodayStr();
-    isAll = false;
-    if(dateInput) dateInput.value = selDate;
-    currentRepMode = 'today';
+  let startDate = startEl ? startEl.value : '';
+  let endDate = endEl ? endEl.value : '';
+
+  // Initial load default to today if both empty and not 'all' mode
+  if(!startDate && !endDate && currentRepRangeMode !== 'all'){
+    startDate = getTodayStr();
+    endDate = getTodayStr();
+    if(startEl) startEl.value = startDate;
+    if(endEl) endEl.value = endDate;
+    currentRepRangeMode = 'today';
   }
 
-  updateRepPresetButtons();
+  updateRepRangeButtons();
 
-  const P = gp(), S = gs(), O = go2();
-  const sHist = gsh().filter(s => isAll ? true : s.date === selDate);
-  const inHist = gih().filter(s => isAll ? true : s.date === selDate);
+  const P = gp();
+  const rawSales = gsh();
+  const rawStockin = gih();
 
-  // Badge date label
+  // Filter by date range
+  const sHist = rawSales.filter(s => {
+    if(startDate && s.date < startDate) return false;
+    if(endDate && s.date > endDate) return false;
+    return true;
+  });
+
+  const inHist = rawStockin.filter(i => {
+    if(startDate && i.date < startDate) return false;
+    if(endDate && i.date > endDate) return false;
+    return true;
+  });
+
+  // Badge label
   const dateBadge = document.getElementById('rep-date-badge');
   if(dateBadge){
-    if(isAll){
-      dateBadge.textContent = '🌐 Tüm Zamanlar Görüntüleniyor';
-    } else if(selDate === getTodayStr()){
-      dateBadge.textContent = `📅 Bugün (${new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })})`;
+    if(!startDate && !endDate){
+      dateBadge.textContent = '🌐 Tüm Zamanlar Analiz Ediliyor';
+    } else if(startDate === endDate){
+      dateBadge.textContent = `📅 ${new Date(startDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
     } else {
-      dateBadge.textContent = `📅 ${new Date(selDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      const sStr = startDate ? new Date(startDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) : 'Başlangıçtan';
+      const eStr = endDate ? new Date(endDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Bugüne';
+      dateBadge.textContent = `📅 ${sStr} ➔ ${eStr}`;
     }
   }
 
@@ -1756,7 +1846,6 @@ function renderRep(){
 
   const totalStockInQty = inHist.reduce((acc, i) => acc + (i.qty || 0), 0);
   const totalStockInVal = inHist.reduce((acc, i) => acc + (i.totalValue || (i.qty * (i.buyPrice || 0)) || 0), 0);
-
   const totalInventoryVal = P.reduce((acc, p) => acc + (p.stk * (p.price || 0)), 0);
 
   // Metric Cards
@@ -1766,45 +1855,134 @@ function renderRep(){
       <div class="stat-card s-blue">
         <div class="stat-ico">🛒</div>
         <div class="stat-val">${tl(totalSalesTL)}</div>
-        <div class="stat-lbl">${isAll ? 'Toplam Satış Cirosu' : 'Günlük Satış Cirosu'}</div>
-        <div class="stat-meta">${totalSoldQty} adet ürün satıldı (${sHist.length} fiş)</div>
+        <div class="stat-lbl">Satış Cirosu</div>
+        <div class="stat-meta">${totalSoldQty} adet satıldı (${sHist.length} işlem)</div>
       </div>
       <div class="stat-card s-green">
         <div class="stat-ico">💰</div>
         <div class="stat-val" style="color:var(--green)">+${tl(totalProfitTL)}</div>
-        <div class="stat-lbl">${isAll ? 'Toplam Net Kâr' : 'Günlük Net Kâr'}</div>
-        <div class="stat-meta">Kâr Marjı: %${profitMargin.toFixed(1)}</div>
+        <div class="stat-lbl">Net Elde Edilen Kâr</div>
+        <div class="stat-meta">Ort. Kâr Marjı: %${profitMargin.toFixed(1)}</div>
       </div>
       <div class="stat-card s-yellow">
         <div class="stat-ico">📥</div>
         <div class="stat-val">${totalStockInQty} Adet</div>
-        <div class="stat-lbl">${isAll ? 'Stoğa Eklenen Toplam' : 'Günlük Eklenen Ürünler'}</div>
+        <div class="stat-lbl">Stoğa Eklenen</div>
         <div class="stat-meta">${tl(totalStockInVal)} giriş maliyet değeri</div>
       </div>
       <div class="stat-card s-purple">
         <div class="stat-ico">💎</div>
         <div class="stat-val">${tl(totalInventoryVal)}</div>
-        <div class="stat-lbl">Aktif Stok Değeri</div>
+        <div class="stat-lbl">Mevcut Envanter Değeri</div>
         <div class="stat-meta">${P.length} çeşit kayıtlı ürün</div>
       </div>
     `;
   }
 
-  // 1. Sales table
+  // 1. KATEGORİ BAZINDA RAPOR TABLOSU (Category-based Summary)
+  const catMap = {};
+
+  // All active categories from products
+  P.forEach(p => {
+    const c = p.cat || 'Genel';
+    if(!catMap[c]){
+      catMap[c] = {
+        name: c,
+        prodCount: 0,
+        soldQty: 0,
+        salesTL: 0,
+        profitTL: 0,
+        stockInQty: 0,
+        currentStk: 0,
+        currentVal: 0
+      };
+    }
+    catMap[c].prodCount++;
+    catMap[c].currentStk += parseInt(p.stk || 0);
+    catMap[c].currentVal += parseInt(p.stk || 0) * (parseFloat(p.price) || 0);
+  });
+
+  // Accumulate filtered sales for each category
+  sHist.forEach(s => {
+    (s.items || []).forEach(item => {
+      const prod = P.find(x => x.id === item.prodId);
+      const c = item.cat || (prod ? prod.cat : 'Genel');
+      if(!catMap[c]){
+        catMap[c] = { name: c, prodCount: 0, soldQty: 0, salesTL: 0, profitTL: 0, stockInQty: 0, currentStk: 0, currentVal: 0 };
+      }
+      catMap[c].soldQty += parseInt(item.qty || 0);
+      catMap[c].salesTL += parseFloat(item.total || 0);
+      catMap[c].profitTL += parseFloat(item.profit || 0);
+    });
+  });
+
+  // Accumulate filtered stock-ins for each category
+  inHist.forEach(i => {
+    const prod = P.find(x => x.id === i.prodId);
+    const c = i.cat || (prod ? prod.cat : 'Genel');
+    if(!catMap[c]){
+      catMap[c] = { name: c, prodCount: 0, soldQty: 0, salesTL: 0, profitTL: 0, stockInQty: 0, currentStk: 0, currentVal: 0 };
+    }
+    catMap[c].stockInQty += parseInt(i.qty || 0);
+  });
+
+  const catList = Object.values(catMap).sort((a, b) => (b.salesTL + b.currentVal) - (a.salesTL + a.currentVal));
+  const catCountEl = document.getElementById('rep-cat-count');
+  if(catCountEl) catCountEl.textContent = `${catList.length} Kategori`;
+
+  const catsTbody = document.getElementById('rep-cats-tbody');
+  if(catsTbody){
+    if(!catList.length){
+      catsTbody.innerHTML = '<tr><td colspan="9"><div class="empty" style="padding:20px;color:var(--txt3)">Henüz kayıtlı kategori bulunmuyor</div></td></tr>';
+    } else {
+      catsTbody.innerHTML = catList.map(c => {
+        const cost = c.salesTL - c.profitTL;
+        const margin = cost > 0 ? ((c.profitTL / cost) * 100) : (c.salesTL > 0 ? 100 : 0);
+        return `<tr>
+          <td><strong style="color:var(--txt)">${c.name}</strong></td>
+          <td><span class="badge b-blue">${c.prodCount} çeşit</span></td>
+          <td><strong style="color:var(--accent)">${c.soldQty}</strong></td>
+          <td style="font-weight:700">${tl(c.salesTL)}</td>
+          <td style="font-weight:700;color:var(--green)">+${tl(c.profitTL)}</td>
+          <td><span style="font-size:11.5px;font-weight:600;color:var(--txt2)">%${margin.toFixed(1)}</span></td>
+          <td><span style="font-weight:700;color:var(--yellow)">+${c.stockInQty}</span></td>
+          <td><strong>${c.currentStk}</strong></td>
+          <td style="font-weight:700;color:var(--purple,#8b5cf6)">${tl(c.currentVal)}</td>
+        </tr>`;
+      }).join('') + `
+        <tr style="background:var(--bg3);font-weight:800;border-top:2px solid var(--border)">
+          <td>GENEL TOPLAM</td>
+          <td>${P.length} çeşit</td>
+          <td style="color:var(--accent)">${totalSoldQty}</td>
+          <td>${tl(totalSalesTL)}</td>
+          <td style="color:var(--green)">+${tl(totalProfitTL)}</td>
+          <td>%${profitMargin.toFixed(1)}</td>
+          <td style="color:var(--yellow)">+${totalStockInQty}</td>
+          <td>${P.reduce((s,p)=>s+parseInt(p.stk||0),0)}</td>
+          <td style="color:var(--purple,#8b5cf6)">${tl(totalInventoryVal)}</td>
+        </tr>
+      `;
+    }
+  }
+
+  // 2. Sales table
   const salesCountEl = document.getElementById('rep-sales-count');
-  if(salesCountEl) salesCountEl.textContent = `${sHist.length} Satış İşlemi`;
+  if(salesCountEl) salesCountEl.textContent = `${sHist.length} Satış`;
   const salesTbody = document.getElementById('rep-sales-tbody');
   if(salesTbody){
     if(!sHist.length){
-      salesTbody.innerHTML = '<tr><td colspan="7"><div class="empty" style="padding:24px 14px"><div style="font-size:24px;margin-bottom:6px">🛒</div><p style="font-size:12.5px;color:var(--txt3)">Bu tarihte satış kaydı bulunmuyor</p></div></td></tr>';
+      salesTbody.innerHTML = '<tr><td colspan="8"><div class="empty" style="padding:24px 14px"><div style="font-size:24px;margin-bottom:6px">🛒</div><p style="font-size:12.5px;color:var(--txt3)">Seçilen tarih aralığında satış kaydı bulunmuyor</p></div></td></tr>';
     } else {
       let rows = '';
       sHist.forEach(s => {
         (s.items || []).forEach(item => {
+          const prod = P.find(x => x.id === item.prodId);
+          const cat = item.cat || (prod ? prod.cat : '—');
           rows += `<tr>
-            <td style="color:var(--txt3);font-size:11.5px;font-weight:600">${s.time || '—'}</td>
+            <td style="color:var(--txt3);font-size:11.5px;font-weight:600">${s.date} ${s.time ? s.time.slice(0,5) : ''}</td>
             <td><span style="font-size:11px;font-weight:700;color:var(--accent)">${s.receiptNo || ('#'+s.id)}</span></td>
             <td><div style="font-weight:600">${item.name}</div></td>
+            <td><span class="badge" style="font-size:10.5px">${cat}</span></td>
             <td><span style="font-weight:700">${item.qty} ${item.unit}</span></td>
             <td style="color:var(--txt2)">${tl(item.sellPrice)}</td>
             <td style="font-weight:700">${tl(item.total)}</td>
@@ -1816,56 +1994,64 @@ function renderRep(){
     }
   }
 
-  // 2. Stock-in table
+  // 3. Stock-in table
   const stockinCountEl = document.getElementById('rep-stockin-count');
-  if(stockinCountEl) stockinCountEl.textContent = `${inHist.length} Stok Hareketi`;
+  if(stockinCountEl) stockinCountEl.textContent = `${inHist.length} Giriş`;
   const stockinTbody = document.getElementById('rep-stockin-tbody');
   if(stockinTbody){
     if(!inHist.length){
-      stockinTbody.innerHTML = '<tr><td colspan="7"><div class="empty" style="padding:24px 14px"><div style="font-size:24px;margin-bottom:6px">📥</div><p style="font-size:12.5px;color:var(--txt3)">Bu tarihte stoğa eklenen ürün bulunmuyor</p></div></td></tr>';
+      stockinTbody.innerHTML = '<tr><td colspan="8"><div class="empty" style="padding:24px 14px"><div style="font-size:24px;margin-bottom:6px">📥</div><p style="font-size:12.5px;color:var(--txt3)">Seçilen tarih aralığında stoğa eklenen ürün bulunmuyor</p></div></td></tr>';
     } else {
-      stockinTbody.innerHTML = inHist.map(i => `<tr>
-        <td style="color:var(--txt3);font-size:11.5px;font-weight:600">${i.time || '—'}</td>
-        <td><div style="font-weight:600">${i.name}</div>${i.barc ? `<div class="mono" style="font-size:10px;color:var(--txt3)">${i.barc}</div>` : ''}</td>
-        <td><span style="font-weight:700;color:var(--green)">+${i.qty} ${i.unit}</span></td>
-        <td style="color:var(--txt2)">${tl(i.buyPrice)}</td>
-        <td style="font-weight:600;color:var(--accent)">${tl(i.sellPrice)}</td>
-        <td style="font-weight:700">${tl(i.totalValue)}</td>
-        <td style="font-size:11px;color:var(--txt2)">${i.note || '—'}</td>
-      </tr>`).join('');
+      stockinTbody.innerHTML = inHist.map(i => {
+        const prod = P.find(x => x.id === i.prodId);
+        const cat = i.cat || (prod ? prod.cat : '—');
+        return `<tr>
+          <td style="color:var(--txt3);font-size:11.5px;font-weight:600">${i.date || ''} ${i.time ? i.time.slice(0,5) : ''}</td>
+          <td><div style="font-weight:600">${i.name}</div>${i.barc ? `<div class="mono" style="font-size:10px;color:var(--txt3)">${i.barc}</div>` : ''}</td>
+          <td><span class="badge" style="font-size:10.5px">${cat}</span></td>
+          <td><span style="font-weight:700;color:var(--green)">+${i.qty} ${i.unit}</span></td>
+          <td style="color:var(--txt2)">${tl(i.buyPrice)}</td>
+          <td style="font-weight:600;color:var(--accent)">${tl(i.sellPrice)}</td>
+          <td style="font-weight:700">${tl(i.totalValue)}</td>
+          <td style="font-size:11px;color:var(--txt2)">${i.note || '—'}</td>
+        </tr>`;
+      }).join('');
     }
   }
 }
 
-function resetAllSalesHistory(){
-  if(!confirm('DİKKAT: Mevcut ürün stoklarınız KORUNACAK, sadece geçmiş satış kayıtları ve ciro/kazanç istatistikleri sıfırlanacaktır. Devam etmek istiyor musunuz?')) return;
-  localStorage.setItem('nl_sales_hist', '[]');
-  salesCart = [];
-  triggerCloudPush('sales_reset', true);
-  renderDash();
-  renderSalesHistory();
-  renderReports();
-  toast('s', 'Satışlar Sıfırlandı', 'Ürün stoklarınız korundu, satış geçmişi sıfırlandı.');
-}
-
 function csvDailyReport(){
-  const selDate = document.getElementById('rep-date')?.value || getTodayStr();
-  const isAll = (!document.getElementById('rep-date')?.value);
-  const sHist = gsh().filter(s => isAll ? true : s.date === selDate);
-  const inHist = gih().filter(s => isAll ? true : s.date === selDate);
+  const startEl = document.getElementById('rep-date-start');
+  const endEl = document.getElementById('rep-date-end');
+  const startDate = startEl ? startEl.value : '';
+  const endDate = endEl ? endEl.value : '';
 
-  const headers = ['İşlem Türü', 'Tarih', 'Saat', 'Fiş/İşlem No', 'Ürün Adı', 'Miktar', 'Birim', 'Alış Fiyatı (₺)', 'Satış Fiyatı (₺)', 'Toplam Tutar (₺)', 'Elde Edilen Kâr (₺)', 'Kullanıcı / Not'];
+  const P = gp();
+  const sHist = gsh().filter(s => {
+    if(startDate && s.date < startDate) return false;
+    if(endDate && s.date > endDate) return false;
+    return true;
+  });
+  const inHist = gih().filter(i => {
+    if(startDate && i.date < startDate) return false;
+    if(endDate && i.date > endDate) return false;
+    return true;
+  });
+
+  const headers = ['İşlem Türü', 'Tarih', 'Saat', 'Fiş/İşlem No', 'Ürün Adı', 'Kategori', 'Miktar', 'Birim', 'Alış Fiyatı (₺)', 'Satış Fiyatı (₺)', 'Toplam Tutar (₺)', 'Elde Edilen Kâr (₺)', 'Kullanıcı / Not'];
   const rows = [];
 
   // Add Sales
   sHist.forEach(s => {
     (s.items || []).forEach(item => {
+      const prod = P.find(x => x.id === item.prodId);
       rows.push([
         'SATIŞ',
         s.date,
         s.time || '',
         s.receiptNo || ('#' + s.id),
         item.name,
+        item.cat || (prod ? prod.cat : ''),
         item.qty,
         item.unit,
         item.buyPrice,
@@ -1879,12 +2065,14 @@ function csvDailyReport(){
 
   // Add Stock-in
   inHist.forEach(inItem => {
+    const prod = P.find(x => x.id === inItem.prodId);
     rows.push([
       'STOK GİRİŞİ',
       inItem.date,
       inItem.time || '',
       '#' + inItem.id,
       inItem.name,
+      inItem.cat || (prod ? prod.cat : ''),
       '+' + inItem.qty,
       inItem.unit,
       inItem.buyPrice,
@@ -1895,7 +2083,8 @@ function csvDailyReport(){
     ]);
   });
 
-  const filename = isAll ? 'genel_hareket_raporu.csv' : `gunluk_rapor_${selDate}.csv`;
+  const rangeStr = (startDate && endDate) ? `${startDate}_${endDate}` : (startDate || endDate || 'tum_zamanlar');
+  const filename = `hareket_ve_kategori_raporu_${rangeStr}.csv`;
   dlCSV(filename, headers, rows);
 }
 
