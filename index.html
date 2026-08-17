@@ -529,11 +529,12 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         </div>
       </div>
       <div class="filter-bar">
-        <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="p-search" placeholder="Ürün ara..." oninput="renderProds()"></div>
-        <select id="p-cat" onchange="renderProds()"><option value="">Tüm Kategoriler</option></select>
+        <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="p-search" placeholder="Ürün, barkod veya kategori ara..." oninput="renderProds()"></div>
+        <select id="p-cat" onchange="onFilterCatChange()"><option value="">Tüm Ana Kategoriler</option></select>
+        <select id="p-subcat" onchange="renderProds()"><option value="">Tüm Alt Kategoriler</option></select>
         <select id="p-status" onchange="renderProds()"><option value="">Tüm Durumlar</option><option value="ok">Normal</option><option value="warn">Düşük</option><option value="crit">Kritik</option></select>
       </div>
-      <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Barkod</th><th>Kategori</th><th>Tedarikçi</th><th>Stok</th><th>Alış Fiyatı</th><th>Satış Fiyatı</th><th>Kâr (₺)</th><th>Kâr Marjı (%)</th><th>İşlemler</th></tr></thead><tbody id="prods-tbody"></tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Barkod</th><th>Ana / Alt Kategori</th><th>Tedarikçi</th><th>Stok</th><th>Alış Fiyatı</th><th>Satış Fiyatı</th><th>Kâr (₺)</th><th>Kâr Marjı (%)</th><th>İşlemler</th></tr></thead><tbody id="prods-tbody"></tbody></table></div>
     </div>
 
     <!-- CRITICAL -->
@@ -1022,8 +1023,12 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <input type="text" id="p-alt-barc" placeholder="Örn: 869000000002, 869000000003">
       </div>
       <div class="form-row">
-        <div class="fg"><label>Kategori *</label><input type="text" id="p-cat2" list="catlist" required placeholder="Örn: Kırtasiye"><datalist id="catlist"></datalist></div>
+        <div class="fg"><label>Ana Kategori *</label><input type="text" id="p-cat2" list="catlist" required placeholder="Örn: Kırtasiye" oninput="updateSubCatDatalist(this.value)"><datalist id="catlist"></datalist></div>
+        <div class="fg"><label>Alt Kategori</label><input type="text" id="p-subcat" list="subcatlist" placeholder="Örn: Kağıt Ürünleri"><datalist id="subcatlist"></datalist></div>
+      </div>
+      <div class="form-row">
         <div class="fg"><label>Birim</label><select id="p-unit"><option>Adet</option><option>Kg</option><option>Litre</option><option>Metre</option><option>Kutu</option><option>Paket</option><option>Koli</option><option>Bidon</option><option>Çift</option></select></div>
+        <div class="fg"><label>Tedarikçi</label><select id="p-sup"><option value="">Seçiniz</option></select></div>
       </div>
       <div class="form-row">
         <div class="fg"><label>Mevcut Stok *</label><input type="number" id="p-stk" required min="0" placeholder="0"></div>
@@ -1034,7 +1039,6 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <div class="fg"><label>Satış Birim Fiyatı (₺)</label><input type="number" id="p-sell-price" min="0" step="0.01" placeholder="0.00" oninput="calcProdProfit()"></div>
       </div>
       <div id="p-profit-hint" style="font-size:12px;font-weight:600;margin:-4px 0 14px;padding:8px 12px;border-radius:8px;background:rgba(16,185,129,.1);color:var(--green);display:none"></div>
-      <div class="fg"><label>Tedarikçi</label><select id="p-sup"><option value="">Seçiniz</option></select></div>
       <div class="fg"><label>Not</label><textarea id="p-note" rows="2" placeholder="İsteğe bağlı..."></textarea></div>
       <input type="hidden" id="p-id">
       <div class="modal-ftr"><button type="button" class="btn btn-ghost" onclick="closeM('m-prod')">İptal</button><button type="submit" class="btn btn-primary">Kaydet</button></div>
@@ -1451,26 +1455,58 @@ function findProductByBarcode(code){
   }) || null;
 }
 
+function updateSubCatDatalist(mainCat){
+  const P = gp();
+  const subCats = [...new Set(P.filter(p => !mainCat || p.cat === mainCat).map(p => p.subCat).filter(Boolean))].sort();
+  const dl = document.getElementById('subcatlist');
+  if(dl) dl.innerHTML = subCats.map(sc => `<option value="${sc}">`).join('');
+}
+
+function onFilterCatChange(){
+  const catF = document.getElementById('p-cat')?.value || '';
+  const subCatEl = document.getElementById('p-subcat');
+  const P = gp();
+  if(subCatEl){
+    const subCats = [...new Set(P.filter(p => !catF || p.cat === catF).map(p => p.subCat).filter(Boolean))].sort();
+    subCatEl.innerHTML = '<option value="">Tüm Alt Kategoriler</option>' + subCats.map(sc => `<option value="${sc}">${sc}</option>`).join('');
+  }
+  renderProds();
+}
+
 function renderProds(){
   const search=(document.getElementById('p-search')?.value||'').toLowerCase();
   const catF=document.getElementById('p-cat')?.value||'';
+  const subCatF=document.getElementById('p-subcat')?.value||'';
   const stF=document.getElementById('p-status')?.value||'';
   let P=gp();
-  const cats=[...new Set(P.map(p=>p.cat))].sort();
+
+  // Populate Main Category filter & datalists
+  const mainCats=[...new Set(P.map(p=>p.cat).filter(Boolean))].sort();
   const catEl=document.getElementById('p-cat');
-  if(catEl){const prev=catEl.value;catEl.innerHTML='<option value="">Tüm Kategoriler</option>'+cats.map(c=>`<option value="${c}" ${c===prev?'selected':''}>${c}</option>`).join('');}
-  const dl=document.getElementById('catlist');if(dl)dl.innerHTML=cats.map(c=>`<option value="${c}">`).join('');
+  if(catEl && !catEl.children.length > 1){
+    const prev=catEl.value;
+    catEl.innerHTML='<option value="">Tüm Ana Kategoriler</option>'+mainCats.map(c=>`<option value="${c}" ${c===prev?'selected':''}>${c}</option>`).join('');
+  }
+  const dl=document.getElementById('catlist');
+  if(dl) dl.innerHTML=mainCats.map(c=>`<option value="${c}">`).join('');
+  
+  const allSubCats=[...new Set(P.map(p=>p.subCat).filter(Boolean))].sort();
+  const subDl=document.getElementById('subcatlist');
+  if(subDl) subDl.innerHTML=allSubCats.map(sc=>`<option value="${sc}">`).join('');
+
   if(search){
     P=P.filter(p => {
       const altStr = Array.isArray(p.altBarcodes) ? p.altBarcodes.join(' ') : (p.altBarcodes || '');
       return p.name.toLowerCase().includes(search) ||
         (p.barc || '').toLowerCase().includes(search) ||
         altStr.toLowerCase().includes(search) ||
-        p.cat.toLowerCase().includes(search);
+        (p.cat || '').toLowerCase().includes(search) ||
+        (p.subCat || '').toLowerCase().includes(search);
     });
   }
-  if(catF)P=P.filter(p=>p.cat===catF);
-  if(stF)P=P.filter(p=>sst(p)===stF);
+  if(catF) P=P.filter(p=>p.cat===catF);
+  if(subCatF) P=P.filter(p=>(p.subCat||'')===subCatF);
+  if(stF) P=P.filter(p=>sst(p)===stF);
   const S=gs();
   const tb=document.getElementById('prods-tbody');
   if(!P.length){tb.innerHTML='<tr><td colspan="10"><div class="empty"><div class="empty-icon">📦</div><h3>Ürün bulunamadı</h3><p>Filtrelerinizi değiştirin veya yeni ürün ekleyin</p></div></td></tr>';return;}
@@ -1492,7 +1528,10 @@ function renderProds(){
         ${p.barc ? `<div style="font-weight:600">${p.barc}</div>` : '<span style="color:var(--txt3)">—</span>'}
         ${altBadges ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${altBadges}</div>` : ''}
       </td>
-      <td><span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px">${p.cat}</span></td>
+      <td>
+        <span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600">${p.cat || 'Genel'}</span>
+        ${p.subCat ? `<div style="font-size:11px;color:var(--txt2);margin-top:3px;padding-left:2px">↳ ${p.subCat}</div>` : ''}
+      </td>
       <td style="color:var(--txt2)">${sup?sup.name:'—'}</td>
       <td><div class="sbar"><div class="sbar-track"><div class="sbar-fill ${st}" style="width:${pct}%"></div></div><span style="font-size:12px;font-weight:600;min-width:55px">${p.stk} ${p.unit}</span></div><div style="font-size:10px;color:var(--txt3);margin-top:2px">Min: ${p.min}</div></td>
       <td style="font-weight:600;color:var(--txt2)">${tl(buyP)}</td>
@@ -1529,7 +1568,9 @@ function openProdModal(id){
     document.getElementById('p-barc').value=p.barc||'';
     const altArr = Array.isArray(p.altBarcodes) ? p.altBarcodes : (typeof p.altBarcodes === 'string' ? p.altBarcodes.split(',') : []);
     document.getElementById('p-alt-barc').value = altArr.map(x => x.trim()).filter(Boolean).join(', ');
-    document.getElementById('p-cat2').value=p.cat;
+    document.getElementById('p-cat2').value=p.cat || '';
+    document.getElementById('p-subcat').value=p.subCat || '';
+    updateSubCatDatalist(p.cat || '');
     document.getElementById('p-unit').value=p.unit;
     document.getElementById('p-stk').value=p.stk;
     document.getElementById('p-min').value=p.min;
@@ -1543,6 +1584,8 @@ function openProdModal(id){
     document.querySelector('#m-prod form').reset();
     document.getElementById('p-id').value='';
     document.getElementById('p-alt-barc').value='';
+    document.getElementById('p-subcat').value='';
+    updateSubCatDatalist('');
     calcProdProfit();
     if(lastCode){document.getElementById('p-barc').value=lastCode;lastCode=null;}
   }
@@ -1560,7 +1603,8 @@ function saveProd(e){
     name:document.getElementById('p-name').value.trim(),
     barc:document.getElementById('p-barc').value.trim(),
     altBarcodes: altBarcodes,
-    cat:document.getElementById('p-cat2').value.trim(),
+    cat:document.getElementById('p-cat2').value.trim() || 'Genel',
+    subCat:document.getElementById('p-subcat').value.trim(),
     unit:document.getElementById('p-unit').value,
     stk:parseInt(document.getElementById('p-stk').value)||0,
     min:parseInt(document.getElementById('p-min').value)||0,
@@ -2649,7 +2693,7 @@ function dlCSV(fn,headers,rows){
 }
 function csvProducts(){
   const P=gp(),S=gs();
-  dlCSV('stok_listesi.csv',['Ürün','Ana Barkod','Alt Barkodlar','Kategori','Tedarikçi','Stok','Birim','Min Seviye','Alış Fiyatı','Satış Fiyatı','Birim Kâr (₺)','Kâr Marjı (%)','Toplam Alış Değeri','Toplam Satış Değeri'],
+  dlCSV('stok_listesi.csv',['Ürün','Ana Barkod','Alt Barkodlar','Ana Kategori','Alt Kategori','Tedarikçi','Stok','Birim','Min Seviye','Alış Fiyatı','Satış Fiyatı','Birim Kâr (₺)','Kâr Marjı (%)','Toplam Alış Değeri','Toplam Satış Değeri'],
     P.map(p=>{
       const sup=S.find(s=>s.id===p.sup);
       const buyP = parseFloat(p.price) || 0;
@@ -2657,7 +2701,7 @@ function csvProducts(){
       const profitTL = sellP - buyP;
       const margin = buyP > 0 ? ((profitTL / buyP) * 100) : (sellP > 0 ? 100 : 0);
       const altStr = Array.isArray(p.altBarcodes) ? p.altBarcodes.join(', ') : (p.altBarcodes || '');
-      return[p.name,p.barc,altStr,p.cat,sup?.name||'',p.stk,p.unit,p.min,buyP,sellP,profitTL.toFixed(2),'%'+margin.toFixed(1),(p.stk*buyP).toFixed(2),(p.stk*sellP).toFixed(2)];
+      return[p.name,p.barc,altStr,p.cat||'Genel',p.subCat||'',sup?.name||'',p.stk,p.unit,p.min,buyP,sellP,profitTL.toFixed(2),'%'+margin.toFixed(1),(p.stk*buyP).toFixed(2),(p.stk*sellP).toFixed(2)];
     }));
 }
 function csvOrders(){
