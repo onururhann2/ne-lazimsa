@@ -2117,41 +2117,109 @@ function onScan(code){
           <span class="mono" style="font-size:11.5px;background:var(--bg);padding:2px 8px;border-radius:4px;border:1px solid var(--border)">${code}</span>
         </div>
         
-        <!-- OPTION 1: LINK AS SUB-BARCODE TO EXISTING PRODUCT -->
+        <!-- OPTION 1: CREATE NEW PRODUCT UNDER A SUB-CATEGORY -->
         <div style="background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:12px;margin-bottom:10px">
-          <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:5px">
-            <span>🔗</span> Mevcut Bir Ürüne Alt Barkod Olarak Ekle
+          <div style="font-size:12.5px;font-weight:700;color:var(--green);margin-bottom:8px;display:flex;align-items:center;gap:5px">
+            <span>➕</span> Bu Alt Kategoriye Yeni Ürün Olarak Ekle
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <div>
-              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:4px">1. Kategori Seçin</label>
-              <select id="scan-link-cat" onchange="onScanCatFilterChange('${code}')" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
-                <option value="">Tüm Kategoriler (${P.length})</option>
-                ${cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('')}
-              </select>
+              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Ana Kategori</label>
+              <input type="text" id="scan-quick-cat" list="catlist" placeholder="Örn: Kitap" value="${cats[0] || 'Genel'}" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px" oninput="updateSubCatDatalist(this.value)">
             </div>
             <div>
-              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:4px">2. Ürünü Seçin</label>
-              <select id="scan-link-prod" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
-                <option value="">Ürün Seçiniz...</option>
-                ${P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('')}
-              </select>
+              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Alt Kategori</label>
+              <input type="text" id="scan-quick-subcat" list="subcatlist" placeholder="Örn: Edebiyat" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
             </div>
           </div>
-          <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkScannedBarcodeToProduct('${code}')" style="font-weight:600">
-            🔗 Bu Ürüne Alt Barkod Olarak Kaydet
+          <div style="margin-bottom:8px">
+            <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Ürün Adı *</label>
+            <input type="text" id="scan-quick-name" placeholder="Örn: Suç ve Ceza veya Edebiyat Kitabı" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12px;font-weight:600">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div>
+              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Başlangıç Stoğu</label>
+              <input type="number" id="scan-quick-stk" value="10" min="0" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Satış Fiyatı (₺)</label>
+              <input type="number" id="scan-quick-price" placeholder="0.00" step="0.01" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
+            </div>
+          </div>
+          <button type="button" class="btn btn-success btn-sm btn-full" onclick="saveQuickProductFromScan('${code}')" style="font-weight:700">
+            💾 Bu Alt Kategoriye Ürün Olarak Kaydet
           </button>
         </div>
 
-        <!-- OPTION 2: CREATE NEW PRODUCT -->
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:9px 12px">
-          <span style="font-size:11.5px;color:var(--txt2)">Bu ürün sistemde hiç yoksa:</span>
-          <button type="button" class="btn btn-primary btn-sm" onclick="openNewProdWithBarcode('${code}')">➕ Yeni Ürün Oluştur</button>
-        </div>
+        <!-- OPTION 2: LINK AS SUB-BARCODE TO EXISTING PRODUCT -->
+        <details style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:11.5px">
+          <summary style="font-weight:600;color:var(--accent);cursor:pointer;user-select:none">
+            🔗 Veya Mevcut Bir Ürüne Alt Barkod Olarak Bağla
+          </summary>
+          <div style="margin-top:8px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+              <div>
+                <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Kategori</label>
+                <select id="scan-link-cat" onchange="onScanCatFilterChange('${code}')" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
+                  <option value="">Tüm Kategoriler (${P.length})</option>
+                  ${cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Ürün</label>
+                <select id="scan-link-prod" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
+                  <option value="">Ürün Seçiniz...</option>
+                  ${P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkScannedBarcodeToProduct('${code}')" style="font-weight:600;font-size:11px;padding:5px">
+              🔗 Bu Ürüne Alt Barkod Yap
+            </button>
+          </div>
+        </details>
       </div>`;
     btn.style.display='none';
   }
   info.style.display='block';
+}
+
+function saveQuickProductFromScan(code){
+  const name = document.getElementById('scan-quick-name')?.value?.trim();
+  const cat = document.getElementById('scan-quick-cat')?.value?.trim() || 'Genel';
+  const subCat = document.getElementById('scan-quick-subcat')?.value?.trim() || '';
+  const stk = parseInt(document.getElementById('scan-quick-stk')?.value) || 0;
+  const sellPrice = parseFloat(document.getElementById('scan-quick-price')?.value) || 0;
+
+  if(!name){
+    toast('w', 'Ürün Adı Gerekli', 'Lütfen ürün adını yazın.');
+    document.getElementById('scan-quick-name')?.focus();
+    return;
+  }
+
+  const P = gp();
+  const newProd = {
+    id: nid(P),
+    name: name,
+    barc: code,
+    altBarcodes: [],
+    cat: cat,
+    subCat: subCat,
+    unit: 'Adet',
+    stk: stk,
+    min: 5,
+    price: sellPrice,
+    sellPrice: sellPrice,
+    sup: null,
+    note: subCat ? `Alt Kategori: ${subCat}` : ''
+  };
+
+  P.push(newProd);
+  sp(P);
+  renderProds();
+  updBadge();
+  closeScanner();
+  toast('s', 'Ürün Başarıyla Eklendi! 🚀', `"${name}" (${cat} ↳ ${subCat || 'Genel'}) kaydedildi.`);
 }
 
 function onScanCatFilterChange(code){
@@ -2195,11 +2263,18 @@ function linkScannedBarcodeToProduct(code){
 }
 
 function openNewProdWithBarcode(code){
-  const selCat = document.getElementById('scan-link-cat')?.value || '';
+  const selCat = document.getElementById('scan-quick-cat')?.value || document.getElementById('scan-link-cat')?.value || '';
+  const selSubCat = document.getElementById('scan-quick-subcat')?.value || '';
   closeScanner();
   openProdModal();
   document.getElementById('p-barc').value = code;
-  if(selCat) document.getElementById('p-cat2').value = selCat;
+  if(selCat){
+    document.getElementById('p-cat2').value = selCat;
+    updateSubCatDatalist(selCat);
+  }
+  if(selSubCat){
+    document.getElementById('p-subcat2').value = selSubCat;
+  }
 }
 
 function doScanAction(){
@@ -3556,37 +3631,93 @@ function onStockinScan(code){
       <div style="color:var(--yellow);font-weight:700;font-size:13px;margin-bottom:4px">⚠️ Barkod Kayıtlı Değil</div>
       <div style="color:var(--txt2);font-size:11.5px;margin-bottom:10px">Okutulan: <strong class="mono" style="color:var(--txt)">${code}</strong></div>
       
-      <!-- LINK AS SUB-BARCODE -->
+      <!-- OPTION 1: CREATE NEW PRODUCT UNDER SUB-CATEGORY AND STOCK-IN -->
       <div style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px;margin-bottom:8px">
-        <div style="font-size:11.5px;font-weight:700;color:var(--accent);margin-bottom:6px">🔗 Mevcut Ürüne Alt Barkod Yap</div>
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">➕ Bu Alt Kategoriye Yeni Ürün Olarak Aç & Stoğa Al</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
           <div>
-            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">1. Kategori</label>
-            <select id="stockin-link-cat" onchange="onStockinCatFilterChange('${code}')" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
-              <option value="">Tüm Kategoriler (${P.length})</option>
-              ${cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('')}
-            </select>
+            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Ana Kategori</label>
+            <input type="text" id="stockin-quick-cat" list="catlist" placeholder="Örn: Kitap" value="${cats[0] || 'Genel'}" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px" oninput="updateSubCatDatalist(this.value)">
           </div>
           <div>
-            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">2. Ürün</label>
-            <select id="stockin-link-prod" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
-              <option value="">Ürün Seçiniz...</option>
-              ${P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('')}
-            </select>
+            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Alt Kategori</label>
+            <input type="text" id="stockin-quick-subcat" list="subcatlist" placeholder="Örn: Edebiyat" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
           </div>
         </div>
-        <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkStockinBarcodeToProduct('${code}')" style="font-weight:600;font-size:11.5px;padding:6px">
-          🔗 Alt Barkod Olarak Kaydet & Stoğa Al
+        <div style="margin-bottom:6px">
+          <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Ürün Adı *</label>
+          <input type="text" id="stockin-quick-name" placeholder="Örn: Suç ve Ceza veya Edebiyat Kitabı" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px;font-weight:600">
+        </div>
+        <button type="button" class="btn btn-success btn-sm btn-full" onclick="saveStockinQuickProduct('${code}')" style="font-weight:700;font-size:11.5px;padding:6px">
+          💾 Alt Kategoriye Ekle & Seç
         </button>
       </div>
 
-      <!-- CREATE NEW PRODUCT -->
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:7px 10px">
-        <span style="font-size:11px;color:var(--txt2)">Sıfırdan ürün aç:</span>
-        <button type="button" class="btn btn-primary btn-sm" onclick="openNewProdWithBarcode('${code}')" style="font-size:11px;padding:4px 8px">➕ Yeni Ürün Oluştur</button>
-      </div>
+      <!-- OPTION 2: LINK AS SUB-BARCODE -->
+      <details style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:11px">
+        <summary style="font-weight:600;color:var(--accent);cursor:pointer;user-select:none">
+          🔗 Veya Mevcut Bir Ürüne Alt Barkod Olarak Bağla
+        </summary>
+        <div style="margin-top:6px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <div>
+              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">1. Kategori</label>
+              <select id="stockin-link-cat" onchange="onStockinCatFilterChange('${code}')" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
+                <option value="">Tüm Kategoriler (${P.length})</option>
+                ${cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">2. Ürün</label>
+              <select id="stockin-link-prod" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
+                <option value="">Ürün Seçiniz...</option>
+                ${P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkStockinBarcodeToProduct('${code}')" style="font-weight:600;font-size:11px;padding:5px">
+            🔗 Bu Ürüne Alt Barkod Yap
+          </button>
+        </div>
+      </details>
     `;
   }
+}
+
+function saveStockinQuickProduct(code){
+  const name = document.getElementById('stockin-quick-name')?.value?.trim();
+  const cat = document.getElementById('stockin-quick-cat')?.value?.trim() || 'Genel';
+  const subCat = document.getElementById('stockin-quick-subcat')?.value?.trim() || '';
+
+  if(!name){
+    toast('w', 'Ürün Adı Gerekli', 'Lütfen ürün adını yazın.');
+    document.getElementById('stockin-quick-name')?.focus();
+    return;
+  }
+
+  const P = gp();
+  const newProd = {
+    id: nid(P),
+    name: name,
+    barc: code,
+    altBarcodes: [],
+    cat: cat,
+    subCat: subCat,
+    unit: 'Adet',
+    stk: 0,
+    min: 5,
+    price: 0,
+    sellPrice: 0,
+    sup: null,
+    note: subCat ? `Alt Kategori: ${subCat}` : ''
+  };
+
+  P.push(newProd);
+  sp(P);
+  renderProds();
+  updBadge();
+  toast('s', 'Ürün Oluşturuldu! 🚀', `"${name}" (${cat} ↳ ${subCat || 'Genel'}) oluşturuldu. Şimdi stok adedini girin.`);
+  onStockinScan(code);
 }
 
 function onStockinCatFilterChange(code){
