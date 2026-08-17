@@ -404,14 +404,14 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <h1>NE LAZIMSA</h1>
       <p>Stok &amp; Satın Alma Yönetimi</p>
     </div>
-    <div class="login-err" id="login-err">❌ E-posta veya şifre hatalı!</div>
-    <div class="fg"><label>E-posta</label><input type="email" id="l-email" value="admin@nelazimsa.com" placeholder="admin@nelazimsa.com"></div>
-    <div class="fg"><label>Şifre</label><input type="password" id="l-pass" value="123456" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="login-err" id="login-err">❌ Kullanıcı adı / e-posta veya şifre hatalı!</div>
+    <div class="fg"><label>Kullanıcı Adı veya E-posta</label><input type="text" id="l-email" value="admin@nelazimsa.com" placeholder="admin veya kasiyer1"></div>
+    <div class="fg"><label>Şifre / PIN</label><input type="password" id="l-pass" value="123456" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-primary btn-full" onclick="doLogin()">
       <span>Giriş Yap</span>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
     </button>
-    <p class="login-hint">Demo: admin@nelazimsa.com / 123456</p>
+    <p class="login-hint">Yönetici: admin@nelazimsa.com / 123456 &bull; Kasiyer: kasiyer / 123456</p>
   </div>
 </div>
 
@@ -471,6 +471,10 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <div class="nav-sec">Analiz</div>
       <div class="nav-item" id="nav-reports" onclick="go('reports')">
         <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Raporlar
+      </div>
+      <div class="nav-sec nav-admin-only">Yönetim</div>
+      <div class="nav-item nav-admin-only" id="nav-users" onclick="go('users')">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>Kullanıcı Yönetimi
       </div>
     </nav>
     <div class="sidebar-footer">
@@ -990,6 +994,40 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       </div>
     </div>
 
+    <!-- USERS MANAGEMENT (ADMIN ONLY) -->
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Kullanıcı &amp; Kasiyer Yönetimi</h1>
+          <p class="page-sub">Kasiyer ve yönetici hesaplarını tanımlayın, yetkilerini yönetin</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-primary" onclick="openUserModal()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Yeni Kasiyer / Kullanıcı Ekle</button>
+        </div>
+      </div>
+      <div class="card" style="padding:14px 18px;margin-bottom:16px;background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);display:flex;align-items:center;gap:12px">
+        <div style="font-size:24px">🔒</div>
+        <div style="font-size:12px;color:var(--txt2)">
+          <strong style="color:var(--txt)">Yetki Kuralı:</strong> 
+          <strong style="color:var(--accent)">Kasiyer</strong> olarak tanımlanan kullanıcılar sisteme giriş yaptıklarında <u>yalnızca Satış Ekranı'na</u> erişebilirler. Stok takibi, kritik stoklar, alış fiyatları, raporlar veya kullanıcı yönetimini göremezler.
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ad Soyad</th>
+              <th>Kullanıcı Adı / E-posta</th>
+              <th>Yetki / Rol</th>
+              <th>Giriş Şifresi / PIN</th>
+              <th>İşlemler</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
 
   <!-- FAB -->
@@ -1136,6 +1174,44 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <div class="fg"><label>Adres</label><textarea id="s-addr" rows="2" placeholder="Tam adres..."></textarea></div>
       <input type="hidden" id="s-id">
       <div class="modal-ftr"><button type="button" class="btn btn-ghost" onclick="closeM('m-sup')">İptal</button><button type="submit" class="btn btn-primary">Kaydet</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- User / Cashier Modal -->
+<div class="overlay" id="m-user">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hdr">
+      <h2 class="modal-ttl" id="user-ttl">Kullanıcı / Kasiyer Ekle</h2>
+      <button class="modal-x" onclick="closeM('m-user')">×</button>
+    </div>
+    <form onsubmit="saveUser(event)">
+      <div class="fg">
+        <label>Ad Soyad *</label>
+        <input type="text" id="u-form-name" required placeholder="Örn: Ahmet Kasiyer">
+      </div>
+      <div class="form-row">
+        <div class="fg">
+          <label>Kullanıcı Adı / E-posta *</label>
+          <input type="text" id="u-form-email" required placeholder="Örn: kasiyer1">
+        </div>
+        <div class="fg">
+          <label>Giriş Şifresi / PIN *</label>
+          <input type="text" id="u-form-pass" required placeholder="Örn: 1234">
+        </div>
+      </div>
+      <div class="fg">
+        <label>Kullanıcı Rolü & Yetkisi *</label>
+        <select id="u-form-role" required style="width:100%;padding:9px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-weight:600">
+          <option value="cashier">🛒 Kasiyer (Yalnızca Satış Ekranı Yetkisi)</option>
+          <option value="admin">👑 Admin / Yönetici (Tüm Sisteme Tam Yetki)</option>
+        </select>
+      </div>
+      <input type="hidden" id="u-form-id">
+      <div class="modal-ftr">
+        <button type="button" class="btn btn-ghost" onclick="closeM('m-user')">İptal</button>
+        <button type="submit" class="btn btn-primary" style="font-weight:700">💾 Kullanıcıyı Kaydet</button>
+      </div>
     </form>
   </div>
 </div>
@@ -1405,46 +1481,318 @@ function fd(d){return d.toISOString().split('T')[0]}
 function tl(n){return'₺'+Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function sst(p){if(p.stk<=0||p.stk<=p.min)return'crit';if(p.stk<=p.min*1.5)return'warn';return'ok'}
 
-// ══════════════ AUTH ══════════════
-function doLogin(){
-  const e=document.getElementById('l-email').value.trim();
-  const p=document.getElementById('l-pass').value;
-  const u=DEMO_USERS.find(x=>x.email===e&&x.password===p);
-  const err=document.getElementById('login-err');
-  if(u){currentUser=u;ls('nl_sess',JSON.stringify(u));err.style.display='none';showApp();}
-  else err.style.display='block';
+// ══════════════ USER & ROLE MANAGEMENT ══════════════
+function getUsers(){
+  try{
+    const raw = localStorage.getItem('nl_users');
+    if(raw) {
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  }catch(e){}
+  const defaultUsers = [
+    { id: 1, name: 'Admin Yönetici', email: 'admin@nelazimsa.com', username: 'admin', password: '123456', role: 'admin' },
+    { id: 2, name: 'Kasiyer 1', email: 'kasiyer@nelazimsa.com', username: 'kasiyer', password: '123456', role: 'cashier' }
+  ];
+  localStorage.setItem('nl_users', JSON.stringify(defaultUsers));
+  return defaultUsers;
 }
-function doLogout(){currentUser=null;localStorage.removeItem('nl_sess');document.getElementById('app').style.display='none';document.getElementById('login-screen').style.display='flex';}
-function checkSess(){const s=ls('nl_sess');if(s){currentUser=JSON.parse(s);showApp();}}
+
+function saveUsers(users){
+  localStorage.setItem('nl_users', JSON.stringify(users));
+  triggerCloudPush('users', true);
+}
+
+function renderUsers(){
+  if(currentUser && currentUser.role !== 'admin'){
+    go('sales');
+    return;
+  }
+  const users = getUsers();
+  const tbody = document.getElementById('users-tbody');
+  if(!tbody) return;
+
+  if(!users.length){
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty" style="padding:20px">Kullanıcı bulunamadı</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = users.map(u => {
+    const isSelf = (currentUser && currentUser.id === u.id);
+    const roleBadge = (u.role === 'admin')
+      ? '<span class="badge b-purple" style="font-weight:700">👑 Admin (Yönetici)</span>'
+      : '<span class="badge b-blue" style="font-weight:700">🛒 Kasiyer (Sadece Satış)</span>';
+
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--txt)">${(u.name||'U')[0].toUpperCase()}</div>
+          <div>
+            <strong style="color:var(--txt);font-size:13px">${u.name}</strong>
+            ${isSelf ? '<span style="font-size:10.5px;color:var(--green);font-weight:600;margin-left:6px">(Siz)</span>' : ''}
+          </div>
+        </div>
+      </td>
+      <td><code style="font-size:12px;color:var(--accent);font-weight:600">${u.email || u.username}</code></td>
+      <td>${roleBadge}</td>
+      <td>
+        <span style="font-family:monospace;font-size:12px;background:var(--bg3);padding:3px 7px;border-radius:6px;border:1px solid var(--border)">${u.password}</span>
+      </td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="openUserModal(${u.id})" style="padding:4px 8px;font-size:11.5px">✏️ Düzenle</button>
+          ${!isSelf ? `<button class="btn btn-danger btn-sm" onclick="delUser(${u.id})" style="padding:4px 8px;font-size:11.5px">🗑️ Sil</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openUserModal(userId = null){
+  if(currentUser && currentUser.role !== 'admin'){
+    toast('w', 'Yetkisiz İşlem', 'Kullanıcı tanımlama yetkisi yalnızca Admin hesabına aittir.');
+    return;
+  }
+  const users = getUsers();
+  const ttl = document.getElementById('user-ttl');
+  const fId = document.getElementById('u-form-id');
+  const fName = document.getElementById('u-form-name');
+  const fEmail = document.getElementById('u-form-email');
+  const fPass = document.getElementById('u-form-pass');
+  const fRole = document.getElementById('u-form-role');
+
+  if(userId){
+    const u = users.find(x => x.id === userId);
+    if(!u) return;
+    ttl.textContent = 'Kullanıcıyı Düzenle';
+    fId.value = u.id;
+    fName.value = u.name || '';
+    fEmail.value = u.email || u.username || '';
+    fPass.value = u.password || '';
+    fRole.value = u.role || 'cashier';
+  } else {
+    ttl.textContent = 'Yeni Kullanıcı / Kasiyer Ekle';
+    fId.value = '';
+    fName.value = '';
+    fEmail.value = '';
+    fPass.value = '';
+    fRole.value = 'cashier';
+  }
+  openM('m-user');
+}
+
+function saveUser(e){
+  e.preventDefault();
+  if(currentUser && currentUser.role !== 'admin'){
+    toast('w', 'Yetkisiz İşlem', 'Sadece Admin kullanıcı ekleyebilir.');
+    return;
+  }
+  const fId = document.getElementById('u-form-id').value;
+  const fName = document.getElementById('u-form-name').value.trim();
+  const fEmail = document.getElementById('u-form-email').value.trim();
+  const fPass = document.getElementById('u-form-pass').value.trim();
+  const fRole = document.getElementById('u-form-role').value;
+
+  if(!fName || !fEmail || !fPass){
+    toast('w', 'Eksik Alan', 'Lütfen tüm zorunlu alanları doldurun.');
+    return;
+  }
+
+  let users = getUsers();
+
+  if(fId){
+    const uid = parseInt(fId);
+    const idx = users.findIndex(x => x.id === uid);
+    if(idx >= 0){
+      users[idx].name = fName;
+      users[idx].email = fEmail;
+      users[idx].username = fEmail;
+      users[idx].password = fPass;
+      users[idx].role = fRole;
+      if(currentUser && currentUser.id === uid){
+        currentUser = users[idx];
+        localStorage.setItem('nl_sess', JSON.stringify(currentUser));
+        applyRolePermissions();
+      }
+      toast('s', 'Kullanıcı Güncellendi', `${fName} başarıyla güncellendi.`);
+    }
+  } else {
+    if(users.some(x => (x.email?.toLowerCase() === fEmail.toLowerCase() || x.username?.toLowerCase() === fEmail.toLowerCase()))){
+      toast('w', 'Kullanıcı Zaten Var', 'Bu kullanıcı adı veya e-posta adresi ile kayıtlı bir hesap bulunmaktadır.');
+      return;
+    }
+    const newId = nid(users);
+    const newUser = {
+      id: newId,
+      name: fName,
+      email: fEmail,
+      username: fEmail,
+      password: fPass,
+      role: fRole
+    };
+    users.push(newUser);
+    toast('s', 'Yeni Kullanıcı Oluşturuldu 🎉', `${fName} (${fRole === 'cashier' ? 'Kasiyer' : 'Admin'}) sisteme eklendi.`);
+  }
+
+  saveUsers(users);
+  closeM('m-user');
+  renderUsers();
+}
+
+function delUser(id){
+  if(currentUser && currentUser.role !== 'admin'){
+    toast('w', 'Yetkisiz İşlem', 'Sadece Admin kullanıcı silebilir.');
+    return;
+  }
+  if(currentUser && currentUser.id === id){
+    toast('w', 'İşlem Engellendi', 'Kendi yönetici hesabınızı silemezsiniz.');
+    return;
+  }
+  let users = getUsers();
+  const target = users.find(x => x.id === id);
+  if(!target) return;
+
+  if(confirm(`"${target.name}" kullanıcısını silmek istediğinize emin misiniz?`)){
+    users = users.filter(x => x.id !== id);
+    saveUsers(users);
+    renderUsers();
+    toast('i', 'Kullanıcı Silindi', `${target.name} sistemden kaldırıldı.`);
+  }
+}
+
+// ══════════════ AUTH & ROLES ══════════════
+function doLogin(){
+  const input = (document.getElementById('l-email').value || '').trim().toLowerCase();
+  const pass = String(document.getElementById('l-pass').value || '');
+  const users = getUsers();
+  const u = users.find(x => {
+    const matchEmail = x.email && x.email.toLowerCase() === input;
+    const matchUser = x.username && x.username.toLowerCase() === input;
+    return (matchEmail || matchUser) && String(x.password) === pass;
+  });
+  const err = document.getElementById('login-err');
+  if(u){
+    currentUser = u;
+    localStorage.setItem('nl_sess', JSON.stringify(u));
+    err.style.display = 'none';
+    showApp();
+  } else {
+    err.style.display = 'block';
+  }
+}
+
+function doLogout(){
+  currentUser = null;
+  localStorage.removeItem('nl_sess');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function checkSess(){
+  const s = ls('nl_sess');
+  if(s){
+    try{
+      currentUser = JSON.parse(s);
+      showApp();
+    }catch(e){
+      doLogout();
+    }
+  }
+}
+
+function applyRolePermissions(){
+  if(!currentUser) return;
+  const isCashier = (currentUser.role === 'cashier');
+
+  // Show / Hide sidebar navigation based on role
+  document.querySelectorAll('.nav-admin-only, #nav-dashboard, #nav-products, #nav-critical, #nav-stockin, #nav-suppliers, #nav-reports, #nav-sync, #nav-users, .sidebar-nav .nav-sec').forEach(el => {
+    if(isCashier){
+      el.style.display = 'none';
+    } else {
+      el.style.display = '';
+    }
+  });
+
+  // Keep sales visible for cashier
+  const navSales = document.getElementById('nav-sales');
+  if(navSales) navSales.style.display = 'flex';
+
+  // Bottom nav adjustments
+  const bnavDash = document.getElementById('bnav-dashboard');
+  const bnavProd = document.getElementById('bnav-products');
+  const bnavStockin = document.getElementById('bnav-stockin');
+  const bnavCrit = document.getElementById('bnav-critical');
+  if(isCashier){
+    if(bnavDash) bnavDash.style.display = 'none';
+    if(bnavProd) bnavProd.style.display = 'none';
+    if(bnavStockin) bnavStockin.style.display = 'none';
+    if(bnavCrit) bnavCrit.style.display = 'none';
+  } else {
+    if(bnavDash) bnavDash.style.display = '';
+    if(bnavProd) bnavProd.style.display = '';
+    if(bnavStockin) bnavStockin.style.display = '';
+    if(bnavCrit) bnavCrit.style.display = '';
+  }
+
+  // Update profile
+  const uAv = document.getElementById('u-av');
+  const uName = document.getElementById('u-name');
+  const uEmail = document.getElementById('u-email');
+  if(uAv) uAv.textContent = (currentUser.name || 'U')[0].toUpperCase();
+  if(uName) uName.textContent = currentUser.name;
+  if(uEmail) {
+    const roleBadge = isCashier
+      ? '<span class="badge b-blue" style="font-size:9.5px;padding:2px 6px;margin-top:3px;display:inline-block">🛒 Kasiyer</span>'
+      : '<span class="badge b-purple" style="font-size:9.5px;padding:2px 6px;margin-top:3px;display:inline-block">👑 Yönetici (Admin)</span>';
+    uEmail.innerHTML = `<div style="color:var(--txt2);font-size:11px">${currentUser.email || currentUser.username}</div>${roleBadge}`;
+  }
+}
+
 function showApp(){
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app').style.display='block';
-  document.getElementById('u-av').textContent=currentUser.name[0];
-  document.getElementById('u-name').textContent=currentUser.name;
-  document.getElementById('u-email').textContent=currentUser.email;
-  applyTheme(ls('nl_theme')||'dark');
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  applyTheme(ls('nl_theme') || 'dark');
   setupRealtimeSync();
-  const lastPage = localStorage.getItem('nl_last_page') || 'dashboard';
-  go(lastPage);
+  applyRolePermissions();
+
+  const isCashier = (currentUser && currentUser.role === 'cashier');
+  const defaultPage = isCashier ? 'sales' : (localStorage.getItem('nl_last_page') || 'dashboard');
+  go(defaultPage);
 }
 
 // ══════════════ NAVIGATION ══════════════
 function go(page){
+  if(currentUser && currentUser.role === 'cashier' && page !== 'sales'){
+    page = 'sales';
+  }
   localStorage.setItem('nl_last_page', page);
   currentTab = page;
   // Stop cameras when leaving stockin/sales pages
-  if(page!=='stockin'){ stopCam('stockin'); stopCam('invoice'); }
-  if(page!=='sales')stopCam('sales');
-  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
-  const n=document.getElementById('nav-'+page),p=document.getElementById('page-'+page);
-  if(n)n.classList.add('active');
-  if(p)p.classList.add('active');
+  if(page !== 'stockin'){ stopCam('stockin'); stopCam('invoice'); }
+  if(page !== 'sales') stopCam('sales');
+
+  document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
+  const n = document.getElementById('nav-' + page), p = document.getElementById('page-' + page);
+  if(n) n.classList.add('active');
+  if(p) p.classList.add('active');
+
   // Sync bottom nav
-  document.querySelectorAll('.bnav-item').forEach(e=>e.classList.remove('active'));
-  const bn=document.getElementById('bnav-'+page);
-  if(bn)bn.classList.add('active');
-  ({dashboard:renderDash,products:renderProds,critical:renderCrit,suppliers:renderSups,reports:renderRep,stockin:initStockin,sales:initSales}[page]||function(){})();
+  document.querySelectorAll('.bnav-item').forEach(e => e.classList.remove('active'));
+  const bn = document.getElementById('bnav-' + page);
+  if(bn) bn.classList.add('active');
+
+  ({
+    dashboard: renderDash,
+    products: renderProds,
+    critical: renderCrit,
+    suppliers: renderSups,
+    reports: renderRep,
+    users: renderUsers,
+    stockin: initStockin,
+    sales: initSales
+  }[page] || function(){})();
+
   updBadge();
   closeSidebar();
   window.scrollTo(0,0);
@@ -4829,6 +5177,7 @@ function triggerCloudPush(reason, immediate = false){
     orders: go2(),
     salesHistory: gsh(),
     stockinHistory: gih(),
+    users: getUsers(),
     updatedAt: lastCloudSyncTime,
     updatedBy: currentUser ? currentUser.email : 'user',
     channel: syncChannel
@@ -4929,6 +5278,10 @@ function applyRemotePayload(payload, source){
       }
       if(Array.isArray(payload.orders)){
         localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
+      }
+      if(Array.isArray(payload.users) && payload.users.length > 0){
+        localStorage.setItem('nl_users', JSON.stringify(payload.users));
+        if(currentTab === 'users') renderUsers();
       }
     }
 
