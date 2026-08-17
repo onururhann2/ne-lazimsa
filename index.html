@@ -3959,6 +3959,11 @@ async function initSupabase(){
           handleRemoteSaleComplete(payload.saleRecord, payload.senderId);
         }
       })
+      .on('broadcast', { event: 'stock_sync' }, ({ payload }) => {
+        if(payload && payload.payload && payload.senderId !== myDeviceId){
+          applyRemotePayload(payload.payload, 'Supabase Realtime Broadcast');
+        }
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'company_inventory' }, payload => {
         isSupabaseConnected = true;
         if(payload.new && payload.new.channel === syncChannel){
@@ -3981,7 +3986,7 @@ async function initSupabase(){
         }
       });
 
-    // 2. High-Frequency Fallback Poller (every 2.5s guarantees sync even if WebSocket reconnects)
+    // 2. High-Frequency Fallback Poller (every 1.5s guarantees instant sync across all IPs)
     if(cloudPollInterval) clearInterval(cloudPollInterval);
     cloudPollInterval = setInterval(async () => {
       if(syncProvider === 'supabase' && sbClient && !isRemoteApplying){
@@ -4001,7 +4006,7 @@ async function initSupabase(){
           }
         }catch(e){}
       }
-    }, 2500);
+    }, 1500);
 
     // 3. Initial Pull
     const { data, error } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
@@ -4110,7 +4115,7 @@ function triggerCloudPush(reason, immediate = false){
     if(broadcastChan) broadcastChan.postMessage({ type: 'SYNC_UPDATE', payload });
   }catch(e){}
 
-  // 2. Broadcast via MQTT Mesh to all phones and computers instantly
+  // 2. Broadcast via MQTT Mesh to all phones and computers instantly (Cross-IP/Wi-Fi)
   try{
     if(mqttClient && mqttClient.connected){
       mqttClient.publish('nelazimsa/sync/' + syncChannel + '/stock', JSON.stringify({
@@ -4119,6 +4124,21 @@ function triggerCloudPush(reason, immediate = false){
         senderId: myDeviceId,
         time: lastCloudSyncTime
       }), { qos: 0 });
+    }
+  }catch(e){}
+
+  // 3. Broadcast via Supabase WebSockets Realtime Channel
+  try{
+    if(sbChannelSub && isSupabaseConnected){
+      sbChannelSub.send({
+        type: 'broadcast',
+        event: 'stock_sync',
+        payload: {
+          payload: payload,
+          senderId: myDeviceId,
+          time: lastCloudSyncTime
+        }
+      });
     }
   }catch(e){}
 
@@ -4237,8 +4257,7 @@ function applyRemotePayload(payload, source){
 function refreshActiveViewSilently(){
   renderSalesHistory();
   const activePage = document.querySelector('.page.active');
-  if(!activePage) return;
-  const pageId = activePage.id.replace('page-', '');
+  const pageId = (activePage ? activePage.id.replace('page-', '') : '') || currentTab || 'dashboard';
   
   if(pageId === 'dashboard') renderDash();
   else if(pageId === 'products') renderProds();
