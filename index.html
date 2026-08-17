@@ -1515,31 +1515,7 @@ function renderProds(){
     const profitColor = profitTL > 0 ? 'var(--green)' : profitTL < 0 ? 'var(--red)' : 'var(--txt2)';
     const marginBadge = profitMargin > 0 ? 'b-ok' : profitMargin < 0 ? 'b-danger' : 'b-blue';
     const altArr = Array.isArray(p.altBarcodes) ? p.altBarcodes : (typeof p.altBarcodes === 'string' ? p.altBarcodes.split(',') : []);
-    const altBadges = altArr.map(x => x.trim()).filter(Boolean).map(b => `<span style="background:rgba(59,130,246,.12);color:var(--accent);font-size:10px;padding:1px 5px;border-radius:4px" title="Alt Barkod">${b}</span>`).join('');
-    
-    // Alt Barkodlar için stok dökümü
-    let altStockBreakdownHtml = '';
-    if(altArr.length > 0){
-      const altMap = p.altStockMap || {};
-      let assignedAlt = 0;
-      altArr.forEach(b => { assignedAlt += (parseInt(altMap[b]) || 0); });
-      const mainStk = Math.max(0, p.stk - assignedAlt);
-
-      altStockBreakdownHtml = `
-        <div style="margin-top:6px;padding:4px 7px;background:rgba(15,23,42,.7);border-radius:6px;border:1px solid var(--border2);font-size:10px;text-align:left">
-          <div style="display:flex;justify-content:space-between;color:var(--txt2);margin-bottom:2px">
-            <span>🏷️ Ana:</span>
-            <strong style="color:var(--txt)">${mainStk} ${p.unit}</strong>
-          </div>
-          ${altArr.map(b => `
-            <div style="display:flex;justify-content:space-between;color:var(--accent);padding:1px 0">
-              <span class="mono">↳ Alt:</span>
-              <strong>${altMap[b] !== undefined ? altMap[b] : Math.round(p.stk / (altArr.length + 1))} ${p.unit}</strong>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }
+    const altBadges = altArr.map(x => x.trim()).filter(Boolean).map(b => `<span style="background:rgba(59,130,246,.12);color:var(--accent);font-size:10.5px;padding:1px 6px;border-radius:4px" title="Alt Barkod">↳ ${b}</span>`).join('');
 
     return`<tr class="${st==='crit'?'crit-row':''}">
       <td><div style="font-weight:600">${p.name}</div>${p.note?`<div style="font-size:11px;color:var(--txt3)">${p.note}</div>`:''}</td>
@@ -1554,7 +1530,6 @@ function renderProds(){
       <td>
         <div class="sbar"><div class="sbar-track"><div class="sbar-fill ${st}" style="width:${pct}%"></div></div><span style="font-size:12px;font-weight:700;min-width:55px">${p.stk} ${p.unit}</span></div>
         <div style="font-size:10px;color:var(--txt3);margin-top:2px">Min: ${p.min} ${p.unit}</div>
-        ${altStockBreakdownHtml}
       </td>
       <td style="font-weight:600;color:var(--txt2)">${tl(buyP)}</td>
       <td style="font-weight:700;color:var(--accent)">${tl(sellP)}</td>
@@ -2057,10 +2032,14 @@ function onScan(code){
               <input type="text" id="scan-quick-cat" list="catlist" placeholder="Örn: Kırtasiye" value="${cats[0] || 'Genel'}" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
             <div>
               <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Başlangıç Stoğu</label>
               <input type="number" id="scan-quick-stk" value="10" min="0" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Alış Fiyatı (₺)</label>
+              <input type="number" id="scan-quick-buyprice" placeholder="0.00" step="0.01" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
             </div>
             <div>
               <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Satış Fiyatı (₺)</label>
@@ -2094,8 +2073,12 @@ function onScan(code){
                 </select>
               </div>
             </div>
-            <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkScannedBarcodeToProduct('${code}')" style="font-weight:600;font-size:11px;padding:5px">
-              🔗 Bu Ürüne Alt Barkod Yap
+            <div style="margin-bottom:6px">
+              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Ürünün Stoğuna Eklenecek Miktar (İsteğe Bağlı)</label>
+              <input type="number" id="scan-link-qty" value="1" min="0" placeholder="1" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
+            </div>
+            <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkScannedBarcodeToProduct('${code}')" style="font-weight:600;font-size:11px;padding:6px">
+              🔗 Bu Ürüne Alt Barkod Yap & Stoğuna Ekle
             </button>
           </div>
         </details>
@@ -2109,7 +2092,8 @@ function saveQuickProductFromScan(code){
   const name = document.getElementById('scan-quick-name')?.value?.trim();
   const cat = document.getElementById('scan-quick-cat')?.value?.trim() || 'Genel';
   const stk = parseInt(document.getElementById('scan-quick-stk')?.value) || 0;
-  const sellPrice = parseFloat(document.getElementById('scan-quick-price')?.value) || 0;
+  const buyPrice = parseFloat(document.getElementById('scan-quick-buyprice')?.value) || 0;
+  const sellPrice = parseFloat(document.getElementById('scan-quick-price')?.value) || buyPrice;
 
   if(!name){
     toast('w', 'Ürün Adı Gerekli', 'Lütfen ürün adını yazın.');
@@ -2127,7 +2111,7 @@ function saveQuickProductFromScan(code){
     unit: 'Adet',
     stk: stk,
     min: 5,
-    price: sellPrice,
+    price: buyPrice,
     sellPrice: sellPrice,
     sup: null,
     note: ''
@@ -2138,7 +2122,7 @@ function saveQuickProductFromScan(code){
   renderProds();
   updBadge();
   closeScanner();
-  toast('s', 'Ürün Başarıyla Eklendi! 🚀', `"${name}" (${cat}) kaydedildi.`);
+  toast('s', 'Ürün Başarıyla Eklendi! 🚀', `"${name}" (${cat}) ${stk} Adet stok ve ${tl(buyPrice)} alış fiyatı ile kaydedildi.`);
 }
 
 function onScanCatFilterChange(code){
@@ -2155,6 +2139,7 @@ function onScanCatFilterChange(code){
 
 function linkScannedBarcodeToProduct(code){
   const prodId = parseInt(document.getElementById('scan-link-prod')?.value);
+  const addQty = parseInt(document.getElementById('scan-link-qty')?.value) || 0;
   if(!prodId){
     toast('w', 'Ürün Seçilmedi', 'Lütfen alt barkodu bağlamak istediğiniz ürünü seçin.');
     return;
@@ -2174,11 +2159,15 @@ function linkScannedBarcodeToProduct(code){
     prod.altBarcodes.push(code);
   }
   
+  if(addQty > 0){
+    prod.stk = parseInt(prod.stk || 0) + addQty;
+  }
+  
   sp(P);
   renderProds();
   updBadge();
   closeScanner();
-  toast('s', 'Alt Barkod Kaydedildi! 🚀', `"${code}" barkodu "${prod.name}" ürününe başarıyla bağlandı.`);
+  toast('s', 'Alt Barkod Bağlandı & Stok Güncellendi! 🚀', `"${code}" barkodu "${prod.name}" ürününe bağlandı.${addQty > 0 ? ' Toplam Stok: ' + prod.stk + ' ' + prod.unit : ''}`);
 }
 
 function openNewProdWithBarcode(code){
@@ -3566,8 +3555,18 @@ function onStockinScan(code){
             <input type="text" id="stockin-quick-cat" list="catlist" placeholder="Örn: Kırtasiye" value="${cats[0] || 'Genel'}" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
           </div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+          <div>
+            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Alış Fiyatı (₺)</label>
+            <input type="number" id="stockin-quick-buyprice" placeholder="0.00" step="0.01" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
+          </div>
+          <div>
+            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Satış Fiyatı (₺)</label>
+            <input type="number" id="stockin-quick-price" placeholder="0.00" step="0.01" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
+          </div>
+        </div>
         <button type="button" class="btn btn-success btn-sm btn-full" onclick="saveStockinQuickProduct('${code}')" style="font-weight:700;font-size:11.5px;padding:6px">
-          💾 Ürünü Ekle & Seç
+          💾 Ürünü Ekle & Stoğa Başla
         </button>
       </div>
 
@@ -3594,7 +3593,7 @@ function onStockinScan(code){
             </div>
           </div>
           <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkStockinBarcodeToProduct('${code}')" style="font-weight:600;font-size:11px;padding:5px">
-            🔗 Bu Ürüne Alt Barkod Yap
+            🔗 Bu Ürüne Alt Barkod Yap & Seç
           </button>
         </div>
       </details>
@@ -3605,6 +3604,8 @@ function onStockinScan(code){
 function saveStockinQuickProduct(code){
   const name = document.getElementById('stockin-quick-name')?.value?.trim();
   const cat = document.getElementById('stockin-quick-cat')?.value?.trim() || 'Genel';
+  const buyPrice = parseFloat(document.getElementById('stockin-quick-buyprice')?.value) || 0;
+  const sellPrice = parseFloat(document.getElementById('stockin-quick-price')?.value) || buyPrice;
 
   if(!name){
     toast('w', 'Ürün Adı Gerekli', 'Lütfen ürün adını yazın.');
@@ -3622,8 +3623,8 @@ function saveStockinQuickProduct(code){
     unit: 'Adet',
     stk: 0,
     min: 5,
-    price: 0,
-    sellPrice: 0,
+    price: buyPrice,
+    sellPrice: sellPrice,
     sup: null,
     note: ''
   };
