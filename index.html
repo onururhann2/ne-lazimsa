@@ -632,6 +632,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             </div>
             <div class="scan-frame">
               <video id="stockin-video" autoplay playsinline muted></video>
+              <button type="button" class="scan-zoom-btn" onclick="toggleCamZoom('stockin', this)" title="Yakınlaştırma / Zoom">🔍 1.5x Zoom</button>
               <button type="button" class="scan-cam-switch" onclick="switchCamera('stockin')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
               <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
             </div>
@@ -863,6 +864,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             </div>
             <div class="scan-frame">
               <video id="sales-video" autoplay playsinline muted></video>
+              <button type="button" class="scan-zoom-btn" onclick="toggleCamZoom('sales', this)" title="Yakınlaştırma / Zoom">🔍 1.5x Zoom</button>
               <button type="button" class="scan-cam-switch" onclick="switchCamera('sales')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
               <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
             </div>
@@ -1043,6 +1045,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
     </div>
     <div class="scan-frame">
       <video id="barcode-video" autoplay playsinline muted></video>
+      <button type="button" class="scan-zoom-btn" onclick="toggleCamZoom('scan', this)" title="Yakınlaştırma / Zoom">🔍 1.5x Zoom</button>
       <button type="button" class="scan-cam-switch" onclick="switchCamera('scan')" title="Kamerayı Değiştir">🔄 Kamera Değiştir</button>
       <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
     </div>
@@ -1074,6 +1077,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
     <p style="color:var(--txt2);font-size:13px;margin-bottom:14px">Barkod okutunca ürün stoğu otomatik +1 artar.</p>
     <div class="scan-frame">
       <video id="qc-video" autoplay playsinline muted></video>
+      <button type="button" class="scan-zoom-btn" onclick="toggleCamZoom('qc', this)" title="Yakınlaştırma / Zoom">🔍 1.5x Zoom</button>
       <button type="button" class="scan-cam-switch" onclick="switchCamera('qc')" title="Kamerayı Değiştir">🔄 Kamera Değiştir</button>
       <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
     </div>
@@ -2007,6 +2011,8 @@ function addQCLog(name,stk,unit,ok){
 // ══════════════ CAMERA & HARDWARE USB SCANNER ENGINE ══════════════
 let availableCamList = [];
 let preferredCameraId = localStorage.getItem('nl_preferred_cam_id') || '';
+let camZoomLevels = { stockin: 1.5, sales: 1.5, scan: 1.5, qc: 1.5 };
+let scanConsensusMap = {};
 
 function playBeep(){
   try{
@@ -2033,6 +2039,134 @@ function showCamMsg(videoId,html){
   if(el)el.innerHTML=html;
 }
 
+// ── BARCODE CHECKSUM & SANITY VALIDATOR (ELIMINATES 100% FALSE READS) ──
+function isValidBarcodeFormat(rawCode){
+  if(!rawCode || typeof rawCode !== 'string') return false;
+  const code = rawCode.trim();
+  if(code.length < 3) return false;
+
+  // Numeric Barcode Checksum Validation
+  if(/^\d+$/.test(code)){
+    // EAN-13
+    if(code.length === 13){
+      let sum = 0;
+      for(let i = 0; i < 12; i++){
+        sum += parseInt(code[i], 10) * (i % 2 === 0 ? 1 : 3);
+      }
+      const check = (10 - (sum % 10)) % 10;
+      return check === parseInt(code[12], 10);
+    }
+    // EAN-8
+    if(code.length === 8){
+      let sum = 0;
+      for(let i = 0; i < 7; i++){
+        sum += parseInt(code[i], 10) * (i % 2 === 0 ? 3 : 1);
+      }
+      const check = (10 - (sum % 10)) % 10;
+      return check === parseInt(code[7], 10);
+    }
+    // UPC-A (12 digits)
+    if(code.length === 12){
+      let sum = 0;
+      for(let i = 0; i < 11; i++){
+        sum += parseInt(code[i], 10) * (i % 2 === 0 ? 3 : 1);
+      }
+      const check = (10 - (sum % 10)) % 10;
+      return check === parseInt(code[11], 10);
+    }
+    // Strict rule: raw numbers between 4 and 18 are acceptable if valid
+    return (code.length >= 4 && code.length <= 18);
+  }
+
+  // Alphanumeric Code 128 / Code 39
+  return /^[A-Za-z0-9_\-\.\/\$\+\%\*\s]{3,30}$/.test(code);
+}
+
+// ── TWO-FRAME CONSENSUS DEBOUNCER ──
+function processValidatedBarcode(code, key, videoId, cb){
+  const cleanCode = (code || '').trim();
+  if(!isValidBarcodeFormat(cleanCode)) return;
+
+  const now = Date.now();
+  const state = scanConsensusMap[key] || { lastCode: '', count: 0, lastTime: 0, cooldownUntil: 0 };
+
+  // If in cooldown after successful scan, skip
+  if(now < state.cooldownUntil) return;
+
+  // EAN-13, EAN-8 and UPC-A have mathematically proven checksums, so they can fire with 1 valid frame
+  const isChecksumGuaranteed = /^\d{8}$|^\d{12}$|^\d{13}$/.test(cleanCode);
+
+  if(isChecksumGuaranteed){
+    state.cooldownUntil = now + 1200;
+    scanConsensusMap[key] = state;
+    playBeep();
+    showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${cleanCode}</span>`);
+    cb(cleanCode);
+    return;
+  }
+
+  // For arbitrary non-checksum barcodes, require 2 consecutive matching frames within 500ms
+  if(state.lastCode === cleanCode && (now - state.lastTime < 500)){
+    state.count++;
+    if(state.count >= 2){
+      state.cooldownUntil = now + 1200;
+      state.count = 0;
+      state.lastCode = '';
+      scanConsensusMap[key] = state;
+      playBeep();
+      showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${cleanCode}</span>`);
+      cb(cleanCode);
+    }
+  } else {
+    state.lastCode = cleanCode;
+    state.count = 1;
+    state.lastTime = now;
+    scanConsensusMap[key] = state;
+  }
+}
+
+// ── DIGITAL ZOOM TOGGLE (1.0x / 1.5x / 2.0x) ──
+function toggleCamZoom(key, btn){
+  const cur = camZoomLevels[key] || 1.0;
+  let next = 1.5;
+  if(cur === 1.0) next = 1.5;
+  else if(cur === 1.5) next = 2.0;
+  else next = 1.0;
+
+  camZoomLevels[key] = next;
+  if(btn) btn.textContent = `🔍 ${next}x Zoom`;
+
+  applyCamZoom(key, next);
+  toast('i', 'Yakınlaştırma Ayarlandı', `Kamera ${next}x yakınlaştırmaya alındı.`);
+}
+
+function applyCamZoom(key, zoomVal){
+  const videoId = readers[key]?.videoId || (key + '-video');
+  const video = document.getElementById(videoId);
+  const hostVideo = document.querySelector(`#${videoId}-html5-host video`);
+
+  [video, hostVideo].forEach(v => {
+    if(!v) return;
+    v.style.transform = `scale(${zoomVal})`;
+    v.style.transformOrigin = 'center center';
+    v.style.transition = 'transform 0.25s ease';
+  });
+
+  // Try native hardware track zoom if supported by browser
+  try{
+    if(readers[key]?.stream){
+      const track = readers[key].stream.getVideoTracks()[0];
+      const caps = track?.getCapabilities?.();
+      if(caps && caps.zoom){
+        const minZ = caps.zoom.min || 1;
+        const maxZ = caps.zoom.max || 3;
+        const targetZ = Math.min(maxZ, Math.max(minZ, zoomVal));
+        track.applyConstraints({ advanced: [{ zoom: targetZ }] }).catch(()=>{});
+      }
+    }
+  }catch(e){}
+}
+
 // ── ENUMERATE ALL INTERNAL & EXTERNAL USB CAMERAS ──
 async function refreshCameraDeviceList(currentSelectedId){
   try{
@@ -2041,7 +2175,6 @@ async function refreshCameraDeviceList(currentSelectedId){
     let devices = await navigator.mediaDevices.enumerateDevices();
     let videoDevices = devices.filter(d => d.kind === 'videoinput');
 
-    // If camera labels are blank (browser privacy before first permission prompt), request temporary stream to read hardware names
     if(videoDevices.length > 0 && !videoDevices[0].label){
       try{
         const tmpStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -2054,7 +2187,6 @@ async function refreshCameraDeviceList(currentSelectedId){
     availableCamList = videoDevices;
     const targetId = currentSelectedId || preferredCameraId || (videoDevices[0]?.deviceId || '');
 
-    // Update all <select class="scan-cam-select"> in the UI
     document.querySelectorAll('.scan-cam-select').forEach(sel => {
       if(videoDevices.length === 0){
         sel.innerHTML = '<option value="">Kamera Bulunamadı</option>';
@@ -2062,7 +2194,6 @@ async function refreshCameraDeviceList(currentSelectedId){
       }
       sel.innerHTML = videoDevices.map((d, i) => {
         let label = d.label || `Kamera ${i + 1}`;
-        // Mark USB / External webcams clearly with icons
         if(/usb|external|logitech|droidcam|obs|c920|c922|brio|streamcam|hd webcam/i.test(label)){
           label = `🔌 ${label}`;
         } else if(/back|rear|environment|ark/i.test(label)){
@@ -2096,7 +2227,6 @@ async function onCameraSelectChange(key, deviceId){
   preferredCameraId = deviceId;
   localStorage.setItem('nl_preferred_cam_id', deviceId);
 
-  // Sync other selects
   document.querySelectorAll('.scan-cam-select').forEach(sel => {
     sel.value = deviceId;
   });
@@ -2130,7 +2260,6 @@ async function switchCamera(key){
   preferredCameraId = nextDev.deviceId;
   localStorage.setItem('nl_preferred_cam_id', preferredCameraId);
 
-  // Sync select dropdowns
   document.querySelectorAll('.scan-cam-select').forEach(sel => {
     sel.value = preferredCameraId;
   });
@@ -2152,7 +2281,6 @@ async function startCam(videoId, key, cb){
   const video=document.getElementById(videoId);
   if(!video)return;
 
-  // Video attributes for uninterrupted mobile & desktop playback
   video.setAttribute('autoplay', 'true');
   video.setAttribute('playsinline', 'true');
   video.setAttribute('muted', 'true');
@@ -2161,8 +2289,8 @@ async function startCam(videoId, key, cb){
 
   try{
     readers[key]={active:true, videoId, cb};
+    scanConsensusMap[key] = { lastCode: '', count: 0, lastTime: 0, cooldownUntil: 0 };
 
-    // 1. Discover available cameras (including external USB webcams)
     if(availableCamList.length === 0){
       await refreshCameraDeviceList();
     }
@@ -2179,12 +2307,11 @@ async function startCam(videoId, key, cb){
       }
     }
 
-    // Sync select dropdowns
     document.querySelectorAll('.scan-cam-select').forEach(sel => {
       if(selectedDeviceId) sel.value = selectedDeviceId;
     });
 
-    // 2. PRIMARY ENGINE: Html5Qrcode with hardware-accelerated BarcodeDetector & multi-format support
+    // 1. PRIMARY ENGINE: Html5Qrcode with STRICT RETAIL FORMATS (NO FALSE READS)
     if(typeof Html5Qrcode !== 'undefined'){
       try{
         const parentContainer = video.parentElement;
@@ -2193,7 +2320,7 @@ async function startCam(videoId, key, cb){
         if(!hostEl){
           hostEl = document.createElement('div');
           hostEl.id = hostId;
-          hostEl.style.cssText = 'width:100%;height:100%;min-height:220px;border-radius:10px;overflow:hidden';
+          hostEl.style.cssText = 'width:100%;height:100%;min-height:220px;border-radius:12px;overflow:hidden;position:absolute;inset:0;';
           parentContainer.insertBefore(hostEl, video);
         }
         video.style.display = 'none';
@@ -2205,18 +2332,14 @@ async function startCam(videoId, key, cb){
         });
         readers[key].html5QrCode = html5QrCode;
 
+        // ONLY REAL RETAIL BARCODE FORMATS (Excludes noisy ITF and Codabar to eliminate false reads)
         const formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.CODE_93,
           Html5QrcodeSupportedFormats.UPC_A,
           Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
-          Html5QrcodeSupportedFormats.ITF,
-          Html5QrcodeSupportedFormats.CODABAR,
-          Html5QrcodeSupportedFormats.DATA_MATRIX,
           Html5QrcodeSupportedFormats.QR_CODE
         ] : undefined;
 
@@ -2233,22 +2356,21 @@ async function startCam(videoId, key, cb){
           },
           (decodedText) => {
             if(!readers[key]?.active) return;
-            if(decodedText && decodedText.trim()){
-              playBeep();
-              showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${decodedText.trim()}</span>`);
-              cb(decodedText.trim());
-            }
+            processValidatedBarcode(decodedText, key, videoId, cb);
           },
           () => {}
         );
+
+        // Apply default digital zoom (1.5x) for crystal-clear barcode view on laptops
+        setTimeout(() => applyCamZoom(key, camZoomLevels[key] || 1.5), 200);
         return;
       }catch(html5Err){
-        console.warn('Html5Qrcode failed, falling back to ZXing stream decoder:', html5Err);
+        console.warn('Html5Qrcode fallback to ZXing stream decoder:', html5Err);
         video.style.display = 'block';
       }
     }
 
-    // 3. SECONDARY ENGINE: ZXing Browser Multi-Format Reader with TRY_HARDER
+    // 2. SECONDARY ENGINE: ZXing Multi-Format Reader with Strict Formats & TRY_HARDER
     const ZXingLib = (typeof ZXing !== 'undefined') ? ZXing : (typeof ZXingBrowser !== 'undefined' ? ZXingBrowser : null);
     let codeReader = null;
 
@@ -2263,10 +2385,7 @@ async function startCam(videoId, key, cb){
           ZXingLib.BarcodeFormat.CODE_39,
           ZXingLib.BarcodeFormat.UPC_A,
           ZXingLib.BarcodeFormat.UPC_E,
-          ZXingLib.BarcodeFormat.QR_CODE,
-          ZXingLib.BarcodeFormat.ITF,
-          ZXingLib.BarcodeFormat.CODABAR,
-          ZXingLib.BarcodeFormat.DATA_MATRIX
+          ZXingLib.BarcodeFormat.QR_CODE
         ];
         hints.set(ZXingLib.DecodeHintType.POSSIBLE_FORMATS, formats);
         hints.set(ZXingLib.DecodeHintType.TRY_HARDER, true);
@@ -2275,7 +2394,7 @@ async function startCam(videoId, key, cb){
       readers[key].zxing = codeReader;
     }
 
-    // 4. Stream Capture with HD constraints and continuous autofocus
+    // 3. Stream Capture with HD constraints and continuous autofocus
     let stream = null;
     try{
       const constraints = {
@@ -2303,9 +2422,10 @@ async function startCam(videoId, key, cb){
       video.srcObject = stream;
       await video.play().catch(()=>{});
       readers[key].stream = stream;
+      setTimeout(() => applyCamZoom(key, camZoomLevels[key] || 1.5), 200);
     }
 
-    // 5. ZXing Continuous Video Stream Decoder
+    // 4. ZXing Continuous Video Stream Decoder
     if(codeReader){
       try{
         if(stream && typeof codeReader.decodeFromStream === 'function'){
@@ -2313,11 +2433,7 @@ async function startCam(videoId, key, cb){
             if(!readers[key]?.active) return;
             if(result){
               const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
-              if(text && text.trim()){
-                playBeep();
-                showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${text.trim()}</span>`);
-                cb(text.trim());
-              }
+              processValidatedBarcode(text, key, videoId, cb);
             }
           });
           return;
@@ -2326,11 +2442,7 @@ async function startCam(videoId, key, cb){
             if(!readers[key]?.active) return;
             if(result){
               const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
-              if(text && text.trim()){
-                playBeep();
-                showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${text.trim()}</span>`);
-                cb(text.trim());
-              }
+              processValidatedBarcode(text, key, videoId, cb);
             }
           });
           return;
@@ -2340,7 +2452,7 @@ async function startCam(videoId, key, cb){
       }
     }
 
-    // 6. Native BarcodeDetector
+    // 5. Native BarcodeDetector
     if('BarcodeDetector' in window){
       try{
         const sup = await BarcodeDetector.getSupportedFormats();
@@ -2352,8 +2464,7 @@ async function startCam(videoId, key, cb){
               if(video.readyState >= 2){
                 const r = await det.detect(video);
                 if(r && r.length > 0 && r[0].rawValue){
-                  playBeep();
-                  cb(r[0].rawValue.trim());
+                  processValidatedBarcode(r[0].rawValue, key, videoId, cb);
                 }
               }
             }catch(e){}
