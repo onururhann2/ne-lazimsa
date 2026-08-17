@@ -1999,22 +1999,26 @@ function isValidBarcodeFormat(rawCode){
   return /^[A-Za-z0-9_\-\.\/\$\+\%\*\s]{3,30}$/.test(code);
 }
 
-// ── TWO-FRAME CONSENSUS DEBOUNCER ──
+// ── TWO-FRAME CONSENSUS DEBOUNCER WITH SMART COOLDOWN ──
 function processValidatedBarcode(code, key, videoId, cb){
   const cleanCode = (code || '').trim();
   if(!isValidBarcodeFormat(cleanCode)) return;
 
   const now = Date.now();
-  const state = scanConsensusMap[key] || { lastCode: '', count: 0, lastTime: 0, cooldownUntil: 0 };
+  const state = scanConsensusMap[key] || { lastCode: '', count: 0, lastTime: 0, cooldownUntil: 0, lastSuccessCode: '' };
 
   // If in cooldown after successful scan, skip
   if(now < state.cooldownUntil) return;
 
-  // EAN-13, EAN-8 and UPC-A have mathematically proven checksums, so they can fire with 1 valid frame
+  // EAN-13, EAN-8 and UPC-A have mathematically proven checksums
   const isChecksumGuaranteed = /^\d{8}$|^\d{12}$|^\d{13}$/.test(cleanCode);
 
+  // 3.5 seconds cooldown if holding the same item in front of camera, 1.8 seconds between different items
+  const cooldownDuration = (state.lastSuccessCode === cleanCode) ? 3500 : 1800;
+
   if(isChecksumGuaranteed){
-    state.cooldownUntil = now + 1200;
+    state.cooldownUntil = now + cooldownDuration;
+    state.lastSuccessCode = cleanCode;
     scanConsensusMap[key] = state;
     playBeep();
     showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${cleanCode}</span>`);
@@ -2026,7 +2030,8 @@ function processValidatedBarcode(code, key, videoId, cb){
   if(state.lastCode === cleanCode && (now - state.lastTime < 500)){
     state.count++;
     if(state.count >= 2){
-      state.cooldownUntil = now + 1200;
+      state.cooldownUntil = now + cooldownDuration;
+      state.lastSuccessCode = cleanCode;
       state.count = 0;
       state.lastCode = '';
       scanConsensusMap[key] = state;
@@ -2530,13 +2535,15 @@ function initStockin(){
   document.getElementById('stockin-prod-id').value='';
   document.getElementById('stockin-prod-card').style.display='none';
   document.getElementById('stockin-notfound').style.display='none';
-  document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
-  // start camera with debounce
+  document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
+  // start camera with 3.5s cooldown for identical item, 1.8s for different item
   let lastSI=null,lastSIt=0;
   startCam('stockin-video','stockin',(code)=>{
     const now=Date.now();
-    if(code===lastSI&&now-lastSIt<2500)return;
-    lastSI=code;lastSIt=now;
+    if(code===lastSI && now-lastSIt < 3500) return;
+    if(now-lastSIt < 1800) return;
+    lastSI=code;
+    lastSIt=now;
     onStockinScan(code);
   });
 }
@@ -3462,14 +3469,15 @@ function initSales(){
   salesScannedProdId=null;
   document.getElementById('sales-prod-card').style.display='none';
   document.getElementById('sales-notfound').style.display='none';
-  document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
+  document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
   renderCart();
   renderSalesHistory();
-  // start camera with debounce
+  // start camera with 3.5s cooldown for identical item, 1.8s for different item
   let lastSC=null,lastSCt=0;
   startCam('sales-video','sales',(code)=>{
     const now=Date.now();
-    if(code===lastSC&&now-lastSCt<2500)return;
+    if(code===lastSC && now-lastSCt < 3500) return;
+    if(now-lastSCt < 1800) return;
     lastSC=code;lastSCt=now;
     onSalesScan(code);
   });
