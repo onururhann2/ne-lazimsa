@@ -1433,12 +1433,19 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   products jsonb default '[]'::jsonb,
   suppliers jsonb default '[]'::jsonb,
   orders jsonb default '[]'::jsonb,
+  sales_history jsonb default '[]'::jsonb,
+  stockin_history jsonb default '[]'::jsonb,
+  users jsonb default '[]'::jsonb,
   updated_at bigint,
   updated_by text
 );
 alter publication supabase_realtime add table public.company_inventory;
 alter table public.company_inventory enable row level security;
-create policy "Allow all" on public.company_inventory for all using (true) with check (true);</code></pre>
+create policy "Allow all" on public.company_inventory for all using (true) with check (true);
+-- Mevcut tabloya users, sales_history, stockin_history eklemek icin:
+alter table public.company_inventory add column if not exists sales_history jsonb default '[]'::jsonb;
+alter table public.company_inventory add column if not exists stockin_history jsonb default '[]'::jsonb;
+alter table public.company_inventory add column if not exists users jsonb default '[]'::jsonb;</code></pre>
       </details>
     </div>
 
@@ -5310,6 +5317,7 @@ async function initSupabase(){
               orders: data.orders,
               salesHistory: data.sales_history,
               stockinHistory: data.stockin_history,
+              users: data.users,
               updatedAt: data.updated_at,
               updatedBy: data.updated_by
             }, 'Supabase Poll');
@@ -5332,6 +5340,9 @@ async function initSupabase(){
         products: data.products,
         suppliers: data.suppliers,
         orders: data.orders,
+        salesHistory: data.sales_history,
+        stockinHistory: data.stockin_history,
+        users: data.users,
         updatedAt: data.updated_at,
         updatedBy: data.updated_by
       }, 'Supabase Initial');
@@ -5467,6 +5478,7 @@ function triggerCloudPush(reason, immediate = false){
           orders: payload.orders,
           sales_history: payload.salesHistory,
           stockin_history: payload.stockinHistory,
+          users: payload.users,
           updated_at: payload.updatedAt,
           updated_by: payload.updatedBy
         }, { onConflict: 'channel' });
@@ -5520,6 +5532,20 @@ function applyRemotePayload(payload, source){
       }
       if(Array.isArray(payload.users) && payload.users.length > 0){
         localStorage.setItem('nl_users', JSON.stringify(payload.users));
+        // Refresh current session with latest permissions from remote
+        if(currentUser){
+          const freshMe = payload.users.find(u => u.id === currentUser.id || 
+            (u.email && currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+            (u.username && currentUser.username && u.username.toLowerCase() === currentUser.username.toLowerCase())
+          );
+          if(freshMe){
+            currentUser = {...freshMe};
+            if(!currentUser.role) currentUser.role = 'admin';
+            if(currentUser.role !== 'admin' && !currentUser.permissions) currentUser.permissions = ['sales'];
+            localStorage.setItem('nl_sess', JSON.stringify(currentUser));
+            applyRolePermissions();
+          }
+        }
         if(currentTab === 'users') renderUsers();
       }
     }
