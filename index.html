@@ -693,12 +693,32 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
           </div>
           <!-- Found product card -->
           <div id="stockin-prod-card" style="display:none" class="prod-card">
-            <div class="prod-card-name" id="stockin-prod-name"></div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+              <div class="prod-card-name" id="stockin-prod-name"></div>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="if(stockinProdId)openProdModal(stockinProdId)" style="font-size:11px;padding:3px 8px">✏️ Tam Düzenle</button>
+            </div>
             <div class="prod-card-meta">
               <span><span style="color:var(--txt2)">Mevcut Stok:</span> <strong id="stockin-prod-stk"></strong></span>
               <span><span style="color:var(--txt2)">Alış Fiyatı:</span> <strong id="stockin-prod-price"></strong></span>
               <span><span style="color:var(--txt2)">Satış Fiyatı:</span> <strong id="stockin-prod-sellprice" style="color:var(--accent)"></strong></span>
               <span><span style="color:var(--txt2)">Birim:</span> <span id="stockin-prod-unit"></span></span>
+            </div>
+            <!-- Inline Category & Subcategory Editor on Stockin -->
+            <div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--border2)">
+              <div style="font-size:11.5px;font-weight:700;color:var(--txt);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+                <span>🏷️ Kategori & Alt Kategori</span>
+                <span id="stockin-cat-saved-hint" style="color:var(--green);font-size:10.5px;display:none">✅ Kaydedildi</span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                <div>
+                  <label style="font-size:10.5px;color:var(--txt2);display:block;margin-bottom:2px">Ana Kategori</label>
+                  <input type="text" id="stockin-card-cat" list="catlist" placeholder="Örn: Kitap" style="width:100%;padding:5px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px" oninput="updateSubCatDatalist(this.value);updateStockinProdCat();">
+                </div>
+                <div>
+                  <label style="font-size:10.5px;color:var(--txt2);display:block;margin-bottom:2px">Alt Kategori</label>
+                  <input type="text" id="stockin-card-subcat" list="subcatlist" placeholder="Örn: Edebiyat" style="width:100%;padding:5px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px" oninput="updateStockinProdCat();">
+                </div>
+              </div>
             </div>
             <div style="margin-top:10px" id="stockin-prod-badge"></div>
           </div>
@@ -3611,6 +3631,14 @@ function onStockinScan(code){
     document.getElementById('stockin-prod-price').textContent=tl(p.price);
     document.getElementById('stockin-prod-sellprice').textContent=tl(sellP);
     document.getElementById('stockin-prod-unit').textContent=p.unit;
+    
+    // Populate editable category & subcategory in stockin card
+    const cardCatEl = document.getElementById('stockin-card-cat');
+    const cardSubcatEl = document.getElementById('stockin-card-subcat');
+    if(cardCatEl) cardCatEl.value = p.cat || '';
+    if(cardSubcatEl) cardSubcatEl.value = p.subCat || '';
+    updateSubCatDatalist(p.cat || '');
+
     const st=sst(p);
     document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'Düşük Stok':'Kritik Stok'}</span>`;
     document.getElementById('stockin-prod-card').style.display='block';
@@ -3761,14 +3789,40 @@ function linkStockinBarcodeToProduct(code){
   // Immediately switch to this product in Stock-in form
   onStockinScan(code);
 }
+
+function updateStockinProdCat(){
+  if(!stockinProdId) return;
+  const P = gp();
+  const pi = P.findIndex(x => x.id === stockinProdId);
+  if(pi < 0) return;
+  const newCat = document.getElementById('stockin-card-cat')?.value?.trim() || 'Genel';
+  const newSub = document.getElementById('stockin-card-subcat')?.value?.trim() || '';
+  P[pi].cat = newCat;
+  P[pi].subCat = newSub;
+  sp(P);
+  renderProds();
+  const hint = document.getElementById('stockin-cat-saved-hint');
+  if(hint){
+    hint.style.display = 'inline';
+    setTimeout(() => { if(hint) hint.style.display = 'none'; }, 2200);
+  }
+}
+
 function confirmStockin(){
   const id=parseInt(document.getElementById('stockin-prod-id').value);
   const qty=parseInt(document.getElementById('stockin-qty').value)||0;
   const note=document.getElementById('stockin-note').value.trim();
-  if(!id){toast('w','\u00dcr\u00fcn Se\u00e7ilmedi','L\u00fctfen \u00f6nce bir barkod okutun');return;}
-  if(qty<1){toast('w','Miktar Hatal\u0131','En az 1 giriniz');return;}
+  if(!id){toast('w','Ürün Seçilmedi','Lütfen önce bir barkod okutun');return;}
+  if(qty<1){toast('w','Miktar Hatalı','En az 1 giriniz');return;}
   const P=gp(),pi=P.findIndex(p=>p.id===id);
-  if(pi<0){toast('e','Hata','\u00dcr\u00fcn bulunamad\u0131');return;}
+  if(pi<0){toast('e','Hata','Ürün bulunamadı');return;}
+  
+  // Save any category/subcategory edits made on stockin card
+  const newCat = document.getElementById('stockin-card-cat')?.value?.trim();
+  const newSub = document.getElementById('stockin-card-subcat')?.value?.trim();
+  if(newCat) P[pi].cat = newCat;
+  if(newSub !== undefined) P[pi].subCat = newSub;
+
   P[pi].stk = parseInt(P[pi].stk || 0) + qty;
   localStorage.setItem('nl_prod', JSON.stringify(P));
   const p=P[pi];
