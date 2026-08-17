@@ -1407,6 +1407,22 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       </div>
     </div>
 
+    <!-- Eksik sütun uyarısı: tablo şeması güncel değilse görünür -->
+    <div id="schema-warn" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:#f87171;margin-bottom:6px">🚨 Tablo Şeması Eksik</div>
+      <p style="font-size:12px;color:var(--txt2);margin:0 0 8px;line-height:1.5">
+        Supabase tablonuzda <strong id="schema-warn-cols" style="color:var(--txt)"></strong> sütunu yok.
+        Bu yüzden <strong>kullanıcı tanımları ve satış/stok geçmişi cihazlar arasında aktarılamıyor.</strong>
+        Aşağıdaki 2 adım sorunu kalıcı olarak çözer.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button type="button" class="btn btn-primary btn-sm" onclick="copySchemaSql(this)">1️⃣ SQL Kodunu Kopyala</button>
+        <button type="button" class="btn btn-sm" onclick="openSqlEditor()" style="background:#3ecf8e;color:#04231a;font-weight:700">2️⃣ SQL Editor'ü Aç → Yapıştır → RUN</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="recheckSchema(this)">🔄 Kontrol Et</button>
+      </div>
+      <pre id="schema-warn-sql" style="background:var(--bg);padding:10px;border-radius:8px;font-size:11px;color:#fca5a5;overflow-x:auto;user-select:all;margin:0"></pre>
+    </div>
+
     <!-- 1. SUPABASE PANEL -->
     <div id="sync-panel-supabase">
       <div class="form-row">
@@ -1526,17 +1542,121 @@ function noteMissingColumn(error){
   return true;
 }
 
+// Eksik sütunları eklemek için çalıştırılacak SQL
+function schemaFixSql(){
+  const cols = missingColumns.size ? Array.from(missingColumns) : ['users', 'sales_history', 'stockin_history'];
+  return cols.map(c =>
+    `alter table public.company_inventory add column if not exists ${c} jsonb default '[]'::jsonb;`).join('\n');
+}
+
+// Supabase proje panelindeki SQL Editor adresini yapılandırılmış URL'den türetir
+function sqlEditorUrl(){
+  const url = (localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL).replace(/\/+$/, '');
+  const m = url.match(/^https?:\/\/([a-z0-9]+)\.supabase\.(co|in)/i);
+  return m ? `https://supabase.com/dashboard/project/${m[1]}/sql/new` : 'https://supabase.com/dashboard';
+}
+
+function renderSchemaWarning(){
+  const box = document.getElementById('schema-warn');
+  if(!box) return;
+  if(!missingColumns.size){ box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  const colsEl = document.getElementById('schema-warn-cols');
+  const sqlEl = document.getElementById('schema-warn-sql');
+  if(colsEl) colsEl.textContent = Array.from(missingColumns).join(', ');
+  if(sqlEl) sqlEl.textContent = schemaFixSql();
+}
+
+function copySchemaSql(btn){
+  const sql = schemaFixSql();
+  const done = () => {
+    if(btn){
+      const old = btn.textContent;
+      btn.textContent = '✅ Kopyalandı!';
+      setTimeout(() => { btn.textContent = old; }, 2000);
+    }
+    toast('s', 'SQL Kopyalandı', 'Şimdi SQL Editor’ü açıp yapıştırın ve RUN’a basın.');
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(sql).then(done).catch(() => {
+      const el = document.getElementById('schema-warn-sql');
+      if(el){ const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+      toast('i', 'Kopyalanamadı', 'Aşağıdaki kodu elle seçip kopyalayın.');
+    });
+  } else {
+    done();
+  }
+}
+
+function openSqlEditor(){
+  window.open(sqlEditorUrl(), '_blank', 'noopener');
+}
+
+// Sütunların gerçekten var olup olmadığını doğrudan sorgular.
+// Satır olmasa bile çalışır: olmayan bir sütunu select etmek 400 döner.
+async function probeSchema(){
+  let url = (localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL).replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+  let key = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
+  if(key && key.startsWith('sb_secret_')) key = DEFAULT_SB_KEY;
+  if(!url || !key) return { reached: false };
+
+  const cols = ['users', 'sales_history', 'stockin_history'];
+  const hdr = { apikey: key, Authorization: 'Bearer ' + key };
+  const ask = (sel) => fetch(`${url}/rest/v1/company_inventory?select=${sel}&limit=1`, { headers: hdr });
+
+  try{
+    const res = await ask(cols.join(','));
+    if(res.ok){
+      cols.forEach(c => missingColumns.delete(c));
+      return { reached: true };
+    }
+    if(res.status !== 400) return { reached: false };
+    // En az biri eksik: hangisi olduğunu tek tek belirle
+    for(const c of cols){
+      const r = await ask(c);
+      if(r.ok) missingColumns.delete(c);
+      else if(r.status === 400) missingColumns.add(c);
+      else return { reached: false };
+    }
+    return { reached: true };
+  }catch(e){
+    return { reached: false };
+  }
+}
+
+// SQL çalıştırıldıktan sonra şemayı yeniden doğrular
+async function recheckSchema(btn){
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Kontrol ediliyor...'; }
+  try{
+    const probe = await probeSchema();
+    if(probe.reached && !missingColumns.size){
+      missingColumnWarned = false;
+      renderSchemaWarning();
+      toast('s', 'Tablo Hazır 🎉', 'Sütunlar eklendi. Kullanıcı ve geçmiş senkronizasyonu artık aktif.');
+      triggerCloudPush('schema_fixed', true);
+      setSyncStatusUI('ok', 'Canlı');
+    } else if(!probe.reached){
+      toast('e', 'Sunucuya Ulaşılamadı', 'İnternet bağlantınızı kontrol edip tekrar deneyin.');
+    } else {
+      toast('w', 'Sütunlar Hâlâ Yok', 'SQL kodunu çalıştırdığınızdan ve RUN’a bastığınızdan emin olun.');
+    }
+  }catch(e){
+    toast('e', 'Kontrol Başarısız', String(e.message || e));
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '🔄 Kontrol Et'; }
+  }
+}
+
 function warnMissingColumns(){
+  renderSchemaWarning();
   if(missingColumnWarned || !missingColumns.size) return;
   missingColumnWarned = true;
   const cols = Array.from(missingColumns).join(', ');
   console.error('[NE LAZIMSA] Supabase tablosunda eksik sütun(lar): ' + cols +
-    '\nSQL Editor’de çalıştırın:\n' +
-    Array.from(missingColumns).map(c =>
-      `alter table public.company_inventory add column if not exists ${c} jsonb default '[]'::jsonb;`).join('\n'));
+    '\nSQL Editor’de çalıştırın:\n' + schemaFixSql());
   setSyncStatusUI('offline', 'Tablo Eksik');
   toast('e', 'Supabase Tablosu Eksik',
-    `"${cols}" sütun(lar)ı yok. Kullanıcı/geçmiş senkronizasyonu ÇALIŞMAZ. Senkronizasyon ayarlarındaki SQL kodunu Supabase SQL Editor’de çalıştırın.`);
+    `"${cols}" sütunu yok. Kullanıcı/geçmiş senkronizasyonu ÇALIŞMAZ. Düzeltmek için ☁️ Senkronizasyon ayarlarını açın — tek tuşla halledebilirsiniz.`);
 }
 let broadcastChan = null;
 
@@ -2087,15 +2207,19 @@ async function fetchRemoteUsersDirect(){
   }
 }
 
-// Okunan satırda users sütunu hiç yoksa tablo şeması eksiktir.
+// select('*') ile okunan satırda beklenen sütunlar var mı?
+// Sonradan eklenen sütunları da temizler, böylece SQL çalıştırıldığında uyarı kalkar.
 function checkUsersColumn(row){
-  if(row && typeof row === 'object' && !('users' in row)){
-    missingColumns.add('users');
-    if(!('sales_history' in row)) missingColumns.add('sales_history');
-    if(!('stockin_history' in row)) missingColumns.add('stockin_history');
+  if(!row || typeof row !== 'object') return true;
+  ['users', 'sales_history', 'stockin_history'].forEach(c => {
+    if(c in row) missingColumns.delete(c);
+    else missingColumns.add(c);
+  });
+  if(missingColumns.size){
     warnMissingColumns();
     return false;
   }
+  renderSchemaWarning();
   return true;
 }
 
@@ -5418,8 +5542,15 @@ function openSyncModal(){
   if(fbChan) fbChan.value = syncChannel;
 
   const isConn = (syncProvider === 'supabase' && isSupabaseConnected) || (syncProvider === 'firebase' && isFirebaseConnected);
-  setSyncStatusUI(isConn ? 'ok' : 'offline');
+  setSyncStatusUI(missingColumns.size ? 'offline' : (isConn ? 'ok' : 'offline'), missingColumns.size ? 'Tablo Eksik' : undefined);
+  renderSchemaWarning();
   openM('m-sync');
+
+  // Modal her açıldığında şemayı tazele: SQL başka bir sekmede
+  // çalıştırıldıysa uyarı kendiliğinden kalksın
+  if(syncProvider === 'supabase'){
+    probeSchema().then(p => { if(p.reached) renderSchemaWarning(); });
+  }
 }
 
 function saveCloudConfig(){
