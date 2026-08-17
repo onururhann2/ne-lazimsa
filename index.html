@@ -529,13 +529,64 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         </div>
       </div>
       <div id="cat-subcat-summary-bar" style="margin-bottom:14px"></div>
-      <div class="filter-bar">
-        <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="p-search" placeholder="Ürün, barkod veya kategori ara..." oninput="renderProds()"></div>
-        <select id="p-cat" onchange="onFilterCatChange()"><option value="">Tüm Ana Kategoriler</option></select>
-        <select id="p-subcat" onchange="renderProds()"><option value="">Tüm Alt Kategoriler</option></select>
-        <select id="p-status" onchange="renderProds()"><option value="">Tüm Durumlar</option><option value="ok">Normal</option><option value="warn">Düşük</option><option value="crit">Kritik</option></select>
+      
+      <!-- View Switcher Tabs -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+        <button id="btn-view-prods" class="btn btn-primary btn-sm" onclick="setProdsViewMode('list')">📦 Ürün Listesi Görünümü</button>
+        <button id="btn-view-subcats" class="btn btn-ghost btn-sm" onclick="setProdsViewMode('subcats')">📂 Alt Kategori Bazlı Stok Tablosu</button>
       </div>
-      <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Barkod</th><th>Ana / Alt Kategori</th><th>Tedarikçi</th><th>Toplam & Alt Stoklar</th><th>Alış Fiyatı</th><th>Satış Fiyatı</th><th>Kâr (₺)</th><th>Kâr Marjı (%)</th><th>İşlemler</th></tr></thead><tbody id="prods-tbody"></tbody></table></div>
+
+      <!-- 1. REGULAR PRODUCT TABLE VIEW -->
+      <div id="prods-list-view">
+        <div class="filter-bar">
+          <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="p-search" placeholder="Ürün, barkod veya alt kategori ara..." oninput="renderProds()"></div>
+          <select id="p-cat" onchange="onFilterCatChange()"><option value="">Tüm Ana Kategoriler</option></select>
+          <select id="p-subcat" onchange="renderProds()"><option value="">Tüm Alt Kategoriler</option></select>
+          <select id="p-status" onchange="renderProds()"><option value="">Tüm Durumlar</option><option value="ok">Normal</option><option value="warn">Düşük</option><option value="crit">Kritik</option></select>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ürün</th>
+                <th>Barkod</th>
+                <th>Ana Kategori</th>
+                <th>Alt Kategori</th>
+                <th>Tedarikçi</th>
+                <th>Toplam & Alt Stoklar</th>
+                <th>Alış Fiyatı</th>
+                <th>Satış Fiyatı</th>
+                <th>Kâr (₺)</th>
+                <th>Kâr Marjı (%)</th>
+                <th>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody id="prods-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. AGGREGATED SUB-CATEGORIES STOCKS TABLE VIEW -->
+      <div id="subcats-tbl-view" style="display:none">
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ana Kategori</th>
+                <th>Alt Kategori</th>
+                <th>Ürün Çeşidi</th>
+                <th>Toplam Stok</th>
+                <th>Stok Durumu</th>
+                <th>Toplam Alış Değeri</th>
+                <th>Toplam Satış Değeri</th>
+                <th>İçerdiği Ürünler</th>
+                <th>Filtrele</th>
+              </tr>
+            </thead>
+            <tbody id="subcats-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- CRITICAL -->
@@ -1476,6 +1527,114 @@ function findProductByBarcode(code){
   }) || null;
 }
 
+let prodsViewMode = 'list';
+
+function setProdsViewMode(mode){
+  prodsViewMode = mode;
+  const listEl = document.getElementById('prods-list-view');
+  const subcatsEl = document.getElementById('subcats-tbl-view');
+  const btnList = document.getElementById('btn-view-prods');
+  const btnSubcats = document.getElementById('btn-view-subcats');
+
+  if(mode === 'subcats'){
+    if(listEl) listEl.style.display = 'none';
+    if(subcatsEl) subcatsEl.style.display = 'block';
+    if(btnList){ btnList.className = 'btn btn-ghost btn-sm'; }
+    if(btnSubcats){ btnSubcats.className = 'btn btn-primary btn-sm'; }
+    renderSubCatsTable();
+  } else {
+    if(listEl) listEl.style.display = 'block';
+    if(subcatsEl) subcatsEl.style.display = 'none';
+    if(btnList){ btnList.className = 'btn btn-primary btn-sm'; }
+    if(btnSubcats){ btnSubcats.className = 'btn btn-ghost btn-sm'; }
+    renderProds();
+  }
+}
+
+function renderSubCatsTable(){
+  const tb = document.getElementById('subcats-tbody');
+  if(!tb) return;
+  const P = gp();
+  if(!P.length){
+    tb.innerHTML = '<tr><td colspan="9"><div class="empty"><div class="empty-icon">📂</div><h3>Henüz ürün bulunmuyor</h3></div></td></tr>';
+    return;
+  }
+
+  // Aggregate by Ana Kategori & Alt Kategori
+  const groupMap = {};
+  P.forEach(p => {
+    const c = p.cat || 'Genel';
+    const sc = p.subCat || 'Belirtilmemiş';
+    const key = `${c}____${sc}`;
+    if(!groupMap[key]){
+      groupMap[key] = {
+        cat: c,
+        subCat: sc,
+        prods: [],
+        totalStk: 0,
+        totalBuyVal: 0,
+        totalSellVal: 0,
+        critCount: 0
+      };
+    }
+    const buyP = parseFloat(p.price) || 0;
+    const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : buyP;
+    const stk = parseInt(p.stk || 0);
+
+    groupMap[key].prods.push(p);
+    groupMap[key].totalStk += stk;
+    groupMap[key].totalBuyVal += (stk * buyP);
+    groupMap[key].totalSellVal += (stk * sellP);
+    if(sst(p) === 'crit') groupMap[key].critCount += 1;
+  });
+
+  const groups = Object.values(groupMap).sort((a, b) => a.cat.localeCompare(b.cat) || a.subCat.localeCompare(b.subCat));
+
+  tb.innerHTML = groups.map(g => {
+    const isUnspecified = g.subCat === 'Belirtilmemiş';
+    const subBadge = isUnspecified
+      ? `<span style="color:var(--txt3);font-style:italic">Belirtilmemiş</span>`
+      : `<span style="background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3);padding:3px 9px;border-radius:6px;font-weight:700;font-size:12px">↳ ${g.subCat}</span>`;
+
+    const statusBadge = g.critCount > 0 
+      ? `<span class="badge b-danger">⚠️ ${g.critCount} Ürün Kritik</span>`
+      : `<span class="badge b-ok">✅ Normal</span>`;
+
+    const prodsPills = g.prods.map(p => `
+      <span style="background:var(--bg3);border:1px solid var(--border2);font-size:11px;padding:2px 6px;border-radius:4px;display:inline-flex;align-items:center;gap:4px">
+        <strong>${p.name}</strong> <span style="color:var(--accent)">(${p.stk} ${p.unit})</span>
+      </span>
+    `).join(' ');
+
+    return `
+      <tr>
+        <td><strong style="font-size:12.5px;color:var(--txt)">${g.cat}</strong></td>
+        <td>${subBadge}</td>
+        <td><span class="badge b-blue" style="font-weight:700">${g.prods.length} Çeşit</span></td>
+        <td><strong style="font-size:14px;color:var(--green)">${g.totalStk} Adet</strong></td>
+        <td>${statusBadge}</td>
+        <td style="font-weight:600;color:var(--txt2)">${tl(g.totalBuyVal)}</td>
+        <td style="font-weight:700;color:var(--accent)">${tl(g.totalSellVal)}</td>
+        <td><div style="display:flex;flex-wrap:wrap;gap:4px;max-width:320px">${prodsPills}</div></td>
+        <td>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="filterBySubCat('${g.cat}', '${isUnspecified ? '' : g.subCat}')" style="font-size:11px;padding:3px 8px">
+            🔍 Listele
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterBySubCat(cat, subCat){
+  setProdsViewMode('list');
+  const catEl = document.getElementById('p-cat');
+  if(catEl){ catEl.value = cat; onFilterCatChange(); }
+  const subCatEl = document.getElementById('p-subcat');
+  if(subCatEl){ subCatEl.value = subCat; }
+  renderProds();
+}
+
 function updateSubCatDatalist(mainCat){
   const P = gp();
   const subCats = [...new Set(P.filter(p => !mainCat || p.cat === mainCat).map(p => p.subCat).filter(Boolean))].sort();
@@ -1595,7 +1754,7 @@ function renderProds(){
   if(stF) P=P.filter(p=>sst(p)===stF);
   const S=gs();
   const tb=document.getElementById('prods-tbody');
-  if(!P.length){tb.innerHTML='<tr><td colspan="10"><div class="empty"><div class="empty-icon">📦</div><h3>Ürün bulunamadı</h3><p>Filtrelerinizi değiştirin veya yeni ürün ekleyin</p></div></td></tr>';return;}
+  if(!P.length){tb.innerHTML='<tr><td colspan="11"><div class="empty"><div class="empty-icon">📦</div><h3>Ürün bulunamadı</h3><p>Filtrelerinizi değiştirin veya yeni ürün ekleyin</p></div></td></tr>';return;}
   tb.innerHTML=P.map(p=>{
     const st=sst(p),pct=Math.min(100,Math.round(p.stk/(p.min*2||1)*100));
     const sup=S.find(s=>s.id===p.sup);
@@ -1639,18 +1798,19 @@ function renderProds(){
         ${altBadges ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${altBadges}</div>` : ''}
       </td>
       <td>
-        <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">
-          <span style="background:var(--bg3);border:1px solid var(--border);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;color:var(--txt)">${p.cat || 'Genel'}</span>
-          ${p.subCat ? `
-            <span style="font-size:11px;color:#60a5fa;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);padding:1px 6px;border-radius:4px;font-weight:600">
-              ↳ ${p.subCat}
-            </span>
-          ` : `
-            <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:1px 6px;color:var(--yellow);border:1px dashed rgba(245,158,11,.4);border-radius:4px" onclick="quickSetSubCat(${p.id})">
-              + Alt Kategori Yaz
-            </button>
-          `}
-        </div>
+        <span style="background:var(--bg3);border:1px solid var(--border);padding:3px 9px;border-radius:12px;font-size:11.5px;font-weight:700;color:var(--txt)">${p.cat || 'Genel'}</span>
+      </td>
+      <td>
+        ${p.subCat ? `
+          <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);padding:3px 9px;border-radius:6px;font-size:11.5px;font-weight:700;color:#60a5fa">
+            <span>↳ ${p.subCat}</span>
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:0 3px;font-size:10px;color:var(--txt3)" onclick="quickSetSubCat(${p.id})" title="Değiştir">✏️</button>
+          </div>
+        ` : `
+          <button type="button" class="btn btn-warning btn-sm" style="font-size:10.5px;padding:3px 8px;font-weight:600" onclick="quickSetSubCat(${p.id})">
+            + Alt Kategori Belirle
+          </button>
+        `}
       </td>
       <td style="color:var(--txt2)">${sup?sup.name:'—'}</td>
       <td>
@@ -1676,6 +1836,7 @@ function quickSetSubCat(id){
     p.subCat = newSub.trim();
     sp(P);
     renderProds();
+    renderSubCatsTable();
     toast('s', 'Alt Kategori Güncellendi', `"${p.name}" ürününe "${p.subCat}" alt kategorisi atandı.`);
   }
 }
