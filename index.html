@@ -514,11 +514,11 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <div class="card" style="padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <label style="font-size:11px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.5px">📅 Rapor Tarihi:</label>
-          <input type="date" id="rep-date" onchange="renderRep()" style="padding:6px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;font-family:'Inter',sans-serif;outline:none;cursor:pointer">
+          <input type="date" id="rep-date" onchange="currentRepMode = this.value ? 'custom' : 'all'; renderRep();" style="padding:6px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;font-family:'Inter',sans-serif;outline:none;cursor:pointer">
           <div style="display:flex;gap:5px">
-            <button class="btn btn-ghost btn-sm" onclick="setRepDate('today')">Bugün</button>
-            <button class="btn btn-ghost btn-sm" onclick="setRepDate('yesterday')">Dün</button>
-            <button class="btn btn-ghost btn-sm" onclick="setRepDate('all')">Tüm Zamanlar</button>
+            <button class="btn btn-sm" id="btn-rep-today" style="background:var(--accent);color:#fff" onclick="setRepDate('today')">Bugün</button>
+            <button class="btn btn-sm btn-ghost" id="btn-rep-yesterday" onclick="setRepDate('yesterday')">Dün</button>
+            <button class="btn btn-sm btn-ghost" id="btn-rep-all" onclick="setRepDate('all')">Tüm Zamanlar</button>
           </div>
         </div>
         <div id="rep-date-badge" style="font-size:12px;font-weight:600;color:var(--accent)"></div>
@@ -1584,26 +1584,69 @@ function saveSup(e){
 function delSup(id){if(!confirm('Bu tedarikçiyi silmek istediğinize emin misiniz?'))return;ss(gs().filter(s=>s.id!==id));renderSups();toast('s','Silindi','Tedarikçi silindi');}
 
 // ══════════════ REPORTS & DAILY ANALYTICS ══════════════
+let currentRepMode = 'today';
+
 function setRepDate(preset){
+  currentRepMode = preset;
   const el = document.getElementById('rep-date');
-  if(!el) return;
-  if(preset === 'today'){
-    el.value = getTodayStr();
-  } else if(preset === 'yesterday'){
-    el.value = getYesterdayStr();
-  } else if(preset === 'all'){
-    el.value = '';
+  if(el){
+    if(preset === 'today'){
+      el.value = getTodayStr();
+    } else if(preset === 'yesterday'){
+      el.value = getYesterdayStr();
+    } else if(preset === 'all'){
+      el.value = '';
+    }
   }
+  updateRepPresetButtons();
   renderRep();
+}
+
+function updateRepPresetButtons(){
+  const btnToday = document.getElementById('btn-rep-today');
+  const btnYest = document.getElementById('btn-rep-yesterday');
+  const btnAll = document.getElementById('btn-rep-all');
+
+  [btnToday, btnYest, btnAll].forEach(b => {
+    if(!b) return;
+    b.classList.remove('btn-primary');
+    b.classList.add('btn-ghost');
+    b.style.background = 'transparent';
+    b.style.color = 'var(--txt)';
+  });
+
+  if(currentRepMode === 'today' && btnToday){
+    btnToday.style.background = 'var(--accent)';
+    btnToday.style.color = '#fff';
+  } else if(currentRepMode === 'yesterday' && btnYest){
+    btnYest.style.background = 'var(--accent)';
+    btnYest.style.color = '#fff';
+  } else if(currentRepMode === 'all' && btnAll){
+    btnAll.style.background = 'var(--accent)';
+    btnAll.style.color = '#fff';
+  }
 }
 
 function renderRep(){
   const dateInput = document.getElementById('rep-date');
-  if(dateInput && !dateInput.value && dateInput.dataset.mode !== 'all'){
-    dateInput.value = getTodayStr();
+  let selDate = '';
+  let isAll = false;
+
+  if(currentRepMode === 'all'){
+    selDate = '';
+    isAll = true;
+    if(dateInput) dateInput.value = '';
+  } else if(dateInput && dateInput.value){
+    selDate = dateInput.value;
+    isAll = false;
+  } else {
+    selDate = getTodayStr();
+    isAll = false;
+    if(dateInput) dateInput.value = selDate;
+    currentRepMode = 'today';
   }
-  const selDate = dateInput ? dateInput.value : getTodayStr();
-  const isAll = !selDate;
+
+  updateRepPresetButtons();
 
   const P = gp(), S = gs(), O = go2();
   const sHist = gsh().filter(s => isAll ? true : s.date === selDate);
