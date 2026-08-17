@@ -2013,8 +2013,8 @@ function processValidatedBarcode(code, key, videoId, cb){
   // EAN-13, EAN-8 and UPC-A have mathematically proven checksums
   const isChecksumGuaranteed = /^\d{8}$|^\d{12}$|^\d{13}$/.test(cleanCode);
 
-  // 3.5 seconds cooldown if holding the same item in front of camera, 1.8 seconds between different items
-  const cooldownDuration = (state.lastSuccessCode === cleanCode) ? 3500 : 1800;
+  // 5.0 seconds cooldown if holding the same item in front of camera, 2.5 seconds between different items
+  const cooldownDuration = (state.lastSuccessCode === cleanCode) ? 5000 : 2500;
 
   if(isChecksumGuaranteed){
     state.cooldownUntil = now + cooldownDuration;
@@ -2536,12 +2536,12 @@ function initStockin(){
   document.getElementById('stockin-prod-card').style.display='none';
   document.getElementById('stockin-notfound').style.display='none';
   document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
-  // start camera with 3.5s cooldown for identical item, 1.8s for different item
+  // start camera with 5.0s cooldown for identical item, 2.5s for different item
   let lastSI=null,lastSIt=0;
   startCam('stockin-video','stockin',(code)=>{
     const now=Date.now();
-    if(code===lastSI && now-lastSIt < 3500) return;
-    if(now-lastSIt < 1800) return;
+    if(code===lastSI && now-lastSIt < 5000) return;
+    if(now-lastSIt < 2500) return;
     lastSI=code;
     lastSIt=now;
     onStockinScan(code);
@@ -3472,18 +3472,25 @@ function initSales(){
   document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
   renderCart();
   renderSalesHistory();
-  // start camera with 3.5s cooldown for identical item, 1.8s for different item
+  // start camera with 5.0s cooldown for identical item, 2.5s for different item
   let lastSC=null,lastSCt=0;
   startCam('sales-video','sales',(code)=>{
     const now=Date.now();
-    if(code===lastSC && now-lastSCt < 3500) return;
-    if(now-lastSCt < 1800) return;
+    if(code===lastSC && now-lastSCt < 5000) return;
+    if(now-lastSCt < 2500) return;
     lastSC=code;lastSCt=now;
     onSalesScan(code);
   });
 }
+
+let lastSalesScanCode = null, lastSalesScanTime = 0;
 function onSalesScan(code, fromRemote = false){
+  const now = Date.now();
   if(!fromRemote){
+    if(code === lastSalesScanCode && now - lastSalesScanTime < 5000) return;
+    if(now - lastSalesScanTime < 2500) return;
+    lastSalesScanCode = code;
+    lastSalesScanTime = now;
     broadcastRemoteScan(code);
   }
 
