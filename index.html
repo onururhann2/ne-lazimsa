@@ -1225,59 +1225,46 @@ function getYesterdayStr(){
   return `${year}-${month}-${day}`;
 }
 function getTimeStr(d = new Date()){
-  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function initData(){
-  // Comprehensive Sanitize: Purge all demo/test mock records across products, suppliers, orders, reports & sales
-  const mockBarcodes = new Set(['8690000000001','8690000000002','8690000000003','8690000000004','8690000000005','8690000000006','8690000000007','8690000000008','8690000000009','8690000000010']);
-  const mockNames = new Set(['A4 Fotokopi Kağıdı (500lü)', 'Tükenmez Kalem (Mavi)', 'Toner HP LaserJet 85A', 'USB Klavye', 'Sıvı Sabun (5lt)', 'Çöp Torbası (50li)', 'Karton Kutu (Büyük)', 'Şeffaf Bant (10lu)', 'Ağır Hizmet Eldiveni', 'Maket Bıçağı']);
-  const mockSupNames = new Set(['Ofis Dünyası A.Ş.', 'Teknoloji Market', 'Temizlik Pro', 'Ambalaj Center']);
-  const mockReceipts = new Set(['#948201', '#948202', '#948190']);
+  // Run mock data cleanup ONLY ONCE on initial launch so subsequent sales are never wiped
+  if(!localStorage.getItem('nl_mock_sanitized_v4')){
+    const mockBarcodes = new Set(['8690000000001','8690000000002','8690000000003','8690000000004','8690000000005','8690000000006','8690000000007','8690000000008','8690000000009','8690000000010']);
+    const mockNames = new Set(['A4 Fotokopi Kağıdı (500lü)', 'Tükenmez Kalem (Mavi)', 'Toner HP LaserJet 85A', 'USB Klavye', 'Sıvı Sabun (5lt)', 'Çöp Torbası (50li)', 'Karton Kutu (Büyük)', 'Şeffaf Bant (10lu)', 'Ağır Hizmet Eldiveni', 'Maket Bıçağı']);
+    const mockSupNames = new Set(['Ofis Dünyası A.Ş.', 'Teknoloji Market', 'Temizlik Pro', 'Ambalaj Center']);
+    const mockReceipts = new Set(['#948201', '#948202', '#948190']);
 
-  try{
-    let curProds = gp();
-    if(Array.isArray(curProds)){
-      curProds = curProds.filter(p => !mockBarcodes.has(p.barc) && !mockNames.has(p.name));
-      localStorage.setItem('nl_prod', JSON.stringify(curProds));
-    }
+    try{
+      let curProds = gp();
+      if(Array.isArray(curProds)){
+        curProds = curProds.filter(p => !mockBarcodes.has(p.barc) && !mockNames.has(p.name));
+        localStorage.setItem('nl_prod', JSON.stringify(curProds));
+      }
 
-    const validProdIds = new Set(curProds.map(p => p.id));
-    const validProdBarcs = new Set(curProds.map(p => p.barc).filter(Boolean));
+      let curSups = gs();
+      if(Array.isArray(curSups)){
+        curSups = curSups.filter(s => !mockSupNames.has(s.name));
+        localStorage.setItem('nl_sup', JSON.stringify(curSups));
+      }
 
-    let curSups = gs();
-    if(Array.isArray(curSups)){
-      curSups = curSups.filter(s => !mockSupNames.has(s.name));
-      localStorage.setItem('nl_sup', JSON.stringify(curSups));
-    }
+      let curSales = gsh();
+      if(Array.isArray(curSales)){
+        curSales = curSales.filter(s => !mockReceipts.has(s.receiptNo) && s.id !== 101 && s.id !== 102 && s.id !== 103);
+        localStorage.setItem('nl_sales_hist', JSON.stringify(curSales));
+      }
 
-    let curOrds = go2();
-    if(Array.isArray(curOrds)){
-      curOrds = curOrds.filter(o => validProdIds.has(o.prod));
-      localStorage.setItem('nl_ord', JSON.stringify(curOrds));
-    }
+      let curStockin = gih();
+      if(Array.isArray(curStockin)){
+        curStockin = curStockin.filter(s => s.id !== 201 && s.id !== 202 && s.id !== 203);
+        localStorage.setItem('nl_stockin_hist', JSON.stringify(curStockin));
+      }
+    }catch(e){}
 
-    // Reports & Sales History: Keep ONLY sales containing user's actual products
-    let curSales = gsh();
-    if(Array.isArray(curSales)){
-      curSales = curSales.filter(s => {
-        if(mockReceipts.has(s.receiptNo) || s.id === 101 || s.id === 102 || s.id === 103) return false;
-        const hasValidItem = (s.items || []).some(it => validProdIds.has(it.prodId) || (!mockNames.has(it.name) && !mockBarcodes.has(it.barc)));
-        return hasValidItem;
-      });
-      localStorage.setItem('nl_sales_hist', JSON.stringify(curSales));
-    }
-
-    // Reports & Stock-in History: Keep ONLY stock movements of user's actual products
-    let curStockin = gih();
-    if(Array.isArray(curStockin)){
-      curStockin = curStockin.filter(s => {
-        if(s.id === 201 || s.id === 202 || s.id === 203) return false;
-        return validProdIds.has(s.prodId) || validProdBarcs.has(s.barc) || (!mockNames.has(s.name) && !mockBarcodes.has(s.barc));
-      });
-      localStorage.setItem('nl_stockin_hist', JSON.stringify(curStockin));
-    }
-  }catch(e){}
+    localStorage.setItem('nl_mock_sanitized_v4', 'true');
+    setTimeout(() => triggerCloudPush('purge_mock_data', true), 500);
+  }
 
   if(!ls('nl_sup')) ls('nl_sup', '[]');
   if(!ls('nl_prod')) ls('nl_prod', '[]');
@@ -1287,7 +1274,6 @@ function initData(){
   if(!ls('nl_theme')) ls('nl_theme','dark');
   
   setupRealtimeSync();
-  setTimeout(() => triggerCloudPush('purge_mock_data', true), 500);
 }
 
 function ls(k,v){if(v!==undefined)localStorage.setItem(k,v);else return localStorage.getItem(k)}
@@ -3590,16 +3576,15 @@ function renderSalesHistory(){
     if(countEl) countEl.textContent = '0 Satış';
     return;
   }
-  const slice100 = sHist.slice(0, 100);
-  if(countEl) countEl.textContent = `${slice100.length} Satış`;
-  hist.innerHTML = slice100.map(s => {
+  if(countEl) countEl.textContent = `${sHist.length} Satış`;
+  hist.innerHTML = sHist.map(s => {
     const summary = (s.items || []).map(c => `${c.name} x${c.qty}`).join(', ');
     const userLabel = s.user ? ` <span style="color:var(--txt3);font-size:11px">(${s.user})</span>` : '';
     const dateLabel = s.date ? `<span style="color:var(--txt3);font-size:10.5px;margin-left:4px">${s.date}</span>` : '';
     return `
-      <div style="padding:9px 12px;border-radius:8px;font-size:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18)">
+      <div style="padding:10px 12px;border-radius:8px;font-size:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-          <span style="font-weight:600">${s.time || ''} (${s.receiptNo || '#'}) ${userLabel} ${dateLabel}</span>
+          <span style="font-weight:600">${s.time || ''} <span style="color:var(--accent);font-size:11px">(${s.receiptNo || '#'})</span> ${userLabel} ${dateLabel}</span>
           <span style="color:var(--red);font-weight:700">${tl(s.totalAmount || 0)}</span>
         </div>
         <div style="color:var(--txt2);font-size:11.5px">${summary}</div>
