@@ -615,8 +615,8 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <div class="tbl-wrap" style="margin-bottom:20px">
         <div class="tbl-head" style="background:rgba(139,92,246,.06)">
           <div>
-            <span class="tbl-title" style="display:flex;align-items:center;gap:6px">📊 Kategori Bazında Satış & Stok Analizi</span>
-            <div style="font-size:11px;color:var(--txt2);margin-top:2px">Kategorideki ürünlerin satış fiyatları, satış performansı ve anlık stok değerleri</div>
+            <span class="tbl-title" style="display:flex;align-items:center;gap:6px">📊 Kategori Bazında Satış, Stok & Ciro Potansiyeli Analizi</span>
+            <div style="font-size:11px;color:var(--txt2);margin-top:2px">Kategorilerin dönem satışları, mevcut envanteri ve tüm stok satıldığında oluşacak toplam tutarlar</div>
           </div>
           <span class="badge b-purple" id="rep-cat-count">0 Kategori</span>
         </div>
@@ -625,14 +625,15 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <thead>
               <tr>
                 <th>Kategori</th>
-                <th>Kategorideki Ürünler & Satış Fiyatları</th>
-                <th>Çeşit</th>
-                <th>Satılan Miktar</th>
-                <th>Satış Cirosu</th>
-                <th>Elde Edilen Kâr</th>
-                <th>Kâr Marjı</th>
+                <th>Ürün Çeşidi</th>
+                <th>Dönem Satılan</th>
+                <th>Dönem Satış Cirosu</th>
+                <th>Dönem Net Kârı</th>
+                <th>Dönem Kâr Marjı</th>
                 <th>Mevcut Stok</th>
-                <th>Mevcut Stok Değeri</th>
+                <th>Mevcut Alış Değeri</th>
+                <th style="color:var(--accent);font-weight:700">Tüm Stok Satılırsa Tutar (Satış Değeri)</th>
+                <th style="color:var(--green);font-weight:700">Tüm Stok Satılırsa Potansiyel Kâr</th>
               </tr>
             </thead>
             <tbody id="rep-cats-tbody"></tbody>
@@ -1812,8 +1813,13 @@ function renderRep(){
   const totalProfitTL = sHist.reduce((acc, s) => acc + (s.totalProfit || 0), 0);
   const totalSoldQty = sHist.reduce((acc, s) => acc + (s.items || []).reduce((x, y) => x + (y.qty || 0), 0), 0);
   const profitMargin = (totalSalesTL - totalProfitTL > 0) ? ((totalProfitTL / (totalSalesTL - totalProfitTL)) * 100) : (totalSalesTL > 0 ? 100 : 0);
-  const totalInventoryVal = P.reduce((acc, p) => acc + (p.stk * (p.price || 0)), 0);
+  const totalInventoryVal = P.reduce((acc, p) => acc + (parseInt(p.stk || 0) * (parseFloat(p.price) || 0)), 0);
   const totalInventoryQty = P.reduce((acc, p) => acc + parseInt(p.stk || 0), 0);
+  const totalPotentialSellVal = P.reduce((acc, p) => {
+    const sp = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : (parseFloat(p.price) || 0);
+    return acc + (parseInt(p.stk || 0) * sp);
+  }, 0);
+  const totalPotentialProfit = totalPotentialSellVal - totalInventoryVal;
 
   // Metric Cards
   const statsEl = document.getElementById('rep-stats');
@@ -1822,31 +1828,31 @@ function renderRep(){
       <div class="stat-card s-blue">
         <div class="stat-ico">🛒</div>
         <div class="stat-val">${tl(totalSalesTL)}</div>
-        <div class="stat-lbl">Satış Cirosu</div>
+        <div class="stat-lbl">Dönem Satış Cirosu</div>
         <div class="stat-meta">${totalSoldQty} adet satıldı (${sHist.length} işlem)</div>
       </div>
       <div class="stat-card s-green">
         <div class="stat-ico">💰</div>
         <div class="stat-val" style="color:var(--green)">+${tl(totalProfitTL)}</div>
-        <div class="stat-lbl">Net Elde Edilen Kâr</div>
+        <div class="stat-lbl">Dönem Net Kârı</div>
         <div class="stat-meta">Ort. Kâr Marjı: %${profitMargin.toFixed(1)}</div>
       </div>
       <div class="stat-card s-yellow">
         <div class="stat-ico">📦</div>
-        <div class="stat-val">${totalSoldQty} Adet</div>
-        <div class="stat-lbl">Satılan Ürün Adedi</div>
-        <div class="stat-meta">Seçilen tarih aralığında</div>
+        <div class="stat-val">${totalInventoryQty} Adet</div>
+        <div class="stat-lbl">Mevcut Toplam Stok</div>
+        <div class="stat-meta">Alış Değeri: ${tl(totalInventoryVal)}</div>
       </div>
       <div class="stat-card s-purple">
         <div class="stat-ico">💎</div>
-        <div class="stat-val">${tl(totalInventoryVal)}</div>
-        <div class="stat-lbl">Mevcut Toplam Stok Değeri</div>
-        <div class="stat-meta">${totalInventoryQty} adet / ${P.length} çeşit ürün</div>
+        <div class="stat-val">${tl(totalPotentialSellVal)}</div>
+        <div class="stat-lbl">Tüm Stok Satılırsa Toplam Ciro</div>
+        <div class="stat-meta" style="color:var(--green);font-weight:700">Beklenen Kâr: +${tl(totalPotentialProfit)}</div>
       </div>
     `;
   }
 
-  // 1. KATEGORİ BAZINDA RAPOR TABLOSU (Category Analysis with Selling Prices)
+  // 1. KATEGORİ BAZINDA RAPOR TABLOSU (Category Analysis with Potential Full Revenue)
   const catMap = {};
 
   // All active categories from products
@@ -1860,12 +1866,18 @@ function renderRep(){
         salesTL: 0,
         profitTL: 0,
         currentStk: 0,
-        currentVal: 0
+        costVal: 0,
+        potentialSellVal: 0
       };
     }
+    const stk = parseInt(p.stk || 0);
+    const buyP = parseFloat(p.price) || 0;
+    const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : buyP;
+
     catMap[c].prodCount++;
-    catMap[c].currentStk += parseInt(p.stk || 0);
-    catMap[c].currentVal += parseInt(p.stk || 0) * (parseFloat(p.price) || 0);
+    catMap[c].currentStk += stk;
+    catMap[c].costVal += (stk * buyP);
+    catMap[c].potentialSellVal += (stk * sellP);
   });
 
   // Accumulate filtered sales for each category
@@ -1874,7 +1886,7 @@ function renderRep(){
       const prod = P.find(x => x.id === item.prodId);
       const c = item.cat || (prod ? prod.cat : 'Genel');
       if(!catMap[c]){
-        catMap[c] = { name: c, prodCount: 0, soldQty: 0, salesTL: 0, profitTL: 0, currentStk: 0, currentVal: 0 };
+        catMap[c] = { name: c, prodCount: 0, soldQty: 0, salesTL: 0, profitTL: 0, currentStk: 0, costVal: 0, potentialSellVal: 0 };
       }
       catMap[c].soldQty += parseInt(item.qty || 0);
       catMap[c].salesTL += parseFloat(item.total || 0);
@@ -1882,53 +1894,44 @@ function renderRep(){
     });
   });
 
-  const catList = Object.values(catMap).sort((a, b) => (b.salesTL + b.currentVal) - (a.salesTL + a.currentVal));
+  const catList = Object.values(catMap).sort((a, b) => (b.salesTL + b.potentialSellVal) - (a.salesTL + a.potentialSellVal));
   const catCountEl = document.getElementById('rep-cat-count');
   if(catCountEl) catCountEl.textContent = `${catList.length} Kategori`;
 
   const catsTbody = document.getElementById('rep-cats-tbody');
   if(catsTbody){
     if(!catList.length){
-      catsTbody.innerHTML = '<tr><td colspan="9"><div class="empty" style="padding:20px;color:var(--txt3)">Henüz kayıtlı kategori bulunmuyor</div></td></tr>';
+      catsTbody.innerHTML = '<tr><td colspan="10"><div class="empty" style="padding:20px;color:var(--txt3)">Henüz kayıtlı kategori bulunmuyor</div></td></tr>';
     } else {
       catsTbody.innerHTML = catList.map(c => {
         const cost = c.salesTL - c.profitTL;
         const margin = cost > 0 ? ((c.profitTL / cost) * 100) : (c.salesTL > 0 ? 100 : 0);
-        const catProds = P.filter(p => (p.cat || 'Genel') === c.name);
-        const prodsPricesHtml = catProds.length ? `
-          <div style="display:flex;flex-wrap:wrap;gap:4px;max-width:360px">
-            ${catProds.map(p => {
-              const sp = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? p.sellPrice : p.price;
-              return `<span style="font-size:11px;background:var(--bg);border:1px solid var(--border2);padding:2px 6px;border-radius:5px;display:inline-flex;align-items:center;gap:4px" title="${p.name} - Stok: ${p.stk}">
-                <span style="font-weight:600;color:var(--txt)">${p.name}:</span>
-                <span style="color:var(--accent);font-weight:700">${tl(sp)}</span>
-              </span>`;
-            }).join('')}
-          </div>
-        ` : '<span style="color:var(--txt3);font-size:11px">—</span>';
+        const potProfit = c.potentialSellVal - c.costVal;
 
         return `<tr>
           <td><strong style="color:var(--txt);font-size:13px">${c.name}</strong></td>
-          <td>${prodsPricesHtml}</td>
           <td><span class="badge b-blue">${c.prodCount} çeşit</span></td>
           <td><strong style="color:var(--accent);font-size:13px">${c.soldQty}</strong></td>
           <td style="font-weight:700">${tl(c.salesTL)}</td>
           <td style="font-weight:700;color:var(--green)">+${tl(c.profitTL)}</td>
           <td><span style="font-size:11.5px;font-weight:600;color:var(--txt2)">%${margin.toFixed(1)}</span></td>
           <td><strong>${c.currentStk}</strong></td>
-          <td style="font-weight:700;color:var(--purple,#8b5cf6)">${tl(c.currentVal)}</td>
+          <td style="color:var(--txt2)">${tl(c.costVal)}</td>
+          <td style="font-weight:700;color:var(--accent);font-size:13px">${tl(c.potentialSellVal)}</td>
+          <td style="font-weight:700;color:var(--green);font-size:13px">+${tl(potProfit)}</td>
         </tr>`;
       }).join('') + `
         <tr style="background:var(--bg3);font-weight:800;border-top:2px solid var(--border)">
           <td>GENEL TOPLAM</td>
-          <td style="color:var(--txt2);font-size:11.5px">${P.length} adet toplam ürün</td>
           <td>${P.length} çeşit</td>
           <td style="color:var(--accent);font-size:13px">${totalSoldQty}</td>
           <td>${tl(totalSalesTL)}</td>
           <td style="color:var(--green)">+${tl(totalProfitTL)}</td>
           <td>%${profitMargin.toFixed(1)}</td>
           <td>${totalInventoryQty}</td>
-          <td style="color:var(--purple,#8b5cf6)">${tl(totalInventoryVal)}</td>
+          <td style="color:var(--txt2)">${tl(totalInventoryVal)}</td>
+          <td style="color:var(--accent);font-size:13.5px">${tl(totalPotentialSellVal)}</td>
+          <td style="color:var(--green);font-size:13.5px">+${tl(totalPotentialProfit)}</td>
         </tr>
       `;
     }
