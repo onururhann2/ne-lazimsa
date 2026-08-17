@@ -616,7 +616,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <div class="tbl-head" style="background:rgba(139,92,246,.06)">
           <div>
             <span class="tbl-title" style="display:flex;align-items:center;gap:6px">📊 Kategori Bazında Satış & Stok Analizi</span>
-            <div style="font-size:11px;color:var(--txt2);margin-top:2px">Seçilen tarih aralığında kategorilerin performansı ve anlık stok değerleri</div>
+            <div style="font-size:11px;color:var(--txt2);margin-top:2px">Kategorideki ürünlerin satış fiyatları, satış performansı ve anlık stok değerleri</div>
           </div>
           <span class="badge b-purple" id="rep-cat-count">0 Kategori</span>
         </div>
@@ -625,12 +625,12 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <thead>
               <tr>
                 <th>Kategori</th>
-                <th>Ürün Çeşidi</th>
+                <th>Kategorideki Ürünler & Satış Fiyatları</th>
+                <th>Çeşit</th>
                 <th>Satılan Miktar</th>
-                <th>Satış Cirosu (₺)</th>
-                <th>Elde Edilen Kâr (₺)</th>
-                <th>Kâr Marjı (%)</th>
-                <th>Stoğa Eklenen</th>
+                <th>Satış Cirosu</th>
+                <th>Elde Edilen Kâr</th>
+                <th>Kâr Marjı</th>
                 <th>Mevcut Stok</th>
                 <th>Mevcut Stok Değeri</th>
               </tr>
@@ -640,62 +640,31 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         </div>
       </div>
 
-      <!-- 2. İKİ ANA TABLO: SATILAN ÜRÜNLER & STOK GİRİŞLERİ -->
-      <div class="grid-2" style="margin-bottom:20px">
-        <!-- Satılan Ürünler -->
-        <div class="tbl-wrap">
-          <div class="tbl-head" style="background:rgba(59,130,246,.04)">
-            <div>
-              <span class="tbl-title" style="display:flex;align-items:center;gap:6px">🛒 Satılan Ürünler Listesi</span>
-              <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-sales-sub">Seçilen aralıktaki satış hareketleri</div>
-            </div>
-            <span class="badge b-blue" id="rep-sales-count">0 Satış</span>
+      <!-- 2. SATILAN ÜRÜNLER LİSTESİ -->
+      <div class="tbl-wrap" style="margin-bottom:20px">
+        <div class="tbl-head" style="background:rgba(59,130,246,.04)">
+          <div>
+            <span class="tbl-title" style="display:flex;align-items:center;gap:6px">🛒 Satılan Ürünler Listesi</span>
+            <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-sales-sub">Seçilen aralıktaki tüm satış hareketleri</div>
           </div>
-          <div style="max-height:380px;overflow-y:auto">
-            <table>
-              <thead>
-                <tr>
-                  <th>Tarih / Saat</th>
-                  <th>Fiş No</th>
-                  <th>Ürün</th>
-                  <th>Kategori</th>
-                  <th>Miktar</th>
-                  <th>Satış Fiyatı</th>
-                  <th>Toplam</th>
-                  <th>Kâr</th>
-                </tr>
-              </thead>
-              <tbody id="rep-sales-tbody"></tbody>
-            </table>
-          </div>
+          <span class="badge b-blue" id="rep-sales-count">0 Satış</span>
         </div>
-
-        <!-- Stok Girişleri -->
-        <div class="tbl-wrap">
-          <div class="tbl-head" style="background:rgba(16,185,129,.04)">
-            <div>
-              <span class="tbl-title" style="display:flex;align-items:center;gap:6px">📥 Eklenen Stoklar Listesi</span>
-              <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-stockin-sub">Seçilen aralıktaki stok girişleri</div>
-            </div>
-            <span class="badge b-ok" id="rep-stockin-count">0 Giriş</span>
-          </div>
-          <div style="max-height:380px;overflow-y:auto">
-            <table>
-              <thead>
-                <tr>
-                  <th>Tarih / Saat</th>
-                  <th>Ürün</th>
-                  <th>Kategori</th>
-                  <th>Miktar</th>
-                  <th>Alış Fiyatı</th>
-                  <th>Satış Fiyatı</th>
-                  <th>Toplam Değer</th>
-                  <th>Not</th>
-                </tr>
-              </thead>
-              <tbody id="rep-stockin-tbody"></tbody>
-            </table>
-          </div>
+        <div style="max-height:450px;overflow-y:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarih / Saat</th>
+                <th>Fiş No</th>
+                <th>Ürün</th>
+                <th>Kategori</th>
+                <th>Miktar</th>
+                <th>Satış Fiyatı</th>
+                <th>Toplam Tutar</th>
+                <th>Elde Edilen Kâr</th>
+              </tr>
+            </thead>
+            <tbody id="rep-sales-tbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1843,10 +1812,8 @@ function renderRep(){
   const totalProfitTL = sHist.reduce((acc, s) => acc + (s.totalProfit || 0), 0);
   const totalSoldQty = sHist.reduce((acc, s) => acc + (s.items || []).reduce((x, y) => x + (y.qty || 0), 0), 0);
   const profitMargin = (totalSalesTL - totalProfitTL > 0) ? ((totalProfitTL / (totalSalesTL - totalProfitTL)) * 100) : (totalSalesTL > 0 ? 100 : 0);
-
-  const totalStockInQty = inHist.reduce((acc, i) => acc + (i.qty || 0), 0);
-  const totalStockInVal = inHist.reduce((acc, i) => acc + (i.totalValue || (i.qty * (i.buyPrice || 0)) || 0), 0);
   const totalInventoryVal = P.reduce((acc, p) => acc + (p.stk * (p.price || 0)), 0);
+  const totalInventoryQty = P.reduce((acc, p) => acc + parseInt(p.stk || 0), 0);
 
   // Metric Cards
   const statsEl = document.getElementById('rep-stats');
@@ -1865,21 +1832,21 @@ function renderRep(){
         <div class="stat-meta">Ort. Kâr Marjı: %${profitMargin.toFixed(1)}</div>
       </div>
       <div class="stat-card s-yellow">
-        <div class="stat-ico">📥</div>
-        <div class="stat-val">${totalStockInQty} Adet</div>
-        <div class="stat-lbl">Stoğa Eklenen</div>
-        <div class="stat-meta">${tl(totalStockInVal)} giriş maliyet değeri</div>
+        <div class="stat-ico">📦</div>
+        <div class="stat-val">${totalSoldQty} Adet</div>
+        <div class="stat-lbl">Satılan Ürün Adedi</div>
+        <div class="stat-meta">Seçilen tarih aralığında</div>
       </div>
       <div class="stat-card s-purple">
         <div class="stat-ico">💎</div>
         <div class="stat-val">${tl(totalInventoryVal)}</div>
-        <div class="stat-lbl">Mevcut Envanter Değeri</div>
-        <div class="stat-meta">${P.length} çeşit kayıtlı ürün</div>
+        <div class="stat-lbl">Mevcut Toplam Stok Değeri</div>
+        <div class="stat-meta">${totalInventoryQty} adet / ${P.length} çeşit ürün</div>
       </div>
     `;
   }
 
-  // 1. KATEGORİ BAZINDA RAPOR TABLOSU (Category-based Summary)
+  // 1. KATEGORİ BAZINDA RAPOR TABLOSU (Category Analysis with Selling Prices)
   const catMap = {};
 
   // All active categories from products
@@ -1892,7 +1859,6 @@ function renderRep(){
         soldQty: 0,
         salesTL: 0,
         profitTL: 0,
-        stockInQty: 0,
         currentStk: 0,
         currentVal: 0
       };
@@ -1908,22 +1874,12 @@ function renderRep(){
       const prod = P.find(x => x.id === item.prodId);
       const c = item.cat || (prod ? prod.cat : 'Genel');
       if(!catMap[c]){
-        catMap[c] = { name: c, prodCount: 0, soldQty: 0, salesTL: 0, profitTL: 0, stockInQty: 0, currentStk: 0, currentVal: 0 };
+        catMap[c] = { name: c, prodCount: 0, soldQty: 0, salesTL: 0, profitTL: 0, currentStk: 0, currentVal: 0 };
       }
       catMap[c].soldQty += parseInt(item.qty || 0);
       catMap[c].salesTL += parseFloat(item.total || 0);
       catMap[c].profitTL += parseFloat(item.profit || 0);
     });
-  });
-
-  // Accumulate filtered stock-ins for each category
-  inHist.forEach(i => {
-    const prod = P.find(x => x.id === i.prodId);
-    const c = i.cat || (prod ? prod.cat : 'Genel');
-    if(!catMap[c]){
-      catMap[c] = { name: c, prodCount: 0, soldQty: 0, salesTL: 0, profitTL: 0, stockInQty: 0, currentStk: 0, currentVal: 0 };
-    }
-    catMap[c].stockInQty += parseInt(i.qty || 0);
   });
 
   const catList = Object.values(catMap).sort((a, b) => (b.salesTL + b.currentVal) - (a.salesTL + a.currentVal));
@@ -1938,34 +1894,47 @@ function renderRep(){
       catsTbody.innerHTML = catList.map(c => {
         const cost = c.salesTL - c.profitTL;
         const margin = cost > 0 ? ((c.profitTL / cost) * 100) : (c.salesTL > 0 ? 100 : 0);
+        const catProds = P.filter(p => (p.cat || 'Genel') === c.name);
+        const prodsPricesHtml = catProds.length ? `
+          <div style="display:flex;flex-wrap:wrap;gap:4px;max-width:360px">
+            ${catProds.map(p => {
+              const sp = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? p.sellPrice : p.price;
+              return `<span style="font-size:11px;background:var(--bg);border:1px solid var(--border2);padding:2px 6px;border-radius:5px;display:inline-flex;align-items:center;gap:4px" title="${p.name} - Stok: ${p.stk}">
+                <span style="font-weight:600;color:var(--txt)">${p.name}:</span>
+                <span style="color:var(--accent);font-weight:700">${tl(sp)}</span>
+              </span>`;
+            }).join('')}
+          </div>
+        ` : '<span style="color:var(--txt3);font-size:11px">—</span>';
+
         return `<tr>
-          <td><strong style="color:var(--txt)">${c.name}</strong></td>
+          <td><strong style="color:var(--txt);font-size:13px">${c.name}</strong></td>
+          <td>${prodsPricesHtml}</td>
           <td><span class="badge b-blue">${c.prodCount} çeşit</span></td>
-          <td><strong style="color:var(--accent)">${c.soldQty}</strong></td>
+          <td><strong style="color:var(--accent);font-size:13px">${c.soldQty}</strong></td>
           <td style="font-weight:700">${tl(c.salesTL)}</td>
           <td style="font-weight:700;color:var(--green)">+${tl(c.profitTL)}</td>
           <td><span style="font-size:11.5px;font-weight:600;color:var(--txt2)">%${margin.toFixed(1)}</span></td>
-          <td><span style="font-weight:700;color:var(--yellow)">+${c.stockInQty}</span></td>
           <td><strong>${c.currentStk}</strong></td>
           <td style="font-weight:700;color:var(--purple,#8b5cf6)">${tl(c.currentVal)}</td>
         </tr>`;
       }).join('') + `
         <tr style="background:var(--bg3);font-weight:800;border-top:2px solid var(--border)">
           <td>GENEL TOPLAM</td>
+          <td style="color:var(--txt2);font-size:11.5px">${P.length} adet toplam ürün</td>
           <td>${P.length} çeşit</td>
-          <td style="color:var(--accent)">${totalSoldQty}</td>
+          <td style="color:var(--accent);font-size:13px">${totalSoldQty}</td>
           <td>${tl(totalSalesTL)}</td>
           <td style="color:var(--green)">+${tl(totalProfitTL)}</td>
           <td>%${profitMargin.toFixed(1)}</td>
-          <td style="color:var(--yellow)">+${totalStockInQty}</td>
-          <td>${P.reduce((s,p)=>s+parseInt(p.stk||0),0)}</td>
+          <td>${totalInventoryQty}</td>
           <td style="color:var(--purple,#8b5cf6)">${tl(totalInventoryVal)}</td>
         </tr>
       `;
     }
   }
 
-  // 2. Sales table
+  // 2. Satılan Ürünler Tablosu (Sales table)
   const salesCountEl = document.getElementById('rep-sales-count');
   if(salesCountEl) salesCountEl.textContent = `${sHist.length} Satış`;
   const salesTbody = document.getElementById('rep-sales-tbody');
@@ -1991,31 +1960,6 @@ function renderRep(){
         });
       });
       salesTbody.innerHTML = rows;
-    }
-  }
-
-  // 3. Stock-in table
-  const stockinCountEl = document.getElementById('rep-stockin-count');
-  if(stockinCountEl) stockinCountEl.textContent = `${inHist.length} Giriş`;
-  const stockinTbody = document.getElementById('rep-stockin-tbody');
-  if(stockinTbody){
-    if(!inHist.length){
-      stockinTbody.innerHTML = '<tr><td colspan="8"><div class="empty" style="padding:24px 14px"><div style="font-size:24px;margin-bottom:6px">📥</div><p style="font-size:12.5px;color:var(--txt3)">Seçilen tarih aralığında stoğa eklenen ürün bulunmuyor</p></div></td></tr>';
-    } else {
-      stockinTbody.innerHTML = inHist.map(i => {
-        const prod = P.find(x => x.id === i.prodId);
-        const cat = i.cat || (prod ? prod.cat : '—');
-        return `<tr>
-          <td style="color:var(--txt3);font-size:11.5px;font-weight:600">${i.date || ''} ${i.time ? i.time.slice(0,5) : ''}</td>
-          <td><div style="font-weight:600">${i.name}</div>${i.barc ? `<div class="mono" style="font-size:10px;color:var(--txt3)">${i.barc}</div>` : ''}</td>
-          <td><span class="badge" style="font-size:10.5px">${cat}</span></td>
-          <td><span style="font-weight:700;color:var(--green)">+${i.qty} ${i.unit}</span></td>
-          <td style="color:var(--txt2)">${tl(i.buyPrice)}</td>
-          <td style="font-weight:600;color:var(--accent)">${tl(i.sellPrice)}</td>
-          <td style="font-weight:700">${tl(i.totalValue)}</td>
-          <td style="font-size:11px;color:var(--txt2)">${i.note || '—'}</td>
-        </tr>`;
-      }).join('');
     }
   }
 }
