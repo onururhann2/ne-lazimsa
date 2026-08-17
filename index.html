@@ -3056,9 +3056,11 @@ function confirmBulkInvoiceStockin(){
     inHist.unshift(stockinRecord);
   });
 
-  // Save to storage & Sync Cloud
-  sp(P);
-  sih(inHist);
+  // Save to storage & Sync Cloud atomically
+  localStorage.setItem('nl_prod', JSON.stringify(P));
+  if(inHist.length > 500) inHist.length = 500;
+  localStorage.setItem('nl_stockin_hist', JSON.stringify(inHist));
+  triggerCloudPush('invoice_stockin_complete', true);
   updBadge();
 
   // Clear invoice items & show celebration
@@ -3123,8 +3125,8 @@ function confirmStockin(){
   if(qty<1){toast('w','Miktar Hatal\u0131','En az 1 giriniz');return;}
   const P=gp(),pi=P.findIndex(p=>p.id===id);
   if(pi<0){toast('e','Hata','\u00dcr\u00fcn bulunamad\u0131');return;}
-  P[pi].stk+=qty;
-  sp(P);
+  P[pi].stk = parseInt(P[pi].stk || 0) + qty;
+  localStorage.setItem('nl_prod', JSON.stringify(P));
   const p=P[pi];
 
   // Save to persistent Stock-in history
@@ -3148,7 +3150,11 @@ function confirmStockin(){
   };
   const inHist = gih();
   inHist.unshift(stockinRecord);
-  sih(inHist);
+  if(inHist.length > 500) inHist.length = 500;
+  localStorage.setItem('nl_stockin_hist', JSON.stringify(inHist));
+
+  // Single unified atomic cloud push
+  triggerCloudPush('stockin_complete', true);
 
   toast('s','Stok Eklendi',`${p.name} +${qty} ${p.unit}`);
   updBadge();
@@ -3349,26 +3355,14 @@ function broadcastSaleComplete(saleRecord){
 function handleRemoteSaleComplete(saleRecord, senderId){
   if(senderId === myDeviceId || !saleRecord) return;
 
-  // 1. Immediately persist to localStorage
+  // 1. Merge sale record into sales history without duplicates
   const sHist = gsh();
   if(!sHist.some(s => s.id === saleRecord.id || s.receiptNo === saleRecord.receiptNo)){
     sHist.unshift(saleRecord);
     localStorage.setItem('nl_sales_hist', JSON.stringify(sHist));
   }
 
-  // 2. Deduct product stocks locally
-  if(Array.isArray(saleRecord.items)){
-    const P = gp();
-    saleRecord.items.forEach(it => {
-      const pi = P.findIndex(p => p.id === it.prodId);
-      if(pi >= 0){
-        P[pi].stk = Math.max(0, P[pi].stk - (it.qty || 1));
-      }
-    });
-    localStorage.setItem('nl_prod', JSON.stringify(P));
-  }
-
-  // 3. Clear cart if any and re-render all views
+  // 2. Clear cart if any and re-render views (stock was already accurately deducted by seller & synced via STOCK_SYNC)
   salesCart = [];
   renderCart();
   renderSalesHistory();
@@ -3591,7 +3585,7 @@ function renderSalesHistory(){
   }).join('');
 }
 function completeSale(){
-  if(salesCart.length===0){toast('w','Sepet Bo\u015f','\u00dcr\u00fcn ekleyin');return;}
+  if(salesCart.length===0){toast('w','Sepet Boş','Ürün ekleyin');return;}
   const P=gp();
   let ok=true;
   salesCart.forEach(c=>{
@@ -3601,9 +3595,9 @@ function completeSale(){
   if(!ok)return;
   salesCart.forEach(c=>{
     const pi=P.findIndex(p=>p.id===c.prodId);
-    P[pi].stk-=c.qty;
+    P[pi].stk = Math.max(0, parseInt(P[pi].stk || 0) - c.qty);
   });
-  sp(P);
+  localStorage.setItem('nl_prod', JSON.stringify(P));
 
   const saleItems = salesCart.map(c => {
     const p = P.find(x => x.id === c.prodId);
@@ -3639,8 +3633,11 @@ function completeSale(){
   };
   const sHist = gsh();
   sHist.unshift(saleRecord);
-  ssh(sHist);
+  if(sHist.length > 500) sHist.length = 500;
+  localStorage.setItem('nl_sales_hist', JSON.stringify(sHist));
 
+  // Unified atomic cloud push & broadcast
+  triggerCloudPush('sale_complete', true);
   broadcastSaleComplete(saleRecord);
   renderSalesHistory();
 
