@@ -499,13 +499,95 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
     <!-- REPORTS -->
     <div class="page" id="page-reports">
       <div class="page-header">
-        <div><h1 class="page-title">Raporlar</h1><p class="page-sub">Stok ve satın alma analizleri</p></div>
+        <div>
+          <h1 class="page-title">Günlük Raporlar ve Analiz</h1>
+          <p class="page-sub">Seçilen güne ait satış, kâr ve stok hareketleri</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost" onclick="csvDailyReport()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Günlük Rapor CSV</button>
+          <button class="btn btn-ghost" onclick="window.print()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Yazdır</button>
+        </div>
       </div>
-      <div class="stats-grid" id="rep-stats" style="grid-template-columns:repeat(3,1fr)"></div>
-      <div class="charts-grid mt-4">
-        <div class="chart-card"><div class="chart-ttl">📊 Kategori Bazlı Stok</div><canvas id="ch-cat" height="200"></canvas></div>
-        <div class="chart-card"><div class="chart-ttl">📈 Sipariş Durumları</div><canvas id="ch-ord" height="200"></canvas></div>
-        <div class="chart-card col-2"><div class="chart-ttl">💰 En Değerli Stoklar (İlk 8)</div><canvas id="ch-val" height="130"></canvas></div>
+
+      <!-- Date Filter Bar -->
+      <div class="card" style="padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="font-size:11px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.5px">📅 Rapor Tarihi:</label>
+          <input type="date" id="rep-date" onchange="renderRep()" style="padding:6px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;font-family:'Inter',sans-serif;outline:none;cursor:pointer">
+          <div style="display:flex;gap:5px">
+            <button class="btn btn-ghost btn-sm" onclick="setRepDate('today')">Bugün</button>
+            <button class="btn btn-ghost btn-sm" onclick="setRepDate('yesterday')">Dün</button>
+            <button class="btn btn-ghost btn-sm" onclick="setRepDate('all')">Tüm Zamanlar</button>
+          </div>
+        </div>
+        <div id="rep-date-badge" style="font-size:12px;font-weight:600;color:var(--accent)"></div>
+      </div>
+
+      <!-- Dynamic Metric Cards for Selected Date -->
+      <div class="stats-grid" id="rep-stats" style="grid-template-columns:repeat(4,1fr)"></div>
+
+      <!-- Two Main Tables: Sales on Selected Day & Stock-In on Selected Day -->
+      <div class="grid-2" style="margin-bottom:20px">
+        <!-- Günlük Satışlar -->
+        <div class="tbl-wrap">
+          <div class="tbl-head" style="background:rgba(59,130,246,.04)">
+            <div>
+              <span class="tbl-title" style="display:flex;align-items:center;gap:6px">🛒 Günlük Satılan Ürünler</span>
+              <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-sales-sub">Seçilen günde yapılan satışlar</div>
+            </div>
+            <span class="badge b-blue" id="rep-sales-count">0 Satış</span>
+          </div>
+          <div style="max-height:340px;overflow-y:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Saat</th>
+                  <th>Fiş No</th>
+                  <th>Ürün</th>
+                  <th>Miktar</th>
+                  <th>Satış Fiyatı</th>
+                  <th>Toplam</th>
+                  <th>Kâr</th>
+                </tr>
+              </thead>
+              <tbody id="rep-sales-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Günlük Stok Girişleri -->
+        <div class="tbl-wrap">
+          <div class="tbl-head" style="background:rgba(16,185,129,.04)">
+            <div>
+              <span class="tbl-title" style="display:flex;align-items:center;gap:6px">📥 Günlük Eklenen Ürünler</span>
+              <div style="font-size:11px;color:var(--txt2);margin-top:2px" id="rep-stockin-sub">Seçilen günde stoğa giren ürünler</div>
+            </div>
+            <span class="badge b-ok" id="rep-stockin-count">0 Giriş</span>
+          </div>
+          <div style="max-height:340px;overflow-y:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Saat</th>
+                  <th>Ürün</th>
+                  <th>Miktar</th>
+                  <th>Alış Fiyatı</th>
+                  <th>Satış Fiyatı</th>
+                  <th>Toplam Değer</th>
+                  <th>Not</th>
+                </tr>
+              </thead>
+              <tbody id="rep-stockin-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts for Selected Day and Inventory Health -->
+      <div class="charts-grid">
+        <div class="chart-card"><div class="chart-ttl">📊 Günün Kategori Bazlı Satış Dağılımı</div><canvas id="ch-day-cat" height="190"></canvas></div>
+        <div class="chart-card"><div class="chart-ttl">📈 Günün Saatlik Satış Yoğunluğu</div><canvas id="ch-day-hourly" height="190"></canvas></div>
+        <div class="chart-card col-2"><div class="chart-ttl">💰 En Yüksek Değerli Stoklar (Mevcut Envanter)</div><canvas id="ch-val" height="120"></canvas></div>
       </div>
     </div>
 
@@ -919,6 +1001,24 @@ const DEFAULT_PRODUCTS = [
   {id:10,name:'Maket Bıçağı',barc:'8690000000010',cat:'Alet',unit:'Adet',stk:4,min:3,price:28,sellPrice:42,sup:1,note:''}
 ];
 
+function getTodayStr(){
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+function getYesterdayStr(){
+  const d = new Date(Date.now() - 86400000);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+function getTimeStr(d = new Date()){
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
 function initData(){
   // Only seed if NEVER seeded before and no data exists at all
   if(!localStorage.getItem('nl_initialized')){
@@ -936,6 +1036,107 @@ function initData(){
     }
     localStorage.setItem('nl_initialized', 'true');
   }
+
+  // Seed sample transactions if completely missing
+  if(!ls('nl_sales_hist')){
+    const today = getTodayStr();
+    const yesterday = getYesterdayStr();
+    ls('nl_sales_hist', JSON.stringify([
+      {
+        id: 101,
+        receiptNo: '#948201',
+        date: today,
+        time: '10:45',
+        items: [
+          { prodId: 1, name: 'A4 Fotokopi Kağıdı (500lü)', qty: 2, unit: 'Koli', buyPrice: 185, sellPrice: 240, total: 480, profit: 110 },
+          { prodId: 2, name: 'Tükenmez Kalem (Mavi)', qty: 3, unit: 'Kutu', buyPrice: 45, sellPrice: 65, total: 195, profit: 60 }
+        ],
+        totalAmount: 675,
+        totalProfit: 170,
+        user: 'Yönetici'
+      },
+      {
+        id: 102,
+        receiptNo: '#948202',
+        date: today,
+        time: '11:20',
+        items: [
+          { prodId: 4, name: 'USB Klavye', qty: 1, unit: 'Adet', buyPrice: 320, sellPrice: 450, total: 450, profit: 130 }
+        ],
+        totalAmount: 450,
+        totalProfit: 130,
+        user: 'Yönetici'
+      },
+      {
+        id: 103,
+        receiptNo: '#948190',
+        date: yesterday,
+        time: '15:30',
+        items: [
+          { prodId: 3, name: 'Toner HP LaserJet 85A', qty: 1, unit: 'Adet', buyPrice: 850, sellPrice: 1150, total: 1150, profit: 300 }
+        ],
+        totalAmount: 1150,
+        totalProfit: 300,
+        user: 'Yönetici'
+      }
+    ]));
+  }
+
+  if(!ls('nl_stockin_hist')){
+    const today = getTodayStr();
+    const yesterday = getYesterdayStr();
+    ls('nl_stockin_hist', JSON.stringify([
+      {
+        id: 201,
+        prodId: 1,
+        name: 'A4 Fotokopi Kağıdı (500lü)',
+        barc: '8690000000001',
+        cat: 'Kırtasiye',
+        qty: 10,
+        unit: 'Koli',
+        buyPrice: 185,
+        sellPrice: 240,
+        totalValue: 1850,
+        note: 'Merkez depodan sevk',
+        date: today,
+        time: '09:15',
+        user: 'Yönetici'
+      },
+      {
+        id: 202,
+        prodId: 5,
+        name: 'Sıvı Sabun (5lt)',
+        barc: '8690000000005',
+        cat: 'Temizlik',
+        qty: 5,
+        unit: 'Bidon',
+        buyPrice: 145,
+        sellPrice: 195,
+        totalValue: 725,
+        note: 'Tedarikçi teslimatı',
+        date: today,
+        time: '10:00',
+        user: 'Yönetici'
+      },
+      {
+        id: 203,
+        prodId: 8,
+        name: 'Şeffaf Bant (10lu)',
+        barc: '8690000000008',
+        cat: 'Ambalaj',
+        qty: 20,
+        unit: 'Paket',
+        buyPrice: 12.5,
+        sellPrice: 20,
+        totalValue: 250,
+        note: 'Koli içi yedek',
+        date: yesterday,
+        time: '14:10',
+        user: 'Yönetici'
+      }
+    ]));
+  }
+
   if(!ls('nl_theme')) ls('nl_theme','dark');
   
   // Setup Cross-Tab & Cloud Synchronization
@@ -946,11 +1147,15 @@ function ls(k,v){if(v!==undefined)localStorage.setItem(k,v);else return localSto
 function gp(){try{return JSON.parse(ls('nl_prod')||'[]')}catch(e){return[]}}
 function gs(){try{return JSON.parse(ls('nl_sup')||'[]')}catch(e){return[]}}
 function go2(){try{return JSON.parse(ls('nl_ord')||'[]')}catch(e){return[]}}
+function gsh(){try{return JSON.parse(ls('nl_sales_hist')||'[]')}catch(e){return[]}}
+function gih(){try{return JSON.parse(ls('nl_stockin_hist')||'[]')}catch(e){return[]}}
 
 // Save and sync data immediately
 function sp(d){ls('nl_prod',JSON.stringify(d));triggerCloudPush('products');}
 function ss(d){ls('nl_sup',JSON.stringify(d));triggerCloudPush('suppliers');}
 function so(d){ls('nl_ord',JSON.stringify(d));triggerCloudPush('orders');}
+function ssh(d){ls('nl_sales_hist',JSON.stringify(d));triggerCloudPush('sales_history');}
+function sih(d){ls('nl_stockin_hist',JSON.stringify(d));triggerCloudPush('stockin_history');}
 function nid(a){return a.length?Math.max(...a.map(x=>x.id))+1:1}
 function fd(d){return d.toISOString().split('T')[0]}
 function tl(n){return'₺'+Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -1221,26 +1426,258 @@ function saveSup(e){
 }
 function delSup(id){if(!confirm('Bu tedarikçiyi silmek istediğinize emin misiniz?'))return;ss(gs().filter(s=>s.id!==id));renderSups();toast('s','Silindi','Tedarikçi silindi');}
 
-// ══════════════ REPORTS ══════════════
-function renderRep(){
-  const P=gp(),O=go2();
-  const val=P.reduce((s,p)=>s+(p.stk*(p.price||0)),0);
-  const crits=P.filter(p=>sst(p)==='crit').length;
-  document.getElementById('rep-stats').innerHTML=`
-    <div class="stat-card s-blue"><div class="stat-ico">💎</div><div class="stat-val">${tl(val)}</div><div class="stat-lbl">Toplam Stok Değeri</div></div>
-    <div class="stat-card s-red"><div class="stat-ico">⚠️</div><div class="stat-val">${crits}</div><div class="stat-lbl">Kritik Ürün Sayısı</div></div>
-    <div class="stat-card s-yellow"><div class="stat-ico">📋</div><div class="stat-val">${O.length}</div><div class="stat-lbl">Toplam Sipariş</div></div>
-  `;
-  // Category doughnut
-  const catD={};P.forEach(p=>catD[p.cat]=(catD[p.cat]||0)+p.stk);
-  mkChart('ch-cat','doughnut',{labels:Object.keys(catD),datasets:[{data:Object.values(catD),backgroundColor:['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#84CC16'],borderWidth:0}]},{plugins:{legend:{position:'right',labels:{color:'#94A3B8',boxWidth:12,font:{size:11}}}}});
-  // Order status bar
-  const sts=['Bekliyor','Yolda','Teslim Edildi','İptal'];
-  mkChart('ch-ord','bar',{labels:sts,datasets:[{label:'Sipariş',data:sts.map(s=>O.filter(o=>o.stat===s).length),backgroundColor:['#F59E0B','#3B82F6','#10B981','#EF4444'],borderRadius:6,borderWidth:0}]},{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#94A3B8'},grid:{color:'rgba(148,163,184,.08)'}},y:{ticks:{color:'#94A3B8',stepSize:1},grid:{color:'rgba(148,163,184,.08)'}}}});
-  // Top value horizontal bar
-  const top=[...P].map(p=>({name:p.name,v:p.stk*(p.price||0)})).sort((a,b)=>b.v-a.v).slice(0,8);
-  mkChart('ch-val','bar',{labels:top.map(p=>p.name.length>22?p.name.slice(0,22)+'…':p.name),datasets:[{label:'Stok Değeri',data:top.map(p=>p.v),backgroundColor:'rgba(59,130,246,.7)',borderRadius:5,borderWidth:0}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#94A3B8',callback:v=>'₺'+v.toLocaleString('tr-TR')},grid:{color:'rgba(148,163,184,.08)'}},y:{ticks:{color:'#94A3B8',font:{size:11}},grid:{display:false}}}});
+// ══════════════ REPORTS & DAILY ANALYTICS ══════════════
+function setRepDate(preset){
+  const el = document.getElementById('rep-date');
+  if(!el) return;
+  if(preset === 'today'){
+    el.value = getTodayStr();
+  } else if(preset === 'yesterday'){
+    el.value = getYesterdayStr();
+  } else if(preset === 'all'){
+    el.value = '';
+  }
+  renderRep();
 }
+
+function renderRep(){
+  const dateInput = document.getElementById('rep-date');
+  if(dateInput && !dateInput.value && dateInput.dataset.mode !== 'all'){
+    dateInput.value = getTodayStr();
+  }
+  const selDate = dateInput ? dateInput.value : getTodayStr();
+  const isAll = !selDate;
+
+  const P = gp(), S = gs(), O = go2();
+  const sHist = gsh().filter(s => isAll ? true : s.date === selDate);
+  const inHist = gih().filter(s => isAll ? true : s.date === selDate);
+
+  // Badge date label
+  const dateBadge = document.getElementById('rep-date-badge');
+  if(dateBadge){
+    if(isAll){
+      dateBadge.textContent = '🌐 Tüm Zamanlar Görüntüleniyor';
+    } else if(selDate === getTodayStr()){
+      dateBadge.textContent = `📅 Bugün (${new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })})`;
+    } else {
+      dateBadge.textContent = `📅 ${new Date(selDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    }
+  }
+
+  // Calculate totals
+  const totalSalesTL = sHist.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+  const totalProfitTL = sHist.reduce((acc, s) => acc + (s.totalProfit || 0), 0);
+  const totalSoldQty = sHist.reduce((acc, s) => acc + (s.items || []).reduce((x, y) => x + (y.qty || 0), 0), 0);
+  const profitMargin = (totalSalesTL - totalProfitTL > 0) ? ((totalProfitTL / (totalSalesTL - totalProfitTL)) * 100) : (totalSalesTL > 0 ? 100 : 0);
+
+  const totalStockInQty = inHist.reduce((acc, i) => acc + (i.qty || 0), 0);
+  const totalStockInVal = inHist.reduce((acc, i) => acc + (i.totalValue || (i.qty * (i.buyPrice || 0)) || 0), 0);
+
+  const totalInventoryVal = P.reduce((acc, p) => acc + (p.stk * (p.price || 0)), 0);
+
+  // Metric Cards
+  const statsEl = document.getElementById('rep-stats');
+  if(statsEl){
+    statsEl.innerHTML = `
+      <div class="stat-card s-blue">
+        <div class="stat-ico">🛒</div>
+        <div class="stat-val">${tl(totalSalesTL)}</div>
+        <div class="stat-lbl">${isAll ? 'Toplam Satış Cirosu' : 'Günlük Satış Cirosu'}</div>
+        <div class="stat-meta">${totalSoldQty} adet ürün satıldı (${sHist.length} fiş)</div>
+      </div>
+      <div class="stat-card s-green">
+        <div class="stat-ico">💰</div>
+        <div class="stat-val" style="color:var(--green)">+${tl(totalProfitTL)}</div>
+        <div class="stat-lbl">${isAll ? 'Toplam Net Kâr' : 'Günlük Net Kâr'}</div>
+        <div class="stat-meta">Kâr Marjı: %${profitMargin.toFixed(1)}</div>
+      </div>
+      <div class="stat-card s-yellow">
+        <div class="stat-ico">📥</div>
+        <div class="stat-val">${totalStockInQty} Adet</div>
+        <div class="stat-lbl">${isAll ? 'Stoğa Eklenen Toplam' : 'Günlük Eklenen Ürünler'}</div>
+        <div class="stat-meta">${tl(totalStockInVal)} giriş maliyet değeri</div>
+      </div>
+      <div class="stat-card s-purple">
+        <div class="stat-ico">💎</div>
+        <div class="stat-val">${tl(totalInventoryVal)}</div>
+        <div class="stat-lbl">Aktif Stok Değeri</div>
+        <div class="stat-meta">${P.length} çeşit kayıtlı ürün</div>
+      </div>
+    `;
+  }
+
+  // 1. Sales table
+  const salesCountEl = document.getElementById('rep-sales-count');
+  if(salesCountEl) salesCountEl.textContent = `${sHist.length} Satış İşlemi`;
+  const salesTbody = document.getElementById('rep-sales-tbody');
+  if(salesTbody){
+    if(!sHist.length){
+      salesTbody.innerHTML = '<tr><td colspan="7"><div class="empty" style="padding:24px 14px"><div style="font-size:24px;margin-bottom:6px">🛒</div><p style="font-size:12.5px;color:var(--txt3)">Bu tarihte satış kaydı bulunmuyor</p></div></td></tr>';
+    } else {
+      let rows = '';
+      sHist.forEach(s => {
+        (s.items || []).forEach(item => {
+          rows += `<tr>
+            <td style="color:var(--txt3);font-size:11.5px;font-weight:600">${s.time || '—'}</td>
+            <td><span style="font-size:11px;font-weight:700;color:var(--accent)">${s.receiptNo || ('#'+s.id)}</span></td>
+            <td><div style="font-weight:600">${item.name}</div></td>
+            <td><span style="font-weight:700">${item.qty} ${item.unit}</span></td>
+            <td style="color:var(--txt2)">${tl(item.sellPrice)}</td>
+            <td style="font-weight:700">${tl(item.total)}</td>
+            <td><span class="badge b-ok">+${tl(item.profit)}</span></td>
+          </tr>`;
+        });
+      });
+      salesTbody.innerHTML = rows;
+    }
+  }
+
+  // 2. Stock-in table
+  const stockinCountEl = document.getElementById('rep-stockin-count');
+  if(stockinCountEl) stockinCountEl.textContent = `${inHist.length} Stok Hareketi`;
+  const stockinTbody = document.getElementById('rep-stockin-tbody');
+  if(stockinTbody){
+    if(!inHist.length){
+      stockinTbody.innerHTML = '<tr><td colspan="7"><div class="empty" style="padding:24px 14px"><div style="font-size:24px;margin-bottom:6px">📥</div><p style="font-size:12.5px;color:var(--txt3)">Bu tarihte stoğa eklenen ürün bulunmuyor</p></div></td></tr>';
+    } else {
+      stockinTbody.innerHTML = inHist.map(i => `<tr>
+        <td style="color:var(--txt3);font-size:11.5px;font-weight:600">${i.time || '—'}</td>
+        <td><div style="font-weight:600">${i.name}</div>${i.barc ? `<div class="mono" style="font-size:10px;color:var(--txt3)">${i.barc}</div>` : ''}</td>
+        <td><span style="font-weight:700;color:var(--green)">+${i.qty} ${i.unit}</span></td>
+        <td style="color:var(--txt2)">${tl(i.buyPrice)}</td>
+        <td style="font-weight:600;color:var(--accent)">${tl(i.sellPrice)}</td>
+        <td style="font-weight:700">${tl(i.totalValue)}</td>
+        <td style="font-size:11px;color:var(--txt2)">${i.note || '—'}</td>
+      </tr>`).join('');
+    }
+  }
+
+  // Charts
+  // Day categories sold
+  const dayCatMap = {};
+  sHist.forEach(s => {
+    (s.items || []).forEach(item => {
+      const prod = P.find(x => x.id === item.prodId);
+      const cat = prod ? prod.cat : 'Diğer';
+      dayCatMap[cat] = (dayCatMap[cat] || 0) + item.total;
+    });
+  });
+  if(Object.keys(dayCatMap).length === 0){
+    P.forEach(p => { dayCatMap[p.cat] = (dayCatMap[p.cat] || 0) + p.stk; });
+  }
+  mkChart('ch-day-cat', 'doughnut', {
+    labels: Object.keys(dayCatMap),
+    datasets: [{
+      data: Object.values(dayCatMap),
+      backgroundColor: ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#84CC16'],
+      borderWidth: 0
+    }]
+  }, {
+    plugins: { legend: { position: 'right', labels: { color: '#94A3B8', boxWidth: 10, font: { size: 10.5 } } } }
+  });
+
+  // Hourly or Sales by Hour Chart
+  const hourlySales = { '09:00': 0, '11:00': 0, '13:00': 0, '15:00': 0, '17:00': 0, '19:00': 0 };
+  sHist.forEach(s => {
+    if(s.time){
+      const h = parseInt(s.time.split(':')[0]);
+      if(h <= 10) hourlySales['09:00'] += (s.totalAmount || 0);
+      else if(h <= 12) hourlySales['11:00'] += (s.totalAmount || 0);
+      else if(h <= 14) hourlySales['13:00'] += (s.totalAmount || 0);
+      else if(h <= 16) hourlySales['15:00'] += (s.totalAmount || 0);
+      else if(h <= 18) hourlySales['17:00'] += (s.totalAmount || 0);
+      else hourlySales['19:00'] += (s.totalAmount || 0);
+    }
+  });
+  mkChart('ch-day-hourly', 'bar', {
+    labels: Object.keys(hourlySales),
+    datasets: [{
+      label: 'Satış Tutarı (₺)',
+      data: Object.values(hourlySales),
+      backgroundColor: 'rgba(16,185,129,.7)',
+      borderRadius: 5,
+      borderWidth: 0
+    }]
+  }, {
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#94A3B8' }, grid: { color: 'rgba(148,163,184,.08)' } },
+      y: { ticks: { color: '#94A3B8', callback: v => '₺'+v.toLocaleString('tr-TR') }, grid: { color: 'rgba(148,163,184,.08)' } }
+    }
+  });
+
+  // Top Value Chart
+  const top = [...P].map(p => ({ name: p.name, v: p.stk * (p.price || 0) })).sort((a, b) => b.v - a.v).slice(0, 8);
+  mkChart('ch-val', 'bar', {
+    labels: top.map(p => p.name.length > 22 ? p.name.slice(0, 22) + '…' : p.name),
+    datasets: [{
+      label: 'Stok Değeri',
+      data: top.map(p => p.v),
+      backgroundColor: 'rgba(59,130,246,.7)',
+      borderRadius: 5,
+      borderWidth: 0
+    }]
+  }, {
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#94A3B8', callback: v => '₺'+v.toLocaleString('tr-TR') }, grid: { color: 'rgba(148,163,184,.08)' } },
+      y: { ticks: { color: '#94A3B8', font: { size: 10.5 } }, grid: { display: false } }
+    }
+  });
+}
+
+function csvDailyReport(){
+  const selDate = document.getElementById('rep-date')?.value || getTodayStr();
+  const isAll = (!document.getElementById('rep-date')?.value);
+  const sHist = gsh().filter(s => isAll ? true : s.date === selDate);
+  const inHist = gih().filter(s => isAll ? true : s.date === selDate);
+
+  const headers = ['İşlem Türü', 'Tarih', 'Saat', 'Fiş/İşlem No', 'Ürün Adı', 'Miktar', 'Birim', 'Alış Fiyatı (₺)', 'Satış Fiyatı (₺)', 'Toplam Tutar (₺)', 'Elde Edilen Kâr (₺)', 'Kullanıcı / Not'];
+  const rows = [];
+
+  // Add Sales
+  sHist.forEach(s => {
+    (s.items || []).forEach(item => {
+      rows.push([
+        'SATIŞ',
+        s.date,
+        s.time || '',
+        s.receiptNo || ('#' + s.id),
+        item.name,
+        item.qty,
+        item.unit,
+        item.buyPrice,
+        item.sellPrice,
+        item.total,
+        item.profit,
+        s.user || ''
+      ]);
+    });
+  });
+
+  // Add Stock-in
+  inHist.forEach(inItem => {
+    rows.push([
+      'STOK GİRİŞİ',
+      inItem.date,
+      inItem.time || '',
+      '#' + inItem.id,
+      inItem.name,
+      '+' + inItem.qty,
+      inItem.unit,
+      inItem.buyPrice,
+      inItem.sellPrice,
+      inItem.totalValue,
+      '0.00',
+      inItem.note || ''
+    ]);
+  });
+
+  const filename = isAll ? 'genel_hareket_raporu.csv' : `gunluk_rapor_${selDate}.csv`;
+  dlCSV(filename, headers, rows);
+}
+
 function mkChart(id,type,data,opts){
   if(charts[id])charts[id].destroy();
   const ctx=document.getElementById(id)?.getContext('2d');
@@ -1578,6 +2015,30 @@ function confirmStockin(){
   P[pi].stk+=qty;
   sp(P);
   const p=P[pi];
+
+  // Save to persistent Stock-in history
+  const buyP = parseFloat(p.price) || 0;
+  const sellP = (p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '') ? parseFloat(p.sellPrice) : buyP;
+  const stockinRecord = {
+    id: Date.now(),
+    prodId: p.id,
+    name: p.name,
+    barc: p.barc || '',
+    cat: p.cat || '',
+    qty: qty,
+    unit: p.unit || 'Adet',
+    buyPrice: buyP,
+    sellPrice: sellP,
+    totalValue: qty * buyP,
+    note: note || '',
+    date: getTodayStr(),
+    time: getTimeStr(),
+    user: currentUser ? currentUser.name : 'Kullanıcı'
+  };
+  const inHist = gih();
+  inHist.unshift(stockinRecord);
+  sih(inHist);
+
   toast('s','Stok Eklendi',`${p.name} +${qty} ${p.unit}`);
   updBadge();
   // update displayed stock
@@ -1726,15 +2187,54 @@ function completeSale(){
     P[pi].stk-=c.qty;
   });
   sp(P);
-  // save to history
+
+  const saleItems = salesCart.map(c => {
+    const p = P.find(x => x.id === c.prodId);
+    const buyP = p ? (parseFloat(p.price) || 0) : 0;
+    const sellP = parseFloat(c.price) || 0;
+    const profit = (sellP - buyP) * c.qty;
+    return {
+      prodId: c.prodId,
+      name: c.name,
+      qty: c.qty,
+      unit: c.unit,
+      buyPrice: buyP,
+      sellPrice: sellP,
+      total: c.total,
+      profit: profit
+    };
+  });
+
   const tot=salesCart.reduce((s,c)=>s+c.total,0);
+  const totalProfit = saleItems.reduce((s,c)=>s+c.profit,0);
+  const receiptNo = '#' + Math.floor(100000 + Math.random() * 900000);
+
+  // Save to persistent Sales history
+  const saleRecord = {
+    id: Date.now(),
+    receiptNo: receiptNo,
+    date: getTodayStr(),
+    time: getTimeStr(),
+    items: saleItems,
+    totalAmount: tot,
+    totalProfit: totalProfit,
+    user: currentUser ? currentUser.name : 'Kullanıcı'
+  };
+  const sHist = gsh();
+  sHist.unshift(saleRecord);
+  ssh(sHist);
+
+  // save to session history DOM
   const summary=salesCart.map(c=>`${c.name} x${c.qty}`).join(', ');
   const hist=document.getElementById('sales-history');
-  hist.querySelectorAll('[data-hist-empty]').forEach(e=>e.remove());
-  const item=document.createElement('div');
-  item.style.cssText='padding:9px 12px;border-radius:8px;font-size:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18)';
-  item.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:600">${fd(new Date())}</span><span style="color:var(--red);font-weight:700">${tl(tot)}</span></div><div style="color:var(--txt2)">${summary}</div>`;
-  hist.prepend(item);
+  if(hist){
+    hist.querySelectorAll('[data-hist-empty]').forEach(e=>e.remove());
+    const item=document.createElement('div');
+    item.style.cssText='padding:9px 12px;border-radius:8px;font-size:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18)';
+    item.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:600">${getTimeStr()} (${receiptNo})</span><span style="color:var(--red);font-weight:700">${tl(tot)}</span></div><div style="color:var(--txt2)">${summary}</div>`;
+    hist.prepend(item);
+  }
+
   const items=salesCart.length;
   salesCart=[];
   renderCart();
@@ -1742,7 +2242,7 @@ function completeSale(){
   document.getElementById('sales-prod-card').style.display='none';
   document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
   updBadge();
-  toast('s','Sat\u0131\u015f Tamamland\u0131',`${items} kalem, toplam ${tl(tot)}`);
+  toast('s','Sat\u0131\u015f Tamamland\u0131',`${items} kalem, toplam ${tl(tot)} (Kâr: +${tl(totalProfit)})`);
 }
 function resetSales(){
   salesCart=[];
@@ -2086,6 +2586,8 @@ function triggerCloudPush(reason, immediate = false){
     products: gp(),
     suppliers: gs(),
     orders: go2(),
+    salesHistory: gsh(),
+    stockinHistory: gih(),
     updatedAt: lastCloudSyncTime,
     updatedBy: currentUser ? currentUser.email : 'user',
     channel: syncChannel
@@ -2146,8 +2648,12 @@ function applyRemotePayload(payload, source){
   const remoteSups = JSON.stringify(payload.suppliers || []);
   const currentOrds = ls('nl_ord') || '[]';
   const remoteOrds = JSON.stringify(payload.orders || []);
+  const currentSalesH = ls('nl_sales_hist') || '[]';
+  const remoteSalesH = JSON.stringify(payload.salesHistory || payload.sales_history || []);
+  const currentInH = ls('nl_stockin_hist') || '[]';
+  const remoteInH = JSON.stringify(payload.stockinHistory || payload.stockin_history || []);
 
-  const hasChanged = (currentProds !== remoteProds) || (currentSups !== remoteSups) || (currentOrds !== remoteOrds);
+  const hasChanged = (currentProds !== remoteProds) || (currentSups !== remoteSups) || (currentOrds !== remoteOrds) || (currentSalesH !== remoteSalesH) || (currentInH !== remoteInH);
 
   if(!hasChanged){
     if(payload.updatedAt || payload.updated_at){
@@ -2167,6 +2673,12 @@ function applyRemotePayload(payload, source){
     }
     if(Array.isArray(payload.orders)){
       localStorage.setItem('nl_ord', remoteOrds);
+    }
+    if(Array.isArray(payload.salesHistory || payload.sales_history)){
+      localStorage.setItem('nl_sales_hist', remoteSalesH);
+    }
+    if(Array.isArray(payload.stockinHistory || payload.stockin_history)){
+      localStorage.setItem('nl_stockin_hist', remoteInH);
     }
     if(payload.updatedAt || payload.updated_at){
       lastCloudSyncTime = Math.max(lastCloudSyncTime, payload.updatedAt || payload.updated_at);
