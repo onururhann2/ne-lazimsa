@@ -2410,13 +2410,29 @@ function csvOrders(){
     O.map(o=>{const pr=P.find(p=>p.id===o.prod),sup=S.find(s=>s.id===o.sup);return['#'+String(o.id).padStart(4,'0'),pr?.name||'',sup?.name||'',o.qty,o.price,o.total,o.date,o.stat];}));
 }
 
-// ══════════════ TOAST ══════════════
-function toast(type,title,msg){
-  const icons={s:'✅',e:'❌',w:'⚠️',i:'ℹ️'};
-  const el=document.createElement('div');el.className='toast '+type;
-  el.innerHTML=`<div class="toast-ico">${icons[type]||'ℹ️'}</div><div><div class="toast-ttl">${title}</div>${msg?`<div class="toast-msg">${msg}</div>`:''}</div>`;
-  document.getElementById('toasts').appendChild(el);
-  setTimeout(()=>el.remove(),3200);
+// ══════════════ TOAST (DUPLICATE FILTERED) ══════════════
+let recentToastCache = new Map();
+function toast(type, title, msg){
+  const key = `${type}__${title}__${msg || ''}`;
+  const now = Date.now();
+  const lastTime = recentToastCache.get(key) || 0;
+  if(now - lastTime < 2500){
+    return; // Block duplicate notification within 2.5s
+  }
+  recentToastCache.set(key, now);
+  if(recentToastCache.size > 50){
+    const firstKey = recentToastCache.keys().next().value;
+    recentToastCache.delete(firstKey);
+  }
+
+  const icons = { s: '✅', e: '❌', w: '⚠️', i: 'ℹ️' };
+  const toastsContainer = document.getElementById('toasts');
+  if(!toastsContainer) return;
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<div class="toast-ico">${icons[type] || 'ℹ️'}</div><div><div class="toast-ttl">${title}</div>${msg ? `<div class="toast-msg">${msg}</div>` : ''}</div>`;
+  toastsContainer.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
 }
 
 // ══════════════ THEME ══════════════
@@ -3220,12 +3236,12 @@ function initMqttMesh(){
         if(!data || data.senderId === myDeviceId) return;
 
         if(data.type === 'REMOTE_SCAN' && data.code){
-          handleRemoteScan(data.code, data.senderId, data.senderName);
+          handleRemoteScan(data.code, data.senderId, data.senderName, data.eventId);
         } else if(data.type === 'CART_UPDATE' && Array.isArray(data.cart)){
           salesCart = data.cart;
           renderCart();
         } else if(data.type === 'SALE_COMPLETE' && data.saleRecord){
-          handleRemoteSaleComplete(data.saleRecord, data.senderId);
+          handleRemoteSaleComplete(data.saleRecord, data.senderId, data.eventId);
         } else if(data.type === 'STOCK_SYNC' && data.payload){
           if(!isRemoteApplying) applyRemotePayload(data.payload, 'Realtime Mesh');
         }
@@ -3238,12 +3254,26 @@ function initMqttMesh(){
   }
 }
 
+const processedRemoteEvents = new Set();
+function isDuplicateRemoteEvent(eventId){
+  if(!eventId) return false;
+  if(processedRemoteEvents.has(eventId)) return true;
+  processedRemoteEvents.add(eventId);
+  if(processedRemoteEvents.size > 200){
+    const first = processedRemoteEvents.values().next().value;
+    processedRemoteEvents.delete(first);
+  }
+  return false;
+}
+
 function broadcastRemoteScan(code){
   const cleanCode = (code || '').trim();
   if(!cleanCode) return;
+  const eventId = myDeviceId + '_scan_' + cleanCode + '_' + Date.now();
   const payload = {
     type: 'REMOTE_SCAN',
     code: cleanCode,
+    eventId: eventId,
     senderId: myDeviceId,
     senderName: currentUser ? currentUser.name : 'Mobil',
     time: Date.now()
@@ -3321,9 +3351,11 @@ function broadcastCartUpdate(cart){
 
 function broadcastSaleComplete(saleRecord){
   if(!saleRecord) return;
+  const eventId = myDeviceId + '_sale_' + (saleRecord.receiptNo || saleRecord.id) + '_' + Date.now();
   const payload = {
     type: 'SALE_COMPLETE',
     saleRecord: saleRecord,
+    eventId: eventId,
     senderId: myDeviceId,
     time: Date.now()
   };
@@ -3352,8 +3384,11 @@ function broadcastSaleComplete(saleRecord){
   }catch(e){}
 }
 
-function handleRemoteSaleComplete(saleRecord, senderId){
+function handleRemoteSaleComplete(saleRecord, senderId, eventId){
   if(senderId === myDeviceId || !saleRecord) return;
+
+  const dedupKey = eventId || (saleRecord.receiptNo ? `sale_${saleRecord.receiptNo}` : `sale_${saleRecord.id}`);
+  if(isDuplicateRemoteEvent(dedupKey)) return;
 
   // 1. Merge sale record into sales history without duplicates
   const sHist = gsh();
@@ -3372,10 +3407,13 @@ function handleRemoteSaleComplete(saleRecord, senderId){
   toast('s', '🛍️ Yeni Satış Tamamlandı', `${saleRecord.receiptNo || ''} — Toplam ${tl(saleRecord.totalAmount || 0)}`);
 }
 
-function handleRemoteScan(code, senderId, senderName){
+function handleRemoteScan(code, senderId, senderName, eventId){
   if(senderId === myDeviceId) return;
   const cleanCode = (code || '').trim();
   if(!cleanCode) return;
+
+  const dedupKey = eventId || `scan_${senderId}_${cleanCode}_${Math.floor(Date.now() / 2000)}`;
+  if(isDuplicateRemoteEvent(dedupKey)) return;
 
   playBeep();
 
@@ -3383,10 +3421,10 @@ function handleRemoteScan(code, senderId, senderName){
   const isStockinVisible = (currentTab === 'stockin') || (document.getElementById('page-stockin')?.style.display === 'block');
 
   if(isSalesVisible){
-    toast('s', '📱 Telefondan Barkod Geldi', `Barkod: ${cleanCode}`);
+    toast('s', '📱 Telefondan Barkod Okundu', `Barkod: ${cleanCode}`);
     onSalesScan(cleanCode, true);
   } else if(isStockinVisible){
-    toast('s', '📱 Telefondan Barkod Geldi', `Barkod: ${cleanCode}`);
+    toast('s', '📱 Telefondan Barkod Okundu', `Barkod: ${cleanCode}`);
     onStockinScan(cleanCode, true);
   } else {
     toast('i', '📱 Telefondan Barkod Okutuldu', `Barkod: ${cleanCode} (Sepete eklendi)`);
@@ -3816,12 +3854,12 @@ function setupRealtimeSync(){
         if(type === 'SYNC_UPDATE' && payload){
           if(!isRemoteApplying) applyRemotePayload(payload, 'Local Tab');
         } else if(type === 'REMOTE_SCAN' && payload && payload.code && payload.senderId !== myDeviceId){
-          handleRemoteScan(payload.code, payload.senderId, payload.senderName);
+          handleRemoteScan(payload.code, payload.senderId, payload.senderName, payload.eventId);
         } else if(type === 'CART_UPDATE' && payload && Array.isArray(payload.cart) && payload.senderId !== myDeviceId){
           salesCart = payload.cart;
           renderCart();
         } else if(type === 'SALE_COMPLETE' && payload && payload.saleRecord && payload.senderId !== myDeviceId){
-          handleRemoteSaleComplete(payload.saleRecord, payload.senderId);
+          handleRemoteSaleComplete(payload.saleRecord, payload.senderId, payload.eventId);
         }
       };
     }catch(e){}
@@ -3888,7 +3926,7 @@ async function initSupabase(){
       })
       .on('broadcast', { event: 'remote_scan' }, ({ payload }) => {
         if(payload && payload.code && payload.senderId !== myDeviceId){
-          handleRemoteScan(payload.code, payload.senderId, payload.senderName);
+          handleRemoteScan(payload.code, payload.senderId, payload.senderName, payload.eventId);
         }
       })
       .on('broadcast', { event: 'cart_update' }, ({ payload }) => {
@@ -3899,7 +3937,7 @@ async function initSupabase(){
       })
       .on('broadcast', { event: 'sale_complete' }, ({ payload }) => {
         if(payload && payload.saleRecord && payload.senderId !== myDeviceId){
-          handleRemoteSaleComplete(payload.saleRecord, payload.senderId);
+          handleRemoteSaleComplete(payload.saleRecord, payload.senderId, payload.eventId);
         }
       })
       .on('broadcast', { event: 'stock_sync' }, ({ payload }) => {
