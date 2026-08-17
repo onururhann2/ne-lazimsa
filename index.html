@@ -1504,6 +1504,40 @@ let isCloudSyncing = false;
 let lastCloudSyncTime = Date.now();
 let cloudPollInterval = null;
 let usersRepairTimeout = null;
+
+// Supabase tablosunda bulunmayan sütunlar. Bir yazma PGRST204 ile reddedilirse
+// sütun buraya eklenir; sonraki yazmalar onsuz gider, böylece tek eksik sütun
+// yüzünden tüm senkronizasyon durmaz.
+const missingColumns = new Set();
+let missingColumnWarned = false;
+
+// Hata eksik sütundan mı kaynaklanıyor? Öyleyse kaydedip true döner.
+function noteMissingColumn(error){
+  if(!error) return false;
+  const msg = String(error.message || '') + ' ' + String(error.details || '') + ' ' + String(error.hint || '');
+  const m = msg.match(/'([a-z_]+)' column|column "?([a-z_]+)"? of/i);
+  const col = m ? (m[1] || m[2]) : null;
+  const known = ['users', 'sales_history', 'stockin_history'];
+  const found = col && known.includes(col) ? [col] : known.filter(c => msg.includes(c));
+  if(!found.length) return false;
+
+  found.forEach(c => missingColumns.add(c));
+  warnMissingColumns();
+  return true;
+}
+
+function warnMissingColumns(){
+  if(missingColumnWarned || !missingColumns.size) return;
+  missingColumnWarned = true;
+  const cols = Array.from(missingColumns).join(', ');
+  console.error('[NE LAZIMSA] Supabase tablosunda eksik sütun(lar): ' + cols +
+    '\nSQL Editor’de çalıştırın:\n' +
+    Array.from(missingColumns).map(c =>
+      `alter table public.company_inventory add column if not exists ${c} jsonb default '[]'::jsonb;`).join('\n'));
+  setSyncStatusUI('offline', 'Tablo Eksik');
+  toast('e', 'Supabase Tablosu Eksik',
+    `"${cols}" sütun(lar)ı yok. Kullanıcı/geçmiş senkronizasyonu ÇALIŞMAZ. Senkronizasyon ayarlarındaki SQL kodunu Supabase SQL Editor’de çalıştırın.`);
+}
 let broadcastChan = null;
 
 // Initial Seed (Empty clean arrays for production use)
@@ -1614,10 +1648,13 @@ function getUsersRaw(){
       if(Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   }catch(e){}
-  const seedTs = Date.now();
+  // uts:0 KRİTİK — fabrika kayıtları her zaman en düşük önceliğe sahip olmalı.
+  // Aksi halde sıfırdan açılan bir cihaz (yeni tablet, temizlenmiş tarayıcı)
+  // taze zaman damgalı varsayılanlarla buluttaki gerçek hesapları ezer ve
+  // admin şifresini tüm cihazlarda 123456'ya döndürür.
   const defaultUsers = [
-    { id: 1, name: 'Admin Yönetici', email: 'admin@nelazimsa.com', username: 'admin', password: '123456', role: 'admin', uts: seedTs },
-    { id: 2, name: 'Kasiyer 1', email: 'kasiyer@nelazimsa.com', username: 'kasiyer', password: '123456', role: 'cashier', uts: seedTs }
+    { id: 1, name: 'Admin Yönetici', email: 'admin@nelazimsa.com', username: 'admin', password: '123456', role: 'admin', uts: 0, seed: true },
+    { id: 2, name: 'Kasiyer 1', email: 'kasiyer@nelazimsa.com', username: 'kasiyer', password: '123456', role: 'cashier', uts: 0, seed: true }
   ];
   localStorage.setItem('nl_users', JSON.stringify(defaultUsers));
   return defaultUsers;
@@ -1689,15 +1726,22 @@ function applyRemoteUsers(remoteUsers){
   if(!Array.isArray(remoteUsers) || remoteUsers.length === 0) return { changed: false, needsPush: false };
 
   const before = JSON.stringify(getUsersRaw());
-  const merged = mergeUsers(JSON.parse(before), remoteUsers);
+  const remoteMap = new Map(remoteUsers.map(u => [userKey(u), Number(u.uts || 0)]));
+
+  // Bulutta gerçek kayıtlar varsa, bu cihazın hiç kullanılmamış fabrika hesaplarını at.
+  // (Sıfırdan açılan bir cihaz şirketin listesine admin@nelazimsa.com enjekte etmemeli.)
+  const localRaw = JSON.parse(before).filter(u => !(u.seed && !remoteMap.has(userKey(u))));
+
+  const merged = mergeUsers(localRaw, remoteUsers);
   const after = JSON.stringify(merged);
   const changed = (after !== before);
   if(changed) localStorage.setItem('nl_users', after);
 
   // Eski listeye sahip bir cihaz push yapıp yeni kullanıcıyı buluttan düşürmüşse
   // birleşmiş listeyi geri yazarak yakınsamayı garanti et.
-  const remoteMap = new Map(remoteUsers.map(u => [userKey(u), Number(u.uts || 0)]));
+  // Fabrika kayıtları asla buluta gönderilmez.
   const needsPush = merged.some(u => {
+    if(u.seed) return false;
     const k = userKey(u);
     return !remoteMap.has(k) || remoteMap.get(k) < Number(u.uts || 0);
   });
@@ -1891,6 +1935,7 @@ function saveUser(e){
       users[idx].role = fRole;
       users[idx].permissions = fPerms;
       users[idx].uts = Date.now();
+      delete users[idx].seed; // artık gerçek bir kayıt, fabrika ayarı değil
       if(currentUser && currentUser.id === uid){
         currentUser = users[idx];
         localStorage.setItem('nl_sess', JSON.stringify(currentUser));
@@ -1954,25 +1999,47 @@ function delUser(id){
 
 // ══════════════ AUTH & ROLES ══════════════
 function findLoginUser(input, pass){
+  const norm = v => String(v || '').trim().toLowerCase();
   return getUsers().find(x => {
-    const matchEmail = x.email && x.email.toLowerCase() === input;
-    const matchUser = x.username && x.username.toLowerCase() === input;
-    return (matchEmail || matchUser) && String(x.password) === pass;
+    const matchEmail = x.email && norm(x.email) === input;
+    const matchUser = x.username && norm(x.username) === input;
+    return (matchEmail || matchUser) && String(x.password) === String(pass);
   });
 }
 
+let loginBusy = false;
 async function doLogin(){
+  if(loginBusy) return;
   const input = (document.getElementById('l-email').value || '').trim().toLowerCase();
   const pass = String(document.getElementById('l-pass').value || '');
   const err = document.getElementById('login-err');
 
+  const fail = (msg) => {
+    err.textContent = msg;
+    err.style.display = 'block';
+  };
+
   let u = findLoginUser(input, pass);
 
-  // Kullanıcı yerelde yoksa buluttan taze listeyi çekip bir kez daha dene:
-  // yeni tanımlanan bir personel, poll turunu beklemeden hemen giriş yapabilsin.
+  // Kullanıcı yerelde yoksa buluttan taze listeyi çekip bir kez daha dene.
+  // Yeni bir cihazda (tablet, temizlenmiş tarayıcı) localStorage boştur; ilk
+  // poll turunu beklemeden buluttaki gerçek hesaplarla giriş yapılabilmeli.
   if(!u){
-    const pulled = await pullRemoteUsers();
-    if(pulled) u = findLoginUser(input, pass);
+    loginBusy = true;
+    err.textContent = '⏳ Hesap bulutta kontrol ediliyor...';
+    err.style.display = 'block';
+    let pull;
+    try{
+      pull = await pullRemoteUsers();
+    } finally {
+      loginBusy = false;
+    }
+    u = findLoginUser(input, pass);
+
+    if(!u && !pull.reached){
+      fail('⚠️ Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+      return;
+    }
   }
 
   if(u){
@@ -1983,28 +2050,88 @@ async function doLogin(){
     currentUser = {...u}; // Fresh copy
     localStorage.setItem('nl_sess', JSON.stringify(currentUser));
     err.style.display = 'none';
+    err.textContent = '❌ Kullanıcı adı / e-posta veya şifre hatalı!';
     console.log('[NE LAZIMSA] Login:', currentUser.name, 'Role:', currentUser.role, 'Permissions:', currentUser.permissions);
     showApp();
   } else {
-    err.style.display = 'block';
+    fail('❌ Kullanıcı adı / e-posta veya şifre hatalı!');
   }
 }
 
+// Supabase REST üzerinden doğrudan kullanıcı listesi çeker.
+// SDK yüklenmemiş ya da sbClient henüz hazır değilken de çalışır
+// (yeni bir cihazda giriş denemesi initSupabase'den önce olabilir).
+async function fetchRemoteUsersDirect(){
+  let url = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
+  let key = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
+  url = url.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+  if(key && key.startsWith('sb_secret_')) key = DEFAULT_SB_KEY;
+  if(!url || !key) return null;
+
+  // select=* kullanılır: users sütunu tabloda yoksa select=users 400 döner
+  const endpoint = url + '/rest/v1/company_inventory?select=*&channel=eq.' + encodeURIComponent(syncChannel);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try{
+    const res = await fetch(endpoint, {
+      headers: { apikey: key, Authorization: 'Bearer ' + key },
+      signal: ctrl.signal
+    });
+    if(!res.ok) return { reached: false, users: null };
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if(row) checkUsersColumn(row);
+    return { reached: true, users: row ? row.users : null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Okunan satırda users sütunu hiç yoksa tablo şeması eksiktir.
+function checkUsersColumn(row){
+  if(row && typeof row === 'object' && !('users' in row)){
+    missingColumns.add('users');
+    if(!('sales_history' in row)) missingColumns.add('sales_history');
+    if(!('stockin_history' in row)) missingColumns.add('stockin_history');
+    warnMissingColumns();
+    return false;
+  }
+  return true;
+}
+
 // Buluttan yalnızca kullanıcı listesini çeker ve yereldekiyle birleştirir.
+// reached: sunucuya ulaşılabildi mi (ağ hatasını yanlış şifreden ayırmak için)
+// changed: yerel liste değişti mi
 async function pullRemoteUsers(){
   try{
-    if(syncProvider === 'supabase' && sbClient){
-      const { data } = await sbClient.from('company_inventory').select('users').eq('channel', syncChannel).maybeSingle();
-      return applyRemoteUsers(data && data.users).changed;
-    }
-    if(syncProvider === 'firebase' && fbSyncRef){
+    if(syncProvider === 'firebase'){
+      if(!fbSyncRef) return { reached: false, changed: false };
       const snap = await fbSyncRef.child('users').get();
-      return applyRemoteUsers(snap && snap.val()).changed;
+      return { reached: true, changed: applyRemoteUsers(snap && snap.val()).changed };
     }
+
+    let remoteUsers = null;
+    let reached = false;
+    if(sbClient){
+      try{
+        const { data, error } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
+        if(!error){
+          reached = true;
+          if(data){ checkUsersColumn(data); remoteUsers = data.users; }
+        }
+      }catch(e){ /* REST yedeğine düş */ }
+    }
+    if(!reached){
+      const direct = await fetchRemoteUsersDirect();
+      reached = direct.reached;
+      remoteUsers = remoteUsers || direct.users;
+    }
+
+    return { reached, changed: applyRemoteUsers(remoteUsers).changed };
   }catch(e){
     console.warn('Kullanıcı listesi çekilemedi:', e);
+    return { reached: false, changed: false };
   }
-  return false;
 }
 
 function doLogout(){
@@ -5461,6 +5588,7 @@ async function initSupabase(){
         try{
           const { data } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
           if(data){
+            checkUsersColumn(data);
             applyRemotePayload({
               products: data.products,
               suppliers: data.suppliers,
@@ -5486,6 +5614,8 @@ async function initSupabase(){
       }
     } else if(data){
       isSupabaseConnected = true;
+      // Tablo şeması eksikse kullanıcıyı hemen uyar (sessizce başarısız olmasın)
+      checkUsersColumn(data);
       applyRemotePayload({
         products: data.products,
         suppliers: data.suppliers,
@@ -5496,7 +5626,7 @@ async function initSupabase(){
         updatedAt: data.updated_at,
         updatedBy: data.updated_by
       }, 'Supabase Initial');
-      setSyncStatusUI('ok', 'Canlı');
+      if(!missingColumns.size) setSyncStatusUI('ok', 'Canlı');
     } else {
       // Remote table is empty for this channel, seed it with local data
       isSupabaseConnected = true;
@@ -5620,19 +5750,38 @@ function triggerCloudPush(reason, immediate = false){
   const doPush = async () => {
     // 1. Supabase Push
     if(syncProvider === 'supabase' && sbClient){
+      const row = {
+        channel: syncChannel,
+        products: payload.products,
+        suppliers: payload.suppliers,
+        orders: payload.orders,
+        sales_history: payload.salesHistory,
+        stockin_history: payload.stockinHistory,
+        users: payload.users,
+        updated_at: payload.updatedAt,
+        updated_by: payload.updatedBy
+      };
+      // Tabloda eksik olduğu bilinen sütunları baştan çıkar
+      missingColumns.forEach(c => { delete row[c]; });
+
       try{
-        await sbClient.from('company_inventory').upsert({
-          channel: syncChannel,
-          products: payload.products,
-          suppliers: payload.suppliers,
-          orders: payload.orders,
-          sales_history: payload.salesHistory,
-          stockin_history: payload.stockinHistory,
-          users: payload.users,
-          updated_at: payload.updatedAt,
-          updated_by: payload.updatedBy
-        }, { onConflict: 'channel' });
-        setSyncStatusUI('ok');
+        // DİKKAT: supabase-js hata fırlatmaz, { error } döner.
+        // Bu kontrol olmadan başarısız yazmalar "Canlı" gibi görünür.
+        let { error } = await sbClient.from('company_inventory').upsert(row, { onConflict: 'channel' });
+
+        // Tabloda olmayan sütun varsa (PGRST204) onu çıkarıp yeniden dene:
+        // users sütunu yoksa bile ürün/stok senkronizasyonu çalışmaya devam etsin.
+        if(error && noteMissingColumn(error)){
+          missingColumns.forEach(c => { delete row[c]; });
+          ({ error } = await sbClient.from('company_inventory').upsert(row, { onConflict: 'channel' }));
+        }
+
+        if(error){
+          console.error('Supabase push error:', error);
+          setSyncStatusUI('offline', 'Yazma Hatası');
+        } else {
+          setSyncStatusUI('ok');
+        }
       }catch(err){
         console.error('Supabase push error:', err);
         setSyncStatusUI('offline', 'Yazma Hatası');
