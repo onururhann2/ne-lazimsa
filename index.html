@@ -2249,41 +2249,41 @@ async function startCam(videoId, key, cb){
         }
       };
       readers[key].animId = requestAnimationFrame(detectLoop);
-    }
+    } else {
+      // 3. FALLBACK ENGINE: ZXing Browser Multi-Format Decoder (ONLY when native detector is unavailable)
+      const ZXingLib = (typeof ZXing !== 'undefined') ? ZXing : (typeof ZXingBrowser !== 'undefined' ? ZXingBrowser : null);
+      if(ZXingLib && (ZXingLib.BrowserMultiFormatReader || ZXingLib.BrowserBarcodeReader)){
+        try{
+          const ReaderClass = ZXingLib.BrowserMultiFormatReader || ZXingLib.BrowserBarcodeReader;
+          const hints = new Map();
+          if(ZXingLib.BarcodeFormat && ZXingLib.DecodeHintType){
+            const formats = [
+              ZXingLib.BarcodeFormat.EAN_13,
+              ZXingLib.BarcodeFormat.EAN_8,
+              ZXingLib.BarcodeFormat.CODE_128,
+              ZXingLib.BarcodeFormat.CODE_39,
+              ZXingLib.BarcodeFormat.UPC_A,
+              ZXingLib.BarcodeFormat.UPC_E,
+              ZXingLib.BarcodeFormat.QR_CODE
+            ];
+            hints.set(ZXingLib.DecodeHintType.POSSIBLE_FORMATS, formats);
+            hints.set(ZXingLib.DecodeHintType.TRY_HARDER, true);
+          }
+          const codeReader = new ReaderClass(hints);
+          readers[key].zxing = codeReader;
 
-    // 3. SECONDARY PARALLEL ENGINE: ZXing Browser Multi-Format Decoder with TRY_HARDER
-    const ZXingLib = (typeof ZXing !== 'undefined') ? ZXing : (typeof ZXingBrowser !== 'undefined' ? ZXingBrowser : null);
-    if(ZXingLib && (ZXingLib.BrowserMultiFormatReader || ZXingLib.BrowserBarcodeReader)){
-      try{
-        const ReaderClass = ZXingLib.BrowserMultiFormatReader || ZXingLib.BrowserBarcodeReader;
-        const hints = new Map();
-        if(ZXingLib.BarcodeFormat && ZXingLib.DecodeHintType){
-          const formats = [
-            ZXingLib.BarcodeFormat.EAN_13,
-            ZXingLib.BarcodeFormat.EAN_8,
-            ZXingLib.BarcodeFormat.CODE_128,
-            ZXingLib.BarcodeFormat.CODE_39,
-            ZXingLib.BarcodeFormat.UPC_A,
-            ZXingLib.BarcodeFormat.UPC_E,
-            ZXingLib.BarcodeFormat.QR_CODE
-          ];
-          hints.set(ZXingLib.DecodeHintType.POSSIBLE_FORMATS, formats);
-          hints.set(ZXingLib.DecodeHintType.TRY_HARDER, true);
+          if(typeof codeReader.decodeFromStream === 'function'){
+            codeReader.decodeFromStream(stream, video, (result) => {
+              if(!readers[key]?.active) return;
+              if(result){
+                const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
+                processValidatedBarcode(text, key, videoId, cb);
+              }
+            });
+          }
+        }catch(zxingErr){
+          console.warn('ZXing fallback stream error:', zxingErr);
         }
-        const codeReader = new ReaderClass(hints);
-        readers[key].zxing = codeReader;
-
-        if(typeof codeReader.decodeFromStream === 'function'){
-          codeReader.decodeFromStream(stream, video, (result) => {
-            if(!readers[key]?.active) return;
-            if(result){
-              const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
-              processValidatedBarcode(text, key, videoId, cb);
-            }
-          });
-        }
-      }catch(zxingErr){
-        console.warn('ZXing parallel stream error:', zxingErr);
       }
     }
 
@@ -3421,52 +3421,62 @@ function initSales(){
 
 let lastSalesScanCode = null, lastSalesScanTime = 0;
 function onSalesScan(code, fromRemote = false){
+  const cleanCode = (code || '').trim();
+  if(!cleanCode) return;
+
   const now = Date.now();
-  if(!fromRemote){
-    if(code === lastSalesScanCode && now - lastSalesScanTime < 5000) return;
-    if(now - lastSalesScanTime < 2500) return;
-    lastSalesScanCode = code;
-    lastSalesScanTime = now;
-    broadcastRemoteScan(code);
+  // Strictly prevent duplicate scan triggers (regardless of local or remote)
+  if(cleanCode === lastSalesScanCode && (now - lastSalesScanTime < 4000)){
+    return;
+  }
+  if(now - lastSalesScanTime < 1000){
+    return;
   }
 
-  const p=gp().find(x=>x.barc===code);
+  lastSalesScanCode = cleanCode;
+  lastSalesScanTime = now;
+
+  if(!fromRemote){
+    broadcastRemoteScan(cleanCode);
+  }
+
+  const p = gp().find(x => x.barc === cleanCode);
   if(p){
-    salesScannedProdId=p.id;
+    salesScannedProdId = p.id;
     const sellPrice = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : parseFloat(p.price)||0;
-    document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 ${p.name} sepete eklendi</span>`;
+    document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">✅ ${p.name} sepete eklendi</span>`;
     document.getElementById('sales-prod-name').textContent=p.name;
     document.getElementById('sales-prod-stk').textContent=p.stk+' '+p.unit;
     document.getElementById('sales-prod-price').textContent=tl(sellPrice);
     document.getElementById('sales-prod-card').style.display='block';
     document.getElementById('sales-notfound').style.display='none';
-    // ── Otomatik sepete ekle (qty=1, satış fiyatı üzerinden) ──
-    const P=gp();
-    if(p.stk<1){
+    // ── Otomatik sepete SADECE 1 adet ekle ──
+    const P = gp();
+    if(p.stk < 1){
       document.getElementById('sales-prod-result').innerHTML='<span class="badge b-danger">Stok tükenmiş!</span>';
-      document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--red);font-weight:600">\u274c ${p.name} — stok tükenmiş!</span>`;
+      document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--red);font-weight:600">❌ ${p.name} — stok tükenmiş!</span>`;
       toast('e','Yetersiz Stok',p.name+' için stok yok');
       return;
     }
-    const existing=salesCart.find(c=>c.prodId===p.id);
+    const existing = salesCart.find(c => c.prodId === p.id);
     if(existing){
-      if(p.stk<=existing.qty){
+      if(p.stk <= existing.qty){
         document.getElementById('sales-prod-result').innerHTML='<span class="badge b-danger">Stok yetersiz!</span>';
         toast('e','Yetersiz Stok',`Toplam ${p.stk} ${p.unit} mevcut`);
         return;
       }
-      existing.qty+=1;
-      existing.total=existing.qty*existing.price;
-    }else{
-      salesCart.push({prodId:p.id,name:p.name,unit:p.unit,price:sellPrice,qty:1,total:sellPrice});
+      existing.qty += 1;
+      existing.total = existing.qty * existing.price;
+    } else {
+      salesCart.push({ prodId: p.id, name: p.name, unit: p.unit, price: sellPrice, qty: 1, total: sellPrice });
     }
-    const inCart=salesCart.find(c=>c.prodId===p.id);
-    document.getElementById('sales-prod-result').innerHTML=`<span class="badge b-ok">Sepette: ${inCart?inCart.qty:1} ${p.unit} (${tl(inCart?inCart.total:sellPrice)})</span>`;
+    const inCart = salesCart.find(c => c.prodId === p.id);
+    document.getElementById('sales-prod-result').innerHTML=`<span class="badge b-ok">Sepette: ${inCart ? inCart.qty : 1} ${p.unit} (${tl(inCart ? inCart.total : sellPrice)})</span>`;
     renderCart();
     broadcastCartUpdate(salesCart);
-  }else{
-    salesScannedProdId=null;
-    document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--yellow);font-weight:600">\u26a0\ufe0f Barkod bulunamad\u0131: ${code}</span>`;
+  } else {
+    salesScannedProdId = null;
+    document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--yellow);font-weight:600">⚠️ Barkod bulunamadı: ${cleanCode}</span>`;
     document.getElementById('sales-prod-card').style.display='none';
     document.getElementById('sales-notfound').style.display='block';
   }
