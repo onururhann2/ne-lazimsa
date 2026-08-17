@@ -188,18 +188,85 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 .toast-ttl{font-size:12.5px;font-weight:600;color:var(--txt)}
 .toast-msg{font-size:11.5px;color:var(--txt2);margin-top:2px}
 
-/* ── SCANNER ── */
-.scan-frame{position:relative;border-radius:12px;overflow:hidden;background:#000;width:100%;height:280px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center}
-.scan-frame video, #barcode-video, #qc-video, #stockin-video, #sales-video{width:100% !important;height:100% !important;max-height:100% !important;object-fit:cover !important;display:block !important;border-radius:12px !important;transform:none !important}
+/* ── SCANNER (COMPACT BLUE RECTANGLE) ── */
+.scan-frame{
+  position:relative;
+  width:100%;
+  max-width:380px;
+  height:190px;
+  margin:0 auto 12px auto;
+  border-radius:14px;
+  overflow:hidden;
+  background:#000;
+  border:2.5px solid #2563eb;
+  box-shadow:0 0 22px rgba(37,99,235,.35), 0 4px 16px rgba(0,0,0,.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.scan-frame video, #barcode-video, #qc-video, #stockin-video, #sales-video{
+  width:100% !important;
+  height:100% !important;
+  max-height:100% !important;
+  object-fit:cover !important;
+  display:block !important;
+  border-radius:11px !important;
+  transform:none !important;
+}
 .scan-frame canvas{display:none !important}
-.scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:5}
-.scan-guide{width:76%;max-width:320px;height:66%;border:2.5px solid #2563eb;border-radius:14px;position:relative;overflow:hidden;box-shadow:0 0 0 9999px rgba(0,0,0,.48), 0 0 24px rgba(37,99,235,.4) inset}
-.scan-guide::before{content:"Barkodu mavi karenin içine hizalayın";position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;font-weight:700;color:#60a5fa;text-shadow:0 1px 3px rgba(0,0,0,.9);background:rgba(15,23,42,.85);padding:3px 6px;border-radius:4px;margin:0 8px}
-.scan-laser{position:absolute;left:0;right:0;height:2.5px;background:linear-gradient(90deg,transparent,#2563eb,#60a5fa,#2563eb,transparent);box-shadow:0 0 10px #3b82f6;animation:scanLaserAnim 1.8s ease-in-out infinite}
+.scan-laser{
+  position:absolute;
+  left:0;
+  right:0;
+  height:2.5px;
+  background:linear-gradient(90deg,transparent,#2563eb,#60a5fa,#2563eb,transparent);
+  box-shadow:0 0 10px #3b82f6;
+  animation:scanLaserAnim 1.8s ease-in-out infinite;
+  pointer-events:none;
+  z-index:5;
+}
 @keyframes scanLaserAnim{0%{top:8%;opacity:0.4}50%{top:88%;opacity:1}100%{top:8%;opacity:0.4}}
-.scan-cam-switch{position:absolute;top:10px;right:10px;z-index:15;pointer-events:auto;background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 12px;border-radius:8px;font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:5px;backdrop-filter:blur(6px);transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.scan-tag{
+  position:absolute;
+  bottom:8px;
+  left:0;
+  right:0;
+  text-align:center;
+  font-size:11px;
+  font-weight:700;
+  color:#60a5fa;
+  text-shadow:0 1px 3px rgba(0,0,0,.9);
+  background:rgba(15,23,42,.85);
+  padding:3px 8px;
+  border-radius:6px;
+  margin:0 auto;
+  width:fit-content;
+  pointer-events:none;
+  z-index:5;
+  border:1px solid rgba(59,130,246,.3);
+}
+.scan-cam-switch{
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:15;
+  pointer-events:auto;
+  background:rgba(15,23,42,.85);
+  border:1px solid rgba(255,255,255,.2);
+  color:#fff;
+  padding:4px 10px;
+  border-radius:6px;
+  font-size:11px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  backdrop-filter:blur(6px);
+  transition:all .2s;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+}
 .scan-cam-switch:hover{background:rgba(15,23,42,1);transform:scale(1.04)}
-.scan-result{margin-top:12px;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;font-size:12.5px;min-height:38px;display:flex;align-items:center}
+.scan-result{margin-top:10px;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;font-size:12.5px;min-height:38px;display:flex;align-items:center}
 /* ── PRODUCT CARD ── */
 .prod-card{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-top:10px}
 .prod-card-name{font-size:14px;font-weight:700;margin-bottom:6px}
@@ -612,8 +679,9 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             </div>
             <div class="scan-frame">
               <video id="stockin-video" autoplay playsinline muted></video>
+              <div class="scan-laser"></div>
+              <div class="scan-tag">Barkod Okuma Alanı</div>
               <button type="button" class="scan-cam-switch" onclick="switchCamera('stockin')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
-              <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
             </div>
             <div class="scan-result" id="stockin-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
             <div style="display:flex;gap:7px;margin-top:10px">
@@ -843,8 +911,9 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             </div>
             <div class="scan-frame">
               <video id="sales-video" autoplay playsinline muted></video>
+              <div class="scan-laser"></div>
+              <div class="scan-tag">Barkod Okuma Alanı</div>
               <button type="button" class="scan-cam-switch" onclick="switchCamera('sales')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
-              <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
             </div>
             <div class="scan-result" id="sales-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
             <div style="display:flex;gap:7px;margin-top:10px">
@@ -1004,8 +1073,9 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
     </div>
     <div class="scan-frame">
       <video id="barcode-video" autoplay playsinline muted></video>
+      <div class="scan-laser"></div>
+      <div class="scan-tag">Barkod Okuma Alanı</div>
       <button type="button" class="scan-cam-switch" onclick="switchCamera('scan')" title="Kamerayı Değiştir">🔄 Kamera Değiştir</button>
-      <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
     </div>
     <div class="scan-result" id="scan-res"><span style="color:var(--txt3)">Barkodu kameraya tutun veya aşağıya yazın...</span></div>
     <div style="display:flex;gap:7px;margin-top:10px">
@@ -1035,8 +1105,9 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
     <p style="color:var(--txt2);font-size:13px;margin-bottom:14px">Barkod okutunca ürün stoğu otomatik +1 artar.</p>
     <div class="scan-frame">
       <video id="qc-video" autoplay playsinline muted></video>
+      <div class="scan-laser"></div>
+      <div class="scan-tag">Barkod Okuma Alanı</div>
       <button type="button" class="scan-cam-switch" onclick="switchCamera('qc')" title="Kamerayı Değiştir">🔄 Kamera Değiştir</button>
-      <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
     </div>
     <div class="scan-result" id="qc-res"><span style="color:var(--txt3)">Ürün barkodunu okutun...</span></div>
     <div id="qc-log" style="margin-top:10px;max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:5px"></div>
@@ -2101,28 +2172,30 @@ try {
   }
 }
 
-function getGuideCropCoordinates(video, guideEl){
+function getGuideCropCoordinates(video){
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if(!vw || !vh) return null;
 
-  if(guideEl){
-    const vRect = video.getBoundingClientRect();
-    const gRect = guideEl.getBoundingClientRect();
-    if(vRect.width > 0 && vRect.height > 0 && gRect.width > 0 && gRect.height > 0){
-      const scale = Math.max(vRect.width / vw, vRect.height / vh);
-      const renderedW = vw * scale;
-      const renderedH = vh * scale;
-      const offsetX = (vRect.width - renderedW) / 2;
-      const offsetY = (vRect.height - renderedH) / 2;
+  const frameEl = video.closest('.scan-frame') || video.parentElement;
+  if(frameEl){
+    const fRect = frameEl.getBoundingClientRect();
+    if(fRect.width > 0 && fRect.height > 0){
+      const targetAspect = fRect.width / fRect.height;
+      const videoAspect = vw / vh;
+      let sw, sh, sx, sy;
 
-      const relLeft = (gRect.left - vRect.left) - offsetX;
-      const relTop = (gRect.top - vRect.top) - offsetY;
-
-      let sx = Math.round(relLeft / scale);
-      let sy = Math.round(relTop / scale);
-      let sw = Math.round(gRect.width / scale);
-      let sh = Math.round(gRect.height / scale);
+      if(videoAspect > targetAspect){
+        sh = vh;
+        sw = Math.round(vh * targetAspect);
+        sx = Math.round((vw - sw) / 2);
+        sy = 0;
+      } else {
+        sw = vw;
+        sh = Math.round(vw / targetAspect);
+        sx = 0;
+        sy = Math.round((vh - sh) / 2);
+      }
 
       sx = Math.max(0, sx);
       sy = Math.max(0, sy);
@@ -2135,9 +2208,8 @@ function getGuideCropCoordinates(video, guideEl){
     }
   }
 
-  // Fallback central box
-  const sw = Math.round(vw * 0.55);
-  const sh = Math.round(vh * 0.45);
+  const sw = Math.round(vw * 0.70);
+  const sh = Math.round(sw / 2);
   const sx = Math.round((vw - sw) / 2);
   const sy = Math.round((vh - sh) / 2);
   return { sx, sy, sw, sh };
@@ -2211,7 +2283,7 @@ async function startCam(videoId, key, cb){
     await video.play().catch(()=>{});
     readers[key].stream = stream;
 
-    // 2. PRIMARY ENGINE: ZBar WASM / Native BarcodeDetector (Targeted strictly to Blue Center Box)
+    // 2. PRIMARY ENGINE: ZBar WASM / Native BarcodeDetector (Targeted strictly to Blue Rectangle)
     let detector = null;
     try{
       if(typeof BarcodeDetector !== 'undefined'){
@@ -2222,8 +2294,6 @@ async function startCam(videoId, key, cb){
     }catch(detErr){
       console.warn('BarcodeDetector init error:', detErr);
     }
-
-    const guideEl = video.parentElement?.querySelector('.scan-guide');
 
     if(detector){
       let isDetecting = false;
@@ -2236,13 +2306,13 @@ async function startCam(videoId, key, cb){
         if(!isDetecting && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0){
           isDetecting = true;
           try{
-            const crop = getGuideCropCoordinates(video, guideEl);
+            const crop = getGuideCropCoordinates(video);
             if(crop){
               if(cropCanvas.width !== crop.sw || cropCanvas.height !== crop.sh){
                 cropCanvas.width = crop.sw;
                 cropCanvas.height = crop.sh;
               }
-              // Draw ONLY what is physically visible inside the blue reticle box
+              // Draw ONLY what is physically visible inside the blue rectangle
               cropCtx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
 
               const barcodes = await detector.detect(cropCanvas);
@@ -2291,7 +2361,7 @@ async function startCam(videoId, key, cb){
             if(!isZxingBusy && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0){
               isZxingBusy = true;
               try{
-                const crop = getGuideCropCoordinates(video, guideEl);
+                const crop = getGuideCropCoordinates(video);
                 if(crop){
                   if(cropCanvas.width !== crop.sw || cropCanvas.height !== crop.sh){
                     cropCanvas.width = crop.sw;
