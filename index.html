@@ -1853,11 +1853,19 @@ function checkSess(){
   const s = ls('nl_sess');
   if(s){
     try{
-      currentUser = JSON.parse(s);
+      let sessUser = JSON.parse(s);
+      // Always refresh from nl_users to get latest permissions
+      const users = getUsers();
+      const freshUser = users.find(x => x.id === sessUser.id);
+      if(freshUser){
+        currentUser = freshUser;
+      } else {
+        currentUser = sessUser;
+      }
       if(!currentUser.role){
         currentUser.role = (currentUser.email === 'kasiyer@nelazimsa.com' || currentUser.username === 'kasiyer') ? 'cashier' : 'admin';
-        localStorage.setItem('nl_sess', JSON.stringify(currentUser));
       }
+      localStorage.setItem('nl_sess', JSON.stringify(currentUser));
       showApp();
     }catch(e){
       doLogout();
