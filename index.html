@@ -4081,6 +4081,8 @@ function triggerCloudPush(reason, immediate = false){
           products: payload.products,
           suppliers: payload.suppliers,
           orders: payload.orders,
+          sales_history: payload.salesHistory,
+          stockin_history: payload.stockinHistory,
           updated_at: payload.updatedAt,
           updated_by: payload.updatedBy
         }, { onConflict: 'channel' });
@@ -4114,44 +4116,53 @@ function triggerCloudPush(reason, immediate = false){
 function applyRemotePayload(payload, source){
   if(!payload || isRemoteApplying) return;
 
-  const currentProds = ls('nl_prod') || '[]';
-  const remoteProds = JSON.stringify(payload.products || []);
-  const currentSups = ls('nl_sup') || '[]';
-  const remoteSups = JSON.stringify(payload.suppliers || []);
-  const currentOrds = ls('nl_ord') || '[]';
-  const remoteOrds = JSON.stringify(payload.orders || []);
-  const currentSalesH = ls('nl_sales_hist') || '[]';
-  const remoteSalesH = JSON.stringify(payload.salesHistory || payload.sales_history || []);
-  const currentInH = ls('nl_stockin_hist') || '[]';
-  const remoteInH = JSON.stringify(payload.stockinHistory || payload.stockin_history || []);
-
-  const hasChanged = (currentProds !== remoteProds) || (currentSups !== remoteSups) || (currentOrds !== remoteOrds) || (currentSalesH !== remoteSalesH) || (currentInH !== remoteInH);
-
-  if(!hasChanged){
-    if(payload.updatedAt || payload.updated_at){
-      lastCloudSyncTime = Math.max(lastCloudSyncTime, payload.updatedAt || payload.updated_at);
-    }
-    return;
-  }
-
   isRemoteApplying = true;
   
   try{
     if(Array.isArray(payload.products)){
-      localStorage.setItem('nl_prod', remoteProds);
+      localStorage.setItem('nl_prod', JSON.stringify(payload.products));
     }
     if(Array.isArray(payload.suppliers)){
-      localStorage.setItem('nl_sup', remoteSups);
+      localStorage.setItem('nl_sup', JSON.stringify(payload.suppliers));
     }
     if(Array.isArray(payload.orders)){
-      localStorage.setItem('nl_ord', remoteOrds);
+      localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
     }
-    if(Array.isArray(payload.salesHistory || payload.sales_history)){
-      localStorage.setItem('nl_sales_hist', remoteSalesH);
+
+    // Lossless Merge for Sales History (prevents any sale from ever being overwritten or lost)
+    const remoteSales = payload.salesHistory || payload.sales_history;
+    if(Array.isArray(remoteSales)){
+      const localSales = gsh();
+      const salesMap = new Map();
+      localSales.forEach(s => {
+        const key = s.id || s.receiptNo;
+        if(key) salesMap.set(String(key), s);
+      });
+      remoteSales.forEach(s => {
+        const key = s.id || s.receiptNo;
+        if(key) salesMap.set(String(key), s);
+      });
+      const mergedSales = Array.from(salesMap.values()).sort((a, b) => (b.id || 0) - (a.id || 0));
+      localStorage.setItem('nl_sales_hist', JSON.stringify(mergedSales));
     }
-    if(Array.isArray(payload.stockinHistory || payload.stockin_history)){
-      localStorage.setItem('nl_stockin_hist', remoteInH);
+
+    // Lossless Merge for Stock-in History
+    const remoteIn = payload.stockinHistory || payload.stockin_history;
+    if(Array.isArray(remoteIn)){
+      const localIn = gih();
+      const inMap = new Map();
+      localIn.forEach(i => {
+        const key = i.id || (i.time + '_' + i.barc);
+        if(key) inMap.set(String(key), i);
+      });
+      remoteIn.forEach(i => {
+        const key = i.id || (i.time + '_' + i.barc);
+        if(key) inMap.set(String(key), i);
+      });
+      const mergedIn = Array.from(inMap.values()).sort((a, b) => (b.id || 0) - (a.id || 0));
+      localStorage.setItem('nl_stockin_hist', JSON.stringify(mergedIn));
     }
+
     if(payload.updatedAt || payload.updated_at){
       lastCloudSyncTime = Math.max(lastCloudSyncTime, payload.updatedAt || payload.updated_at);
     }
