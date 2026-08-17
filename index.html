@@ -1168,8 +1168,11 @@ create policy "Allow all" on public.company_inventory for all using (true) with 
       </details>
     </div>
 
-    <div class="modal-ftr" style="justify-content:space-between;margin-top:18px">
-      <button type="button" class="btn btn-ghost" onclick="testAndPullCloud()">🔄 Şimdi Test Et &amp; Eşitle</button>
+    <div class="modal-ftr" style="justify-content:space-between;margin-top:18px;flex-wrap:wrap;gap:8px">
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-ghost" onclick="testAndPullCloud()">🔄 Şimdi Test Et &amp; Eşitle</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="clearAllTestData()" title="Tüm test ürünlerini ve satış geçmişini sıfırlar">🧹 Verileri Temizle</button>
+      </div>
       <div class="flex gap-2">
         <button type="button" class="btn btn-ghost" onclick="closeM('m-sync')">Kapat</button>
         <button type="button" class="btn btn-primary" onclick="saveCloudConfig()">💾 Bağlan ve Kaydet</button>
@@ -1200,25 +1203,9 @@ let lastCloudSyncTime = Date.now();
 let cloudPollInterval = null;
 let broadcastChan = null;
 
-// Initial Demo Seed (Used ONLY if storage is 100% empty)
-const DEFAULT_SUPPLIERS = [
-  {id:1,name:'Ofis Dünyası A.Ş.',con:'Mehmet Kaya',tel:'0212 555 11 22',mail:'info@ofisdunyasi.com',city:'İstanbul',web:'',addr:'Bağcılar, İstanbul'},
-  {id:2,name:'Teknoloji Market',con:'Ayşe Demir',tel:'0312 444 33 55',mail:'satis@tekmarket.com',city:'Ankara',web:'',addr:'Çankaya, Ankara'},
-  {id:3,name:'Temizlik Pro',con:'Ali Yıldız',tel:'0232 333 77 88',mail:'siparis@temizlikpro.com',city:'İzmir',web:'',addr:'Konak, İzmir'},
-  {id:4,name:'Ambalaj Center',con:'Fatma Çelik',tel:'0224 222 66 99',mail:'info@ambalajcenter.com',city:'Bursa',web:'',addr:'Nilüfer, Bursa'}
-];
-const DEFAULT_PRODUCTS = [
-  {id:1,name:'A4 Fotokopi Kağıdı (500lü)',barc:'8690000000001',cat:'Kırtasiye',unit:'Koli',stk:12,min:20,price:185,sellPrice:240,sup:1,note:''},
-  {id:2,name:'Tükenmez Kalem (Mavi)',barc:'8690000000002',cat:'Kırtasiye',unit:'Kutu',stk:5,min:10,price:45,sellPrice:65,sup:1,note:''},
-  {id:3,name:'Toner HP LaserJet 85A',barc:'8690000000003',cat:'Bilgisayar',unit:'Adet',stk:2,min:3,price:850,sellPrice:1150,sup:2,note:'Siyah toner'},
-  {id:4,name:'USB Klavye',barc:'8690000000004',cat:'Bilgisayar',unit:'Adet',stk:8,min:5,price:320,sellPrice:450,sup:2,note:''},
-  {id:5,name:'Sıvı Sabun (5lt)',barc:'8690000000005',cat:'Temizlik',unit:'Bidon',stk:3,min:5,price:145,sellPrice:195,sup:3,note:''},
-  {id:6,name:'Çöp Torbası (50li)',barc:'8690000000006',cat:'Temizlik',unit:'Paket',stk:18,min:10,price:35,sellPrice:50,sup:3,note:''},
-  {id:7,name:'Karton Kutu (Büyük)',barc:'8690000000007',cat:'Ambalaj',unit:'Adet',stk:45,min:30,price:15,sellPrice:22,sup:4,note:''},
-  {id:8,name:'Şeffaf Bant (10lu)',barc:'8690000000008',cat:'Ambalaj',unit:'Paket',stk:7,min:15,price:12.5,sellPrice:20,sup:4,note:''},
-  {id:9,name:'Ağır Hizmet Eldiveni',barc:'8690000000009',cat:'Güvenlik',unit:'Çift',stk:1,min:10,price:55,sellPrice:80,sup:3,note:'L beden'},
-  {id:10,name:'Maket Bıçağı',barc:'8690000000010',cat:'Alet',unit:'Adet',stk:4,min:3,price:28,sellPrice:42,sup:1,note:''}
-];
+// Initial Seed (Empty clean arrays for production use)
+const DEFAULT_SUPPLIERS = [];
+const DEFAULT_PRODUCTS = [];
 
 function getTodayStr(){
   const d = new Date();
@@ -1239,126 +1226,26 @@ function getTimeStr(d = new Date()){
 }
 
 function initData(){
-  // Only seed if NEVER seeded before and no data exists at all
-  if(!localStorage.getItem('nl_initialized')){
-    if(!ls('nl_sup')) ls('nl_sup', JSON.stringify(DEFAULT_SUPPLIERS));
-    if(!ls('nl_prod')) ls('nl_prod', JSON.stringify(DEFAULT_PRODUCTS));
-    if(!ls('nl_ord')){
-      const n = new Date();
-      ls('nl_ord', JSON.stringify([
-        {id:1,prod:1,sup:1,qty:50,price:185,total:9250,stat:'Teslim Edildi',date:fd(new Date(n-15*864e5)),note:''},
-        {id:2,prod:3,sup:2,qty:5,price:850,total:4250,stat:'Yolda',date:fd(new Date(n-3*864e5)),note:'Acil'},
-        {id:3,prod:9,sup:3,qty:20,price:55,total:1100,stat:'Bekliyor',date:fd(n),note:''},
-        {id:4,prod:2,sup:1,qty:30,price:45,total:1350,stat:'Teslim Edildi',date:fd(new Date(n-7*864e5)),note:''},
-        {id:5,prod:8,sup:4,qty:40,price:12.5,total:500,stat:'Bekliyor',date:fd(n),note:''}
-      ]));
+  // Clean legacy demo test mock data if present
+  if(!localStorage.getItem('nl_cleaned_mock_v2')){
+    const curP = ls('nl_prod') || '';
+    if(curP.includes('A4 Fotokopi') || curP.includes('Tükenmez Kalem')){
+      localStorage.setItem('nl_prod', '[]');
+      localStorage.setItem('nl_sup', '[]');
+      localStorage.setItem('nl_ord', '[]');
+      localStorage.setItem('nl_sales_hist', '[]');
+      localStorage.setItem('nl_stockin_hist', '[]');
     }
-    localStorage.setItem('nl_initialized', 'true');
+    localStorage.setItem('nl_cleaned_mock_v2', 'true');
   }
 
-  // Seed sample transactions if completely missing
-  if(!ls('nl_sales_hist')){
-    const today = getTodayStr();
-    const yesterday = getYesterdayStr();
-    ls('nl_sales_hist', JSON.stringify([
-      {
-        id: 101,
-        receiptNo: '#948201',
-        date: today,
-        time: '10:45',
-        items: [
-          { prodId: 1, name: 'A4 Fotokopi Kağıdı (500lü)', qty: 2, unit: 'Koli', buyPrice: 185, sellPrice: 240, total: 480, profit: 110 },
-          { prodId: 2, name: 'Tükenmez Kalem (Mavi)', qty: 3, unit: 'Kutu', buyPrice: 45, sellPrice: 65, total: 195, profit: 60 }
-        ],
-        totalAmount: 675,
-        totalProfit: 170,
-        user: 'Yönetici'
-      },
-      {
-        id: 102,
-        receiptNo: '#948202',
-        date: today,
-        time: '11:20',
-        items: [
-          { prodId: 4, name: 'USB Klavye', qty: 1, unit: 'Adet', buyPrice: 320, sellPrice: 450, total: 450, profit: 130 }
-        ],
-        totalAmount: 450,
-        totalProfit: 130,
-        user: 'Yönetici'
-      },
-      {
-        id: 103,
-        receiptNo: '#948190',
-        date: yesterday,
-        time: '15:30',
-        items: [
-          { prodId: 3, name: 'Toner HP LaserJet 85A', qty: 1, unit: 'Adet', buyPrice: 850, sellPrice: 1150, total: 1150, profit: 300 }
-        ],
-        totalAmount: 1150,
-        totalProfit: 300,
-        user: 'Yönetici'
-      }
-    ]));
-  }
-
-  if(!ls('nl_stockin_hist')){
-    const today = getTodayStr();
-    const yesterday = getYesterdayStr();
-    ls('nl_stockin_hist', JSON.stringify([
-      {
-        id: 201,
-        prodId: 1,
-        name: 'A4 Fotokopi Kağıdı (500lü)',
-        barc: '8690000000001',
-        cat: 'Kırtasiye',
-        qty: 10,
-        unit: 'Koli',
-        buyPrice: 185,
-        sellPrice: 240,
-        totalValue: 1850,
-        note: 'Merkez depodan sevk',
-        date: today,
-        time: '09:15',
-        user: 'Yönetici'
-      },
-      {
-        id: 202,
-        prodId: 5,
-        name: 'Sıvı Sabun (5lt)',
-        barc: '8690000000005',
-        cat: 'Temizlik',
-        qty: 5,
-        unit: 'Bidon',
-        buyPrice: 145,
-        sellPrice: 195,
-        totalValue: 725,
-        note: 'Tedarikçi teslimatı',
-        date: today,
-        time: '10:00',
-        user: 'Yönetici'
-      },
-      {
-        id: 203,
-        prodId: 8,
-        name: 'Şeffaf Bant (10lu)',
-        barc: '8690000000008',
-        cat: 'Ambalaj',
-        qty: 20,
-        unit: 'Paket',
-        buyPrice: 12.5,
-        sellPrice: 20,
-        totalValue: 250,
-        note: 'Koli içi yedek',
-        date: yesterday,
-        time: '14:10',
-        user: 'Yönetici'
-      }
-    ]));
-  }
-
+  if(!ls('nl_sup')) ls('nl_sup', '[]');
+  if(!ls('nl_prod')) ls('nl_prod', '[]');
+  if(!ls('nl_ord')) ls('nl_ord', '[]');
+  if(!ls('nl_sales_hist')) ls('nl_sales_hist', '[]');
+  if(!ls('nl_stockin_hist')) ls('nl_stockin_hist', '[]');
   if(!ls('nl_theme')) ls('nl_theme','dark');
   
-  // Setup Cross-Tab & Cloud Synchronization
   setupRealtimeSync();
 }
 
@@ -3489,13 +3376,33 @@ function broadcastSaleComplete(saleRecord){
 function handleRemoteSaleComplete(saleRecord, senderId){
   if(senderId === myDeviceId || !saleRecord) return;
 
+  // 1. Immediately persist to localStorage
+  const sHist = gsh();
+  if(!sHist.some(s => s.id === saleRecord.id || s.receiptNo === saleRecord.receiptNo)){
+    sHist.unshift(saleRecord);
+    localStorage.setItem('nl_sales_hist', JSON.stringify(sHist));
+  }
+
+  // 2. Deduct product stocks locally
+  if(Array.isArray(saleRecord.items)){
+    const P = gp();
+    saleRecord.items.forEach(it => {
+      const pi = P.findIndex(p => p.id === it.prodId);
+      if(pi >= 0){
+        P[pi].stk = Math.max(0, P[pi].stk - (it.qty || 1));
+      }
+    });
+    localStorage.setItem('nl_prod', JSON.stringify(P));
+  }
+
+  // 3. Clear cart if any and re-render all views
+  salesCart = [];
+  renderCart();
+  renderSalesHistory();
+  refreshActiveViewSilently();
+
   playBeep();
   toast('s', '🛍️ Yeni Satış Tamamlandı', `${saleRecord.receiptNo || ''} — Toplam ${tl(saleRecord.totalAmount || 0)}`);
-
-  renderSalesHistory();
-  if(currentTab === 'dashboard' || currentTab === 'reports'){
-    refreshActiveViewSilently();
-  }
 }
 
 function handleRemoteScan(code, senderId, senderName){
@@ -3795,6 +3702,22 @@ function setSyncStatusUI(status, text){
     const d = new Date(lastCloudSyncTime);
     lastTimeEl.textContent = d.toLocaleTimeString('tr-TR');
   }
+}
+
+function clearAllTestData(){
+  if(!confirm('Tüm ürünler, tedarikçiler, siparişler ve satış geçmişi sıfırlanacaktır. Emin misiniz?')) return;
+  localStorage.setItem('nl_prod', '[]');
+  localStorage.setItem('nl_sup', '[]');
+  localStorage.setItem('nl_ord', '[]');
+  localStorage.setItem('nl_sales_hist', '[]');
+  localStorage.setItem('nl_stockin_hist', '[]');
+  salesCart = [];
+  renderCart();
+  renderSalesHistory();
+  refreshActiveViewSilently();
+  triggerCloudPush('clear_all', true);
+  toast('s', 'Veriler Temizlendi', 'Tüm test ve sahte veriler silindi.');
+  closeM('m-sync');
 }
 
 function openSyncModal(){
