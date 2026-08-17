@@ -1226,7 +1226,7 @@ function getTimeStr(d = new Date()){
 }
 
 function initData(){
-  // Sanitize data: Purge all demo/test mock records, keep ONLY user-created products & data
+  // Comprehensive Sanitize: Purge all demo/test mock records across products, suppliers, orders, reports & sales
   const mockBarcodes = new Set(['8690000000001','8690000000002','8690000000003','8690000000004','8690000000005','8690000000006','8690000000007','8690000000008','8690000000009','8690000000010']);
   const mockNames = new Set(['A4 Fotokopi Kağıdı (500lü)', 'Tükenmez Kalem (Mavi)', 'Toner HP LaserJet 85A', 'USB Klavye', 'Sıvı Sabun (5lt)', 'Çöp Torbası (50li)', 'Karton Kutu (Büyük)', 'Şeffaf Bant (10lu)', 'Ağır Hizmet Eldiveni', 'Maket Bıçağı']);
   const mockSupNames = new Set(['Ofis Dünyası A.Ş.', 'Teknoloji Market', 'Temizlik Pro', 'Ambalaj Center']);
@@ -1239,6 +1239,9 @@ function initData(){
       localStorage.setItem('nl_prod', JSON.stringify(curProds));
     }
 
+    const validProdIds = new Set(curProds.map(p => p.id));
+    const validProdBarcs = new Set(curProds.map(p => p.barc).filter(Boolean));
+
     let curSups = gs();
     if(Array.isArray(curSups)){
       curSups = curSups.filter(s => !mockSupNames.has(s.name));
@@ -1247,19 +1250,28 @@ function initData(){
 
     let curOrds = go2();
     if(Array.isArray(curOrds)){
-      curOrds = curOrds.filter(o => o.id > 10 || (o.note !== 'Acil' && o.total !== 9250 && o.total !== 4250 && o.total !== 1100 && o.total !== 1350 && o.total !== 500));
+      curOrds = curOrds.filter(o => validProdIds.has(o.prod));
       localStorage.setItem('nl_ord', JSON.stringify(curOrds));
     }
 
+    // Reports & Sales History: Keep ONLY sales containing user's actual products
     let curSales = gsh();
     if(Array.isArray(curSales)){
-      curSales = curSales.filter(s => !mockReceipts.has(s.receiptNo) && s.id !== 101 && s.id !== 102 && s.id !== 103);
+      curSales = curSales.filter(s => {
+        if(mockReceipts.has(s.receiptNo) || s.id === 101 || s.id === 102 || s.id === 103) return false;
+        const hasValidItem = (s.items || []).some(it => validProdIds.has(it.prodId) || (!mockNames.has(it.name) && !mockBarcodes.has(it.barc)));
+        return hasValidItem;
+      });
       localStorage.setItem('nl_sales_hist', JSON.stringify(curSales));
     }
 
+    // Reports & Stock-in History: Keep ONLY stock movements of user's actual products
     let curStockin = gih();
     if(Array.isArray(curStockin)){
-      curStockin = curStockin.filter(s => s.id !== 201 && s.id !== 202 && s.id !== 203);
+      curStockin = curStockin.filter(s => {
+        if(s.id === 201 || s.id === 202 || s.id === 203) return false;
+        return validProdIds.has(s.prodId) || validProdBarcs.has(s.barc) || (!mockNames.has(s.name) && !mockBarcodes.has(s.barc));
+      });
       localStorage.setItem('nl_stockin_hist', JSON.stringify(curStockin));
     }
   }catch(e){}
