@@ -3322,6 +3322,94 @@ function resetStockin(){
   else initStockinInvoice();
 }
 
+// ── REALTIME MULTI-DEVICE BROADCAST ENGINE (PHONE <-> PC SYNC) ──
+const myDeviceId = localStorage.getItem('nl_device_id') || ('dev_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36));
+localStorage.setItem('nl_device_id', myDeviceId);
+
+function broadcastRemoteScan(code){
+  const cleanCode = (code || '').trim();
+  if(!cleanCode) return;
+  const payload = {
+    code: cleanCode,
+    senderId: myDeviceId,
+    senderName: currentUser ? currentUser.name : 'Mobil',
+    time: Date.now()
+  };
+
+  // 1. Local BroadcastChannel (Same Machine/Browser Tabs)
+  try {
+    if(broadcastChan) broadcastChan.postMessage({ type: 'REMOTE_SCAN', payload });
+  }catch(e){}
+
+  // 2. Supabase WebSockets Realtime Broadcast
+  try {
+    if(sbChannelSub && isSupabaseConnected){
+      sbChannelSub.send({
+        type: 'broadcast',
+        event: 'remote_scan',
+        payload: payload
+      });
+    }
+  }catch(e){}
+
+  // 3. Firebase Realtime Database
+  try {
+    if(fbDb && isFirebaseConnected && syncChannel){
+      fbDb.ref('live_events/' + syncChannel + '/last_scan').set(payload);
+    }
+  }catch(e){}
+}
+
+function broadcastCartUpdate(cart){
+  const payload = {
+    cart: cart || [],
+    senderId: myDeviceId,
+    time: Date.now()
+  };
+
+  try {
+    if(broadcastChan) broadcastChan.postMessage({ type: 'CART_UPDATE', payload });
+  }catch(e){}
+
+  try {
+    if(sbChannelSub && isSupabaseConnected){
+      sbChannelSub.send({
+        type: 'broadcast',
+        event: 'cart_update',
+        payload: payload
+      });
+    }
+  }catch(e){}
+
+  try {
+    if(fbDb && isFirebaseConnected && syncChannel){
+      fbDb.ref('live_events/' + syncChannel + '/live_cart').set(payload);
+    }
+  }catch(e){}
+}
+
+function handleRemoteScan(code, senderId, senderName){
+  if(senderId === myDeviceId) return;
+  const cleanCode = (code || '').trim();
+  if(!cleanCode) return;
+
+  playBeep();
+
+  const isSalesVisible = (currentTab === 'sales') || (document.getElementById('page-sales')?.style.display === 'block');
+  const isStockinVisible = (currentTab === 'stockin') || (document.getElementById('page-stockin')?.style.display === 'block');
+
+  if(isSalesVisible){
+    toast('s', '📱 Telefondan Barkod Geldi', `Barkod: ${cleanCode}`);
+    onSalesScan(cleanCode, true);
+  } else if(isStockinVisible){
+    toast('s', '📱 Telefondan Barkod Geldi', `Barkod: ${cleanCode}`);
+    onStockinScan(cleanCode, true);
+  } else {
+    toast('i', '📱 Telefondan Barkod Okutuldu', `Barkod: ${cleanCode} (Sepete eklendi)`);
+    onSalesScan(cleanCode, true);
+  }
+}
+
 // ══════════════ SALES ══════════════
 function initSales(){
   salesScannedProdId=null;
@@ -3338,7 +3426,11 @@ function initSales(){
     onSalesScan(code);
   });
 }
-function onSalesScan(code){
+function onSalesScan(code, fromRemote = false){
+  if(!fromRemote){
+    broadcastRemoteScan(code);
+  }
+
   const p=gp().find(x=>x.barc===code);
   if(p){
     salesScannedProdId=p.id;
@@ -3372,6 +3464,7 @@ function onSalesScan(code){
     const inCart=salesCart.find(c=>c.prodId===p.id);
     document.getElementById('sales-prod-result').innerHTML=`<span class="badge b-ok">Sepette: ${inCart?inCart.qty:1} ${p.unit} (${tl(inCart?inCart.total:sellPrice)})</span>`;
     renderCart();
+    broadcastCartUpdate(salesCart);
   }else{
     salesScannedProdId=null;
     document.getElementById('sales-scan-res').innerHTML=`<span style="color:var(--yellow);font-weight:600">\u26a0\ufe0f Barkod bulunamad\u0131: ${code}</span>`;
@@ -3396,19 +3489,22 @@ function addToCart(){
     salesCart.push({prodId:p.id,name:p.name,unit:p.unit,price:p.price,qty,total:qty*p.price});
   }
   renderCart();
+  broadcastCartUpdate(salesCart);
   toast('s','Sepete Eklendi',`${p.name} x${qty}`);
 }
 function removeFromCart(prodId){
   salesCart=salesCart.filter(c=>c.prodId!==prodId);
   renderCart();
+  broadcastCartUpdate(salesCart);
 }
 function renderCart(){
   const cart=document.getElementById('sales-cart');
   const totalBar=document.getElementById('sales-total-bar');
   const emptyEl=document.getElementById('sales-cart-empty');
+  if(!cart) return;
   if(salesCart.length===0){
     cart.innerHTML='<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px" id="sales-cart-empty">Sepet bo\u015f \u2014 \u00fcr\u00fcn okutun</div>';
-    totalBar.style.display='none';
+    if(totalBar) totalBar.style.display='none';
     return;
   }
   cart.innerHTML=salesCart.map((c,i)=>`
@@ -3422,8 +3518,8 @@ function renderCart(){
     </div>
   `).join('');
   const tot=salesCart.reduce((s,c)=>s+c.total,0);
-  document.getElementById('sales-total').textContent=tl(tot);
-  totalBar.style.display='flex';
+  if(document.getElementById('sales-total')) document.getElementById('sales-total').textContent=tl(tot);
+  if(totalBar) totalBar.style.display='flex';
 }
 function completeSale(){
   if(salesCart.length===0){toast('w','Sepet Bo\u015f','\u00dcr\u00fcn ekleyin');return;}
@@ -3490,6 +3586,7 @@ function completeSale(){
   const items=salesCart.length;
   salesCart=[];
   renderCart();
+  broadcastCartUpdate(salesCart);
   salesScannedProdId=null;
   document.getElementById('sales-prod-card').style.display='none';
   document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
@@ -3637,19 +3734,24 @@ function saveCloudConfig(){
 
 function setupRealtimeSync(){
   // 1. Same-device cross-tab Broadcast Channel
-  try{
-    if(window.BroadcastChannel){
-      if(broadcastChan) broadcastChan.close();
-      broadcastChan = new BroadcastChannel('nelazimsa_sync_' + syncChannel);
+  if(window.BroadcastChannel){
+    try{
+      broadcastChan = new BroadcastChannel('ne_lazimsa_realtime');
       broadcastChan.onmessage = (e) => {
-        if(e.data && e.data.type === 'SYNC_UPDATE'){
-          applyRemotePayload(e.data.payload, 'Yerel Sekme');
+        const { type, payload } = e.data || {};
+        if(type === 'SYNC_UPDATE' && payload){
+          if(!isRemoteApplying) applyRemotePayload(payload, 'Local Tab');
+        } else if(type === 'REMOTE_SCAN' && payload && payload.code && payload.senderId !== myDeviceId){
+          handleRemoteScan(payload.code, payload.senderId, payload.senderName);
+        } else if(type === 'CART_UPDATE' && payload && Array.isArray(payload.cart) && payload.senderId !== myDeviceId){
+          salesCart = payload.cart;
+          renderCart();
         }
       };
-    }
-  }catch(e){}
+    }catch(e){}
+  }
 
-  // 2. Storage event listener (other windows)
+  // 2. Storage event for cross-tab local updates
   window.addEventListener('storage', (e) => {
     if(e.key === 'nl_prod' || e.key === 'nl_ord' || e.key === 'nl_sup'){
       if(!isRemoteApplying) refreshActiveViewSilently();
@@ -3700,9 +3802,22 @@ async function initSupabase(){
     sbClient = supabase.createClient(url, key);
     setSyncStatusUI('syncing', 'Bağlanıyor');
 
-    // 1. Realtime WebSockets Listener
+    // 1. Realtime WebSockets Listener & Mobile Remote Broadcast
     sbChannelSub = sbClient
-      .channel('inventory_sync_' + syncChannel)
+      .channel('inventory_sync_' + syncChannel, {
+        config: { broadcast: { self: false } }
+      })
+      .on('broadcast', { event: 'remote_scan' }, ({ payload }) => {
+        if(payload && payload.code && payload.senderId !== myDeviceId){
+          handleRemoteScan(payload.code, payload.senderId, payload.senderName);
+        }
+      })
+      .on('broadcast', { event: 'cart_update' }, ({ payload }) => {
+        if(payload && Array.isArray(payload.cart) && payload.senderId !== myDeviceId){
+          salesCart = payload.cart;
+          renderCart();
+        }
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'company_inventory' }, payload => {
         isSupabaseConnected = true;
         if(payload.new && payload.new.channel === syncChannel){
@@ -3710,6 +3825,8 @@ async function initSupabase(){
             products: payload.new.products,
             suppliers: payload.new.suppliers,
             orders: payload.new.orders,
+            salesHistory: payload.new.sales_history,
+            stockinHistory: payload.new.stockin_history,
             updatedAt: payload.new.updated_at,
             updatedBy: payload.new.updated_by
           }, 'Supabase Realtime');
@@ -3734,6 +3851,8 @@ async function initSupabase(){
               products: data.products,
               suppliers: data.suppliers,
               orders: data.orders,
+              salesHistory: data.sales_history,
+              stockinHistory: data.stockin_history,
               updatedAt: data.updated_at,
               updatedBy: data.updated_by
             }, 'Supabase Poll');
