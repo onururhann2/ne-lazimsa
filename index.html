@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.23/dist/index.js"></script>
 <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -3326,22 +3327,73 @@ function resetStockin(){
 const myDeviceId = localStorage.getItem('nl_device_id') || ('dev_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36));
 localStorage.setItem('nl_device_id', myDeviceId);
 
+let mqttClient = null;
+
+function initMqttMesh(){
+  if(typeof mqtt === 'undefined') return;
+  try{
+    if(mqttClient){
+      try{ mqttClient.end(true); }catch(e){}
+    }
+    const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
+    mqttClient = mqtt.connect(brokerUrl, {
+      clientId: 'nl_' + myDeviceId,
+      clean: true,
+      connectTimeout: 5000,
+      reconnectPeriod: 2500
+    });
+
+    mqttClient.on('connect', () => {
+      const topic = 'nelazimsa/sync/' + syncChannel + '/#';
+      mqttClient.subscribe(topic, { qos: 0 });
+    });
+
+    mqttClient.on('message', (topic, message) => {
+      try{
+        const data = JSON.parse(message.toString());
+        if(!data || data.senderId === myDeviceId) return;
+
+        if(data.type === 'REMOTE_SCAN' && data.code){
+          handleRemoteScan(data.code, data.senderId, data.senderName);
+        } else if(data.type === 'CART_UPDATE' && Array.isArray(data.cart)){
+          salesCart = data.cart;
+          renderCart();
+        } else if(data.type === 'STOCK_SYNC' && data.payload){
+          if(!isRemoteApplying) applyRemotePayload(data.payload, 'Realtime Mesh');
+        }
+      }catch(e){}
+    });
+
+    mqttClient.on('error', () => {});
+  }catch(e){
+    console.warn('MQTT Mesh Init error:', e);
+  }
+}
+
 function broadcastRemoteScan(code){
   const cleanCode = (code || '').trim();
   if(!cleanCode) return;
   const payload = {
+    type: 'REMOTE_SCAN',
     code: cleanCode,
     senderId: myDeviceId,
     senderName: currentUser ? currentUser.name : 'Mobil',
     time: Date.now()
   };
 
-  // 1. Local BroadcastChannel (Same Machine/Browser Tabs)
+  // 1. Instant MQTT WebSockets Mesh (Zero config, works on any Wi-Fi/IP/Cellular)
+  try{
+    if(mqttClient && mqttClient.connected){
+      mqttClient.publish('nelazimsa/sync/' + syncChannel + '/scan', JSON.stringify(payload), { qos: 0 });
+    }
+  }catch(e){}
+
+  // 2. Local BroadcastChannel (Same Machine/Browser Tabs)
   try {
     if(broadcastChan) broadcastChan.postMessage({ type: 'REMOTE_SCAN', payload });
   }catch(e){}
 
-  // 2. Supabase WebSockets Realtime Broadcast
+  // 3. Supabase WebSockets Realtime Broadcast
   try {
     if(sbChannelSub && isSupabaseConnected){
       sbChannelSub.send({
@@ -3352,7 +3404,7 @@ function broadcastRemoteScan(code){
     }
   }catch(e){}
 
-  // 3. Firebase Realtime Database
+  // 4. Firebase Realtime Database
   try {
     if(fbDb && isFirebaseConnected && syncChannel){
       fbDb.ref('live_events/' + syncChannel + '/last_scan').set(payload);
@@ -3362,15 +3414,25 @@ function broadcastRemoteScan(code){
 
 function broadcastCartUpdate(cart){
   const payload = {
+    type: 'CART_UPDATE',
     cart: cart || [],
     senderId: myDeviceId,
     time: Date.now()
   };
 
+  // 1. Instant MQTT WebSockets Mesh
+  try{
+    if(mqttClient && mqttClient.connected){
+      mqttClient.publish('nelazimsa/sync/' + syncChannel + '/cart', JSON.stringify(payload), { qos: 0 });
+    }
+  }catch(e){}
+
+  // 2. Local BroadcastChannel
   try {
     if(broadcastChan) broadcastChan.postMessage({ type: 'CART_UPDATE', payload });
   }catch(e){}
 
+  // 3. Supabase Realtime Broadcast
   try {
     if(sbChannelSub && isSupabaseConnected){
       sbChannelSub.send({
@@ -3381,6 +3443,7 @@ function broadcastCartUpdate(cart){
     }
   }catch(e){}
 
+  // 4. Firebase Realtime Database
   try {
     if(fbDb && isFirebaseConnected && syncChannel){
       fbDb.ref('live_events/' + syncChannel + '/live_cart').set(payload);
@@ -3758,7 +3821,10 @@ function setupRealtimeSync(){
     }
   });
 
-  // 3. Connect to chosen cloud provider
+  // 3. Instant Zero-Config MQTT WebSockets Mesh (Direct Mobile <-> Desktop Live Sync)
+  initMqttMesh();
+
+  // 4. Connect to chosen cloud database provider
   if(syncProvider === 'supabase'){
     initSupabase();
   } else {
@@ -3964,9 +4030,21 @@ function triggerCloudPush(reason, immediate = false){
     channel: syncChannel
   };
 
-  // Broadcast locally
+  // 1. Broadcast locally
   try{
     if(broadcastChan) broadcastChan.postMessage({ type: 'SYNC_UPDATE', payload });
+  }catch(e){}
+
+  // 2. Broadcast via MQTT Mesh to all phones and computers instantly
+  try{
+    if(mqttClient && mqttClient.connected){
+      mqttClient.publish('nelazimsa/sync/' + syncChannel + '/stock', JSON.stringify({
+        type: 'STOCK_SYNC',
+        payload: payload,
+        senderId: myDeviceId,
+        time: lastCloudSyncTime
+      }), { qos: 0 });
+    }
   }catch(e){}
 
   setSyncStatusUI('syncing');
