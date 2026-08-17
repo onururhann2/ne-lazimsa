@@ -201,10 +201,6 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 .scan-zoom-btn:hover{background:rgba(15,23,42,1);transform:scale(1.04)}
 .scan-cam-switch{position:absolute;top:10px;right:10px;z-index:15;pointer-events:auto;background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 12px;border-radius:8px;font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:5px;backdrop-filter:blur(6px);transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,.3)}
 .scan-cam-switch:hover{background:rgba(15,23,42,1);transform:scale(1.04)}
-.scan-mode-btn{position:absolute;bottom:10px;right:10px;z-index:15;pointer-events:auto;background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;backdrop-filter:blur(6px);transition:all .2s}
-.scan-mode-btn:hover{background:rgba(15,23,42,1);transform:scale(1.04)}
-.scan-lock-overlay{position:absolute;inset:0;background:rgba(15,23,42,.88);backdrop-filter:blur(4px);z-index:30;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;animation:fadeIn .2s ease}
-.scan-lock-card{background:rgba(30,41,59,.95);border:1.5px solid var(--green);border-radius:14px;padding:16px 20px;box-shadow:0 10px 25px rgba(0,0,0,.5);max-width:88%}
 .scan-result{margin-top:12px;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;font-size:12.5px;min-height:38px;display:flex;align-items:center}
 /* ── PRODUCT CARD ── */
 .prod-card{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-top:10px}
@@ -638,16 +634,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
               <video id="stockin-video" autoplay playsinline muted></video>
               <button type="button" class="scan-zoom-btn" onclick="toggleCamZoom('stockin', this)" title="Yakınlaştırma / Zoom">🔍 1.5x Zoom</button>
               <button type="button" class="scan-cam-switch" onclick="switchCamera('stockin')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
-              <button type="button" class="scan-mode-btn" id="stockin-scan-mode-btn" onclick="toggleCamScanMode('stockin', this)" title="Okuma Modu">🎯 Tekli Mod</button>
               <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
-              <div id="scan-lock-overlay-stockin" class="scan-lock-overlay" style="display:none" onclick="unlockCamScan('stockin')">
-                <div class="scan-lock-card">
-                  <div style="font-size:26px;margin-bottom:4px">✅</div>
-                  <div style="font-weight:700;font-size:14px;color:#fff" id="scan-lock-title-stockin">Ürün Seçildi</div>
-                  <div style="font-size:11.5px;color:rgba(255,255,255,.8);margin-top:2px" id="scan-lock-sub-stockin">Barkod okundu</div>
-                  <button type="button" class="btn btn-primary btn-sm" style="margin-top:10px;border-radius:20px;font-size:11.5px;padding:5px 14px">👆 Yeni Ürün Okut</button>
-                </div>
-              </div>
             </div>
             <div class="scan-result" id="stockin-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
             <div style="display:flex;gap:7px;margin-top:10px">
@@ -879,16 +866,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
               <video id="sales-video" autoplay playsinline muted></video>
               <button type="button" class="scan-zoom-btn" onclick="toggleCamZoom('sales', this)" title="Yakınlaştırma / Zoom">🔍 1.5x Zoom</button>
               <button type="button" class="scan-cam-switch" onclick="switchCamera('sales')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
-              <button type="button" class="scan-mode-btn" id="sales-scan-mode-btn" onclick="toggleCamScanMode('sales', this)" title="Okuma Modu">🎯 Tekli Mod</button>
               <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
-              <div id="scan-lock-overlay-sales" class="scan-lock-overlay" style="display:none" onclick="unlockCamScan('sales')">
-                <div class="scan-lock-card">
-                  <div style="font-size:26px;margin-bottom:4px">✅</div>
-                  <div style="font-weight:700;font-size:14px;color:#fff" id="scan-lock-title-sales">Ürün Sepete Eklendi</div>
-                  <div style="font-size:11.5px;color:rgba(255,255,255,.8);margin-top:2px" id="scan-lock-sub-sales">Barkod başarıyla okundu</div>
-                  <button type="button" class="btn btn-primary btn-sm" style="margin-top:10px;border-radius:20px;font-size:11.5px;padding:5px 14px">👆 Yeni Ürün Okut</button>
-                </div>
-              </div>
             </div>
             <div class="scan-result" id="sales-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
             <div style="display:flex;gap:7px;margin-top:10px">
@@ -2021,66 +1999,10 @@ function isValidBarcodeFormat(rawCode){
   return /^[A-Za-z0-9_\-\.\/\$\+\%\*\s]{3,30}$/.test(code);
 }
 
-// ── SCANNER MODE & SINGLE-SHOT HARD LOCK ENGINE ──
-let camScanLocked = {};
-let camScanLockTimers = {};
-let camScanMode = localStorage.getItem('nl_cam_scan_mode') || 'single';
-
-function toggleCamScanMode(key, btn){
-  camScanMode = (camScanMode === 'single') ? 'continuous' : 'single';
-  localStorage.setItem('nl_cam_scan_mode', camScanMode);
-  updateScanModeButtons();
-  if(camScanLocked[key]) unlockCamScan(key);
-  toast('i', 'Okuma Modu Değişti', camScanMode === 'single' ? '🎯 Tekli Okuma Modu (Ürün okunduktan sonra durur)' : '⚡ Seri Okuma Modu (Kesintisiz okuma)');
-}
-
-function updateScanModeButtons(){
-  const sBtn = document.getElementById('sales-scan-mode-btn');
-  const iBtn = document.getElementById('stockin-scan-mode-btn');
-  const txt = camScanMode === 'single' ? '🎯 Tekli Mod' : '⚡ Seri Mod';
-  if(sBtn) sBtn.textContent = txt;
-  if(iBtn) iBtn.textContent = txt;
-}
-
-function lockCamScan(key, code, prodName){
-  if(camScanMode !== 'single') return;
-
-  camScanLocked[key] = true;
-  const overlay = document.getElementById(`scan-lock-overlay-${key}`);
-  const title = document.getElementById(`scan-lock-title-${key}`);
-  const sub = document.getElementById(`scan-lock-sub-${key}`);
-
-  if(overlay){
-    if(title) title.textContent = prodName ? `✅ ${prodName}` : '✅ Barkod Okundu';
-    if(sub) sub.textContent = `Barkod: ${code} (Sepete eklendi)`;
-    overlay.style.display = 'flex';
-  }
-
-  if(camScanLockTimers[key]) clearTimeout(camScanLockTimers[key]);
-  camScanLockTimers[key] = setTimeout(() => {
-    unlockCamScan(key);
-  }, 4500);
-}
-
-function unlockCamScan(key){
-  if(camScanLockTimers[key]) clearTimeout(camScanLockTimers[key]);
-  camScanLocked[key] = false;
-  const overlay = document.getElementById(`scan-lock-overlay-${key}`);
-  if(overlay) overlay.style.display = 'none';
-
-  if(scanConsensusMap[key]){
-    scanConsensusMap[key].cooldownUntil = Date.now() + 800;
-    scanConsensusMap[key].lastSuccessCode = '';
-  }
-}
-
 // ── TWO-FRAME CONSENSUS DEBOUNCER WITH SMART COOLDOWN ──
 function processValidatedBarcode(code, key, videoId, cb){
   const cleanCode = (code || '').trim();
   if(!isValidBarcodeFormat(cleanCode)) return;
-
-  // HARD LOCK: In single-shot mode, absolutely no scanning allowed while locked
-  if(camScanLocked[key]) return;
 
   const now = Date.now();
   const state = scanConsensusMap[key] || { lastCode: '', count: 0, lastTime: 0, cooldownUntil: 0, lastSuccessCode: '' };
@@ -2100,9 +2022,6 @@ function processValidatedBarcode(code, key, videoId, cb){
     scanConsensusMap[key] = state;
     playBeep();
     showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${cleanCode}</span>`);
-    
-    const p = gp().find(x => x.barc === cleanCode);
-    lockCamScan(key, cleanCode, p ? p.name : '');
     cb(cleanCode);
     return;
   }
@@ -2118,9 +2037,6 @@ function processValidatedBarcode(code, key, videoId, cb){
       scanConsensusMap[key] = state;
       playBeep();
       showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${cleanCode}</span>`);
-      
-      const p = gp().find(x => x.barc === cleanCode);
-      lockCamScan(key, cleanCode, p ? p.name : '');
       cb(cleanCode);
     }
   } else {
@@ -2620,7 +2536,6 @@ function initStockin(){
   document.getElementById('stockin-prod-card').style.display='none';
   document.getElementById('stockin-notfound').style.display='none';
   document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
-  updateScanModeButtons();
   // start camera with 5.0s cooldown for identical item, 2.5s for different item
   let lastSI=null,lastSIt=0;
   startCam('stockin-video','stockin',(code)=>{
@@ -3557,7 +3472,6 @@ function initSales(){
   document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
   renderCart();
   renderSalesHistory();
-  updateScanModeButtons();
   // start camera with 5.0s cooldown for identical item, 2.5s for different item
   let lastSC=null,lastSCt=0;
   startCam('sales-video','sales',(code)=>{
