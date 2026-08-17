@@ -3358,6 +3358,8 @@ function initMqttMesh(){
         } else if(data.type === 'CART_UPDATE' && Array.isArray(data.cart)){
           salesCart = data.cart;
           renderCart();
+        } else if(data.type === 'SALE_COMPLETE' && data.saleRecord){
+          handleRemoteSaleComplete(data.saleRecord, data.senderId);
         } else if(data.type === 'STOCK_SYNC' && data.payload){
           if(!isRemoteApplying) applyRemotePayload(data.payload, 'Realtime Mesh');
         }
@@ -3451,6 +3453,51 @@ function broadcastCartUpdate(cart){
   }catch(e){}
 }
 
+function broadcastSaleComplete(saleRecord){
+  if(!saleRecord) return;
+  const payload = {
+    type: 'SALE_COMPLETE',
+    saleRecord: saleRecord,
+    senderId: myDeviceId,
+    time: Date.now()
+  };
+
+  // 1. Instant MQTT WebSockets Mesh
+  try{
+    if(mqttClient && mqttClient.connected){
+      mqttClient.publish('nelazimsa/sync/' + syncChannel + '/sale', JSON.stringify(payload), { qos: 0 });
+    }
+  }catch(e){}
+
+  // 2. Local BroadcastChannel
+  try{
+    if(broadcastChan) broadcastChan.postMessage({ type: 'SALE_COMPLETE', payload });
+  }catch(e){}
+
+  // 3. Supabase Realtime Broadcast
+  try{
+    if(sbChannelSub && isSupabaseConnected){
+      sbChannelSub.send({
+        type: 'broadcast',
+        event: 'sale_complete',
+        payload: payload
+      });
+    }
+  }catch(e){}
+}
+
+function handleRemoteSaleComplete(saleRecord, senderId){
+  if(senderId === myDeviceId || !saleRecord) return;
+
+  playBeep();
+  toast('s', '🛍️ Yeni Satış Tamamlandı', `${saleRecord.receiptNo || ''} — Toplam ${tl(saleRecord.totalAmount || 0)}`);
+
+  renderSalesHistory();
+  if(currentTab === 'dashboard' || currentTab === 'reports'){
+    refreshActiveViewSilently();
+  }
+}
+
 function handleRemoteScan(code, senderId, senderName){
   if(senderId === myDeviceId) return;
   const cleanCode = (code || '').trim();
@@ -3480,6 +3527,7 @@ function initSales(){
   document.getElementById('sales-notfound').style.display='none';
   document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
   renderCart();
+  renderSalesHistory();
   // start camera with debounce
   let lastSC=null,lastSCt=0;
   startCam('sales-video','sales',(code)=>{
@@ -3584,6 +3632,28 @@ function renderCart(){
   if(document.getElementById('sales-total')) document.getElementById('sales-total').textContent=tl(tot);
   if(totalBar) totalBar.style.display='flex';
 }
+function renderSalesHistory(){
+  const hist = document.getElementById('sales-history');
+  if(!hist) return;
+  const sHist = gsh();
+  if(!sHist || sHist.length === 0){
+    hist.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:16px">Henüz tamamlanan satış yok</div>';
+    return;
+  }
+  hist.innerHTML = sHist.slice(0, 25).map(s => {
+    const summary = (s.items || []).map(c => `${c.name} x${c.qty}`).join(', ');
+    const userLabel = s.user ? ` <span style="color:var(--txt3);font-size:11px">(${s.user})</span>` : '';
+    return `
+      <div style="padding:9px 12px;border-radius:8px;font-size:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-weight:600">${s.time || ''} (${s.receiptNo || '#'}) ${userLabel}</span>
+          <span style="color:var(--red);font-weight:700">${tl(s.totalAmount || 0)}</span>
+        </div>
+        <div style="color:var(--txt2);font-size:11.5px">${summary}</div>
+      </div>
+    `;
+  }).join('');
+}
 function completeSale(){
   if(salesCart.length===0){toast('w','Sepet Bo\u015f','\u00dcr\u00fcn ekleyin');return;}
   const P=gp();
@@ -3635,16 +3705,8 @@ function completeSale(){
   sHist.unshift(saleRecord);
   ssh(sHist);
 
-  // save to session history DOM
-  const summary=salesCart.map(c=>`${c.name} x${c.qty}`).join(', ');
-  const hist=document.getElementById('sales-history');
-  if(hist){
-    hist.querySelectorAll('[data-hist-empty]').forEach(e=>e.remove());
-    const item=document.createElement('div');
-    item.style.cssText='padding:9px 12px;border-radius:8px;font-size:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18)';
-    item.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:600">${getTimeStr()} (${receiptNo})</span><span style="color:var(--red);font-weight:700">${tl(tot)}</span></div><div style="color:var(--txt2)">${summary}</div>`;
-    hist.prepend(item);
-  }
+  broadcastSaleComplete(saleRecord);
+  renderSalesHistory();
 
   const items=salesCart.length;
   salesCart=[];
@@ -3809,6 +3871,8 @@ function setupRealtimeSync(){
         } else if(type === 'CART_UPDATE' && payload && Array.isArray(payload.cart) && payload.senderId !== myDeviceId){
           salesCart = payload.cart;
           renderCart();
+        } else if(type === 'SALE_COMPLETE' && payload && payload.saleRecord && payload.senderId !== myDeviceId){
+          handleRemoteSaleComplete(payload.saleRecord, payload.senderId);
         }
       };
     }catch(e){}
@@ -3882,6 +3946,11 @@ async function initSupabase(){
         if(payload && Array.isArray(payload.cart) && payload.senderId !== myDeviceId){
           salesCart = payload.cart;
           renderCart();
+        }
+      })
+      .on('broadcast', { event: 'sale_complete' }, ({ payload }) => {
+        if(payload && payload.saleRecord && payload.senderId !== myDeviceId){
+          handleRemoteSaleComplete(payload.saleRecord, payload.senderId);
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'company_inventory' }, payload => {
@@ -4142,6 +4211,7 @@ function applyRemotePayload(payload, source){
 }
 
 function refreshActiveViewSilently(){
+  renderSalesHistory();
   const activePage = document.querySelector('.page.active');
   if(!activePage) return;
   const pageId = activePage.id.replace('page-', '');
@@ -4152,7 +4222,10 @@ function refreshActiveViewSilently(){
   else if(pageId === 'orders') renderOrds();
   else if(pageId === 'suppliers') renderSups();
   else if(pageId === 'reports') renderRep();
-  else if(pageId === 'sales') renderCart();
+  else if(pageId === 'sales'){
+    renderCart();
+    renderSalesHistory();
+  }
   updBadge();
 }
 
