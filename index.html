@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -594,12 +595,21 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
     <!-- STOCK IN -->
     <div class="page" id="page-stockin">
       <div class="page-header">
-        <div><h1 class="page-title">Stok Girişi</h1><p class="page-sub">Barkod okutarak stok ekleyin</p></div>
+        <div>
+          <h1 class="page-title">Stok Girişi</h1>
+          <p class="page-sub">Barkod veya Fatura/İrsaliye okutarak hızlı stok ekleyin</p>
+        </div>
         <div class="page-actions">
+          <div style="display:flex;background:var(--bg3);padding:3px;border-radius:9px;border:1px solid var(--border2)">
+            <button class="btn btn-sm" id="btn-stockin-mode-barcode" style="background:var(--accent);color:#fff;border-radius:7px" onclick="setStockinMode('barcode')">🏷️ Tekli Barkod Girişi</button>
+            <button class="btn btn-sm btn-ghost" id="btn-stockin-mode-invoice" style="border-radius:7px" onclick="setStockinMode('invoice')">📄 Fatura / İrsaliye Okuma (OCR)</button>
+          </div>
           <button class="btn btn-ghost" onclick="resetStockin()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>Sıfırla</button>
         </div>
       </div>
-      <div class="page-2col">
+
+      <!-- 1. BARCODE MODE VIEW -->
+      <div id="stockin-barcode-view" class="page-2col">
         <!-- LEFT: Camera + Result -->
         <div>
           <div class="card" style="padding:18px">
@@ -656,6 +666,153 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <div id="stockin-log" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto">
               <div style="color:var(--txt3);font-size:13px;text-align:center;padding:20px">Henüz işlem yok</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. INVOICE OCR MODE VIEW -->
+      <div id="stockin-invoice-view" style="display:none">
+        <div class="grid-2" style="margin-bottom:20px">
+          <!-- Camera / Upload Card -->
+          <div class="card" style="padding:20px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div style="font-size:14px;font-weight:700">📷 Fatura & İrsaliye Okut / Yükle</div>
+              <button class="btn btn-primary btn-sm" onclick="loadSampleInvoice()">✨ Örnek Fatura Dene</button>
+            </div>
+            
+            <!-- Live Camera Frame for Invoice -->
+            <div class="scan-frame" style="height:250px;position:relative">
+              <video id="invoice-cam-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;border-radius:10px"></video>
+              <canvas id="invoice-snap-canvas" style="display:none"></canvas>
+              <div class="scan-overlay" style="border:2px dashed rgba(59,130,246,.7)">
+                <div style="position:absolute;top:10px;left:10px;right:10px;background:rgba(15,23,42,.75);padding:6px 10px;border-radius:6px;font-size:11px;color:#fff;text-align:center">
+                  📄 Faturayı veya irsaliyeyi çerçevenin içerisine hizalayın
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons for OCR -->
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="captureAndProcessInvoice()" style="flex:1">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                📸 Faturayı Çek & Oku (OCR)
+              </button>
+              <label class="btn btn-ghost" style="cursor:pointer;margin:0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                📁 Görsel/PDF Yükle
+                <input type="file" id="inv-file-input" accept="image/*,application/pdf" style="display:none" onchange="handleInvoiceFileUpload(event)">
+              </label>
+              <button class="btn btn-ghost" onclick="toggleInvoicePasteModal()">✍️ Metin Yapıştır</button>
+            </div>
+
+            <!-- OCR Progress bar -->
+            <div id="inv-ocr-progress-card" style="display:none;margin-top:14px;padding:12px;border-radius:8px;background:var(--bg);border:1px solid var(--border2)">
+              <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px">
+                <span id="inv-ocr-status-text">🔍 Fatura metinleri taranıyor...</span>
+                <span id="inv-ocr-percent-text">0%</span>
+              </div>
+              <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+                <div id="inv-ocr-bar" style="width:0%;height:100%;background:var(--accent);transition:width .2s"></div>
+              </div>
+            </div>
+
+            <!-- Paste Area (Collapsible) -->
+            <div id="inv-paste-container" style="display:none;margin-top:14px">
+              <label style="font-size:11.5px;font-weight:600;color:var(--txt2);display:block;margin-bottom:5px">E-Fatura veya Fatura Metnini Yapıştırın:</label>
+              <textarea id="inv-paste-textarea" rows="4" style="width:100%;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12px;font-family:monospace;outline:none" placeholder="Örn: 8690000000001 A4 Kagit 10 Adet 185,00 TL&#10;Tükenmez Kalem 20 Kutu 45.00 TL..."></textarea>
+              <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('inv-paste-container').style.display='none'">Vazgeç</button>
+                <button class="btn btn-primary btn-sm" onclick="parsePastedInvoiceText()">⚡ Metni Çözümle</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Invoice Details / Supplier Metadata -->
+          <div class="card" style="padding:20px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="font-size:14px;font-weight:700;margin-bottom:14px">📋 Fatura / İrsaliye Bilgileri</div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
+                <div class="fg">
+                  <label>Tedarikçi Firma</label>
+                  <select id="inv-supplier-select" style="padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;width:100%">
+                    <option value="">Tedarikçi Seçin (Opsiyonel)</option>
+                  </select>
+                </div>
+                <div class="fg">
+                  <label>Fatura / İrsaliye No</label>
+                  <input type="text" id="inv-no-input" placeholder="Örn: GIB202600012345" style="padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px">
+                </div>
+                <div class="fg">
+                  <label>Fatura Tarihi</label>
+                  <input type="date" id="inv-date-input" style="padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px">
+                </div>
+                <div class="fg">
+                  <label>Giriş Deposu / Not</label>
+                  <input type="text" id="inv-note-input" placeholder="Örn: Ana Depo Raf A" style="padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px">
+                </div>
+              </div>
+            </div>
+
+            <!-- Summary KPI Box -->
+            <div style="background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.18);border-radius:10px;padding:14px;margin-top:14px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:12px;color:var(--txt2)">Okunan Toplam Kalem:</span>
+                <strong id="inv-summary-items" style="font-size:14px;color:var(--txt)">0 Kalem</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:12px;color:var(--txt2)">Stoğa Girecek Toplam Ürün:</span>
+                <strong id="inv-summary-qty" style="font-size:14px;color:var(--green)">0 Adet</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(148,163,184,.15);padding-top:6px;margin-top:6px">
+                <span style="font-size:12px;font-weight:600;color:var(--txt)">Toplam Fatura Alış Tutarı:</span>
+                <strong id="inv-summary-total" style="font-size:16px;color:var(--accent)">₺0,00</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detected Invoice Items Table (Editable) -->
+        <div class="tbl-wrap">
+          <div class="tbl-head" style="background:rgba(59,130,246,.04);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <span class="tbl-title">📦 Faturadan Ayrıştırılan Ürünler</span>
+              <div style="font-size:11px;color:var(--txt2);margin-top:2px">Stoğa eklemeden önce miktarları veya fiyatları düzenleyebilirsiniz</div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" onclick="addManualInvoiceRow()">➕ Boş Satır Ekle</button>
+              <button class="btn btn-success btn-sm" onclick="confirmBulkInvoiceStockin()" id="btn-confirm-bulk-inv" style="font-weight:700">
+                🚀 Seçilenleri Stoğa Ekle (Toplu Giriş)
+              </button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:40px;text-align:center"><input type="checkbox" id="inv-select-all" checked onchange="toggleAllInvoiceRows(this.checked)"></th>
+                  <th>Ürün Adı</th>
+                  <th>Barkod</th>
+                  <th style="width:110px">Miktar</th>
+                  <th style="width:90px">Birim</th>
+                  <th style="width:120px">Alış Fiyatı (₺)</th>
+                  <th style="width:120px">Satış Fiyatı (₺)</th>
+                  <th style="width:120px">Toplam (₺)</th>
+                  <th>Durum</th>
+                  <th style="width:50px;text-align:center">İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="inv-parsed-tbody">
+                <tr>
+                  <td colspan="10">
+                    <div class="empty" style="padding:32px 14px">
+                      <div style="font-size:32px;margin-bottom:8px">📄</div>
+                      <h4 style="margin-bottom:4px">Henüz Fatura Okunmadı</h4>
+                      <p style="font-size:12px;color:var(--txt3)">Kameradan faturanızı çekin, dosya yükleyin veya "Örnek Fatura Dene" butonuna basın.</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1186,7 +1343,7 @@ function showApp(){
 // ══════════════ NAVIGATION ══════════════
 function go(page){
   // Stop cameras when leaving stockin/sales pages
-  if(page!=='stockin')stopCam('stockin');
+  if(page!=='stockin'){ stopCam('stockin'); stopCam('invoice'); }
   if(page!=='sales')stopCam('sales');
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
@@ -1958,8 +2115,39 @@ function applyTheme(t){
   document.getElementById('theme-lbl').textContent=t==='dark'?'Açık Tema':'Koyu Tema';
 }
 
-// ══════════════ STOCK IN ══════════════
+// ══════════════ STOCK IN (BARCODE & INVOICE OCR) ══════════════
+let stockinMode = 'barcode';
+let parsedInvoiceItems = [];
+
+function setStockinMode(mode){
+  stockinMode = mode;
+  const btnB = document.getElementById('btn-stockin-mode-barcode');
+  const btnI = document.getElementById('btn-stockin-mode-invoice');
+  const viewB = document.getElementById('stockin-barcode-view');
+  const viewI = document.getElementById('stockin-invoice-view');
+
+  if(mode === 'barcode'){
+    if(btnB){ btnB.style.background='var(--accent)'; btnB.style.color='#fff'; btnB.classList.remove('btn-ghost'); }
+    if(btnI){ btnI.style.background='transparent'; btnI.style.color='var(--txt2)'; btnI.classList.add('btn-ghost'); }
+    if(viewB) viewB.style.display = 'grid';
+    if(viewI) viewI.style.display = 'none';
+    stopCam('invoice');
+    initStockin();
+  } else {
+    if(btnI){ btnI.style.background='var(--accent)'; btnI.style.color='#fff'; btnI.classList.remove('btn-ghost'); }
+    if(btnB){ btnB.style.background='transparent'; btnB.style.color='var(--txt2)'; btnB.classList.add('btn-ghost'); }
+    if(viewB) viewB.style.display = 'none';
+    if(viewI) viewI.style.display = 'block';
+    stopCam('stockin');
+    initStockinInvoice();
+  }
+}
+
 function initStockin(){
+  if(stockinMode === 'invoice'){
+    initStockinInvoice();
+    return;
+  }
   stockinProdId=null;
   document.getElementById('stockin-prod-display').value='';
   document.getElementById('stockin-qty').value=1;
@@ -1977,6 +2165,578 @@ function initStockin(){
     onStockinScan(code);
   });
 }
+
+function initStockinInvoice(){
+  const sups = gs();
+  const supSel = document.getElementById('inv-supplier-select');
+  if(supSel){
+    const curVal = supSel.value;
+    supSel.innerHTML = '<option value="">Tedarikçi Seçin (Opsiyonel)</option>' + sups.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    if(curVal) supSel.value = curVal;
+  }
+  const dateEl = document.getElementById('inv-date-input');
+  if(dateEl && !dateEl.value) dateEl.value = getTodayStr();
+
+  // Start high-definition invoice camera preview
+  startCamPreview('invoice-cam-video', 'invoice');
+}
+
+async function startCamPreview(videoId, key){
+  stopCam(key);
+  const video = document.getElementById(videoId);
+  if(!video) return;
+  try{
+    readers[key] = { active: true, videoId };
+    const constraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 } } };
+    let stream = null;
+    try{
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    }catch(e){
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    }
+    video.srcObject = stream;
+    await video.play().catch(()=>{});
+    readers[key].stream = stream;
+  }catch(err){
+    console.warn('Cam Preview Error:', err);
+  }
+}
+
+function updateOCRProgress(progress, statusText){
+  const progCard = document.getElementById('inv-ocr-progress-card');
+  const bar = document.getElementById('inv-ocr-bar');
+  const pTxt = document.getElementById('inv-ocr-percent-text');
+  const sTxt = document.getElementById('inv-ocr-status-text');
+  if(progCard) progCard.style.display = 'block';
+  const pct = Math.round((progress || 0) * 100);
+  if(bar) bar.style.width = pct + '%';
+  if(pTxt) pTxt.textContent = pct + '%';
+  if(sTxt && statusText) sTxt.textContent = statusText;
+}
+
+function hideOCRProgress(){
+  const progCard = document.getElementById('inv-ocr-progress-card');
+  if(progCard) progCard.style.display = 'none';
+}
+
+async function captureAndProcessInvoice(){
+  const video = document.getElementById('invoice-cam-video');
+  const canvas = document.getElementById('invoice-snap-canvas');
+  if(!video || !canvas){
+    toast('w', 'Kamera Yok', 'Kamera görüntüsü alınamadı.');
+    return;
+  }
+  if(video.videoWidth === 0 || video.videoHeight === 0){
+    toast('w', 'Kamera Hazır Değil', 'Lütfen kameranın açılmasını bekleyin veya dosya yükleyin.');
+    return;
+  }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  toast('i', 'Fotoğraf Çekildi', 'OCR metin analizi başlatılıyor...');
+  await runInvoiceOCR(canvas);
+}
+
+async function handleInvoiceFileUpload(event){
+  const file = event.target.files?.[0];
+  if(!file) return;
+
+  toast('i', 'Dosya Yüklendi', file.name + ' işleniyor...');
+
+  if(file.type.startsWith('image/')){
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        await runInvoiceOCR(img);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    toast('w', 'Görsel Seçin', 'Lütfen JPG, PNG veya net bir fatura fotoğrafı yükleyin.');
+  }
+}
+
+function toggleInvoicePasteModal(){
+  const box = document.getElementById('inv-paste-container');
+  if(box){
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    if(box.style.display === 'block'){
+      document.getElementById('inv-paste-textarea')?.focus();
+    }
+  }
+}
+
+function parsePastedInvoiceText(){
+  const text = document.getElementById('inv-paste-textarea')?.value?.trim();
+  if(!text){
+    toast('w', 'Metin Boş', 'Lütfen fatura metnini yapıştırın.');
+    return;
+  }
+  const items = parseInvoiceText(text);
+  if(items.length === 0){
+    toast('w', 'Ürün Bulunamadı', 'Metinden ürün satırı tespit edilemedi. Lütfen biçimi kontrol edin.');
+    return;
+  }
+  renderParsedInvoiceRows(items);
+  document.getElementById('inv-paste-container').style.display = 'none';
+  toast('s', 'Metin Ayrıştırıldı', `${items.length} kalem ürün başarıyla bulundu!`);
+}
+
+async function runInvoiceOCR(imageSource){
+  updateOCRProgress(0.1, '🔍 OCR Motoru hazırlanıyor (Tesseract)...');
+  
+  try{
+    if(typeof Tesseract === 'undefined'){
+      toast('e', 'OCR Hatası', 'Tesseract kütüphanesi yüklenemedi. Lütfen internet bağlantınızı kontrol edin.');
+      hideOCRProgress();
+      return;
+    }
+
+    const worker = await Tesseract.createWorker('tur+eng', 1, {
+      logger: m => {
+        if(m.status === 'recognizing text'){
+          updateOCRProgress(m.progress, '📄 Fatura yazıları taranıyor... ' + Math.round(m.progress * 100) + '%');
+        } else if(m.status === 'loading tesseract core' || m.status === 'loading language traineddata'){
+          updateOCRProgress(0.3, '⚙️ Türkçe OCR modeli yükleniyor...');
+        }
+      }
+    });
+
+    const ret = await worker.recognize(imageSource);
+    await worker.terminate();
+
+    hideOCRProgress();
+
+    const rawText = ret.data.text;
+    console.log('OCR Output Text:\n', rawText);
+
+    const items = parseInvoiceText(rawText);
+    if(items.length === 0){
+      toast('w', 'Satır Bulunamadı', 'Faturadan ürün satırı net okunamadı. Lütfen ışığı artırın veya "Metin Yapıştır" ile deneyin.');
+    } else {
+      renderParsedInvoiceRows(items);
+      toast('s', 'Fatura Okundu', `${items.length} kalem ürün tespit edildi!`);
+    }
+  }catch(err){
+    console.error('OCR Process Error:', err);
+    hideOCRProgress();
+    toast('e', 'Tarama Hatası', err.message || 'Fatura taranırken bir hata oluştu');
+  }
+}
+
+function parseInvoiceText(rawText){
+  if(!rawText) return [];
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const products = gp();
+  const results = [];
+
+  // Look for invoice number if present
+  const invNoMatch = rawText.match(/(?:fatura|irsaliye|belge|e-fatura|e-arşiv|no|numarası|fatura no)[:\s]*([A-Z0-9\-]{6,22})/i);
+  if(invNoMatch && document.getElementById('inv-no-input')){
+    document.getElementById('inv-no-input').value = invNoMatch[1];
+  }
+
+  // Look for invoice date if present
+  const dateMatch = rawText.match(/(\d{2})[\.\/\-](\d{2})[\.\/\-](\d{4})/);
+  if(dateMatch && document.getElementById('inv-date-input')){
+    const formattedDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+    document.getElementById('inv-date-input').value = formattedDate;
+  }
+
+  // Iterate lines and extract item rows
+  for(let i = 0; i < lines.length; i++){
+    let line = lines[i];
+    
+    // Skip headers and summary lines
+    if(/^(genel toplam|ara toplam|toplam|kdv|vergi|tarih|sayfa|vd|mersis|adres|tel|iban|hesap|fatura no|irsaliye no|düzenleme|ödenecek)/i.test(line)) {
+      continue;
+    }
+
+    // Pattern: Look for barcode (8-14 digits)
+    const barcodeMatch = line.match(/\b(869\d{10}|\d{8,14})\b/);
+    let barc = barcodeMatch ? barcodeMatch[1] : '';
+
+    // Match numbers in line (potential qty, unit price, total)
+    const numMatches = [...line.matchAll(/\b(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:[\.,]\d+)?)\b/g)].map(m => m[1]);
+
+    if(numMatches.length >= 1){
+      let qty = 1;
+      let unit = 'Adet';
+      let buyPrice = 0;
+      let name = line;
+
+      // Detect Turkish units
+      const unitMatch = line.match(/\b(adet|ad|koli|kutu|paket|kg|lt|litre|çift|top|rulo|metre|m|mt)\b/i);
+      if(unitMatch){
+        const u = unitMatch[1].toLowerCase();
+        if(u.startsWith('ad')) unit = 'Adet';
+        else if(u === 'koli') unit = 'Koli';
+        else if(u === 'kutu') unit = 'Kutu';
+        else if(u === 'paket') unit = 'Paket';
+        else if(u === 'kg') unit = 'Kg';
+        else if(u.startsWith('lt')) unit = 'Bidon';
+        else if(u === 'çift') unit = 'Çift';
+      }
+
+      // Clean numbers
+      const cleanNums = numMatches
+        .map(s => parseFloat(s.replace(/\./g, '').replace(',', '.')))
+        .filter(n => !isNaN(n) && n > 0 && n < 10000000);
+
+      if(cleanNums.length >= 2){
+        if(cleanNums[0] <= 5000 && Number.isInteger(cleanNums[0])){
+          qty = cleanNums[0];
+          buyPrice = cleanNums[1];
+        } else if(cleanNums.length >= 3 && cleanNums[1] <= 5000){
+          qty = cleanNums[1];
+          buyPrice = cleanNums[0];
+        } else {
+          buyPrice = cleanNums[0];
+        }
+      } else if(cleanNums.length === 1){
+        if(cleanNums[0] <= 5000 && Number.isInteger(cleanNums[0])){
+          qty = cleanNums[0];
+        } else {
+          buyPrice = cleanNums[0];
+        }
+      }
+
+      // Clean name
+      name = name
+        .replace(/\b(869\d{10}|\d{8,14})\b/g, '')
+        .replace(/\b(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:[\.,]\d+)?)\b/g, '')
+        .replace(/\b(adet|ad|koli|kutu|paket|kg|lt|litre|çift|top|rulo|metre|tl|try|kdv|oran|isk|fiyat)\b/gi, '')
+        .replace(/[%\*\#_\|\:\;\-\/\\]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if(name.length >= 2){
+        // Match with existing products
+        let matchedProd = null;
+        if(barc){
+          matchedProd = products.find(p => p.barc === barc);
+        }
+        if(!matchedProd){
+          const normName = name.toLowerCase().replace(/[^a-z0-9ğüşıöç]/g, '');
+          matchedProd = products.find(p => {
+            const pNorm = p.name.toLowerCase().replace(/[^a-z0-9ğüşıöç]/g, '');
+            return (pNorm.length > 3 && normName.includes(pNorm)) || (normName.length > 3 && pNorm.includes(normName));
+          });
+        }
+
+        if(matchedProd){
+          results.push({
+            prodId: matchedProd.id,
+            name: matchedProd.name,
+            barc: matchedProd.barc || barc,
+            cat: matchedProd.cat || 'Genel',
+            qty: qty,
+            unit: matchedProd.unit || unit,
+            buyPrice: buyPrice || matchedProd.price || 0,
+            sellPrice: matchedProd.sellPrice || (buyPrice ? Math.round(buyPrice * 1.35) : 0),
+            isNew: false
+          });
+        } else {
+          results.push({
+            prodId: null,
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            barc: barc || '',
+            cat: 'Genel',
+            qty: qty,
+            unit: unit,
+            buyPrice: buyPrice || 0,
+            sellPrice: buyPrice ? Math.round(buyPrice * 1.35) : 0,
+            isNew: true
+          });
+        }
+      }
+    }
+  }
+
+  // Deduplicate
+  const unique = [];
+  results.forEach(r => {
+    const ex = unique.find(u => (r.prodId && u.prodId === r.prodId) || (u.name.toLowerCase() === r.name.toLowerCase()));
+    if(ex){
+      ex.qty += r.qty;
+    } else {
+      unique.push(r);
+    }
+  });
+
+  return unique;
+}
+
+function renderParsedInvoiceRows(items){
+  parsedInvoiceItems = items || [];
+  const tbody = document.getElementById('inv-parsed-tbody');
+  if(!tbody) return;
+
+  if(parsedInvoiceItems.length === 0){
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty" style="padding:32px 14px"><div style="font-size:32px;margin-bottom:8px">📄</div><h4>Faturadan Ürün Tespit Edilemedi</h4><p style="font-size:12px;color:var(--txt3)">Manuel eklemek için "Boş Satır Ekle" butonunu kullanabilirsiniz.</p></div></td></tr>`;
+    updateInvoiceCalculations();
+    return;
+  }
+
+  tbody.innerHTML = parsedInvoiceItems.map((item, idx) => `
+    <tr data-inv-idx="${idx}">
+      <td style="text-align:center"><input type="checkbox" class="inv-row-check" checked onchange="updateInvoiceCalculations()"></td>
+      <td>
+        <input type="text" class="inv-inp-name" value="${item.name.replace(/"/g, '&quot;')}" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12px;font-weight:600" oninput="updateInvoiceCalculations()">
+      </td>
+      <td>
+        <input type="text" class="inv-inp-barc" value="${item.barc || ''}" placeholder="Barkod" style="width:110px;padding:6px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:11px;font-family:monospace" oninput="updateInvoiceCalculations()">
+      </td>
+      <td>
+        <input type="number" min="1" class="inv-inp-qty" value="${item.qty}" style="width:75px;padding:6px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12.5px;font-weight:700;text-align:center" oninput="updateInvoiceCalculations()">
+      </td>
+      <td>
+        <select class="inv-inp-unit" style="padding:6px 6px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:11.5px">
+          <option value="Adet" ${item.unit==='Adet'?'selected':''}>Adet</option>
+          <option value="Koli" ${item.unit==='Koli'?'selected':''}>Koli</option>
+          <option value="Kutu" ${item.unit==='Kutu'?'selected':''}>Kutu</option>
+          <option value="Paket" ${item.unit==='Paket'?'selected':''}>Paket</option>
+          <option value="Kg" ${item.unit==='Kg'?'selected':''}>Kg</option>
+          <option value="Bidon" ${item.unit==='Bidon'?'selected':''}>Bidon</option>
+          <option value="Çift" ${item.unit==='Çift'?'selected':''}>Çift</option>
+        </select>
+      </td>
+      <td>
+        <input type="number" step="0.01" min="0" class="inv-inp-buy" value="${item.buyPrice}" style="width:90px;padding:6px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12px;text-align:right" oninput="onInvoiceBuyPriceChange(${idx}, this.value)">
+      </td>
+      <td>
+        <input type="number" step="0.01" min="0" class="inv-inp-sell" value="${item.sellPrice}" style="width:90px;padding:6px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--accent);font-size:12px;font-weight:600;text-align:right" oninput="updateInvoiceCalculations()">
+      </td>
+      <td>
+        <strong class="inv-row-total" style="font-size:12.5px;color:var(--txt)">${tl(item.qty * item.buyPrice)}</strong>
+      </td>
+      <td>
+        ${item.isNew
+          ? '<span class="badge b-blue" style="font-size:10.5px">✨ Yeni Ürün</span>'
+          : '<span class="badge b-ok" style="font-size:10.5px">✅ Mevcut Ürün</span>'}
+      </td>
+      <td style="text-align:center">
+        <button class="btn btn-ghost btn-sm" onclick="removeInvoiceRow(${idx})" style="padding:4px 7px;color:var(--red)">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+
+  updateInvoiceCalculations();
+}
+
+function onInvoiceBuyPriceChange(idx, val){
+  const buyP = parseFloat(val) || 0;
+  const row = document.querySelector(`tr[data-inv-idx="${idx}"]`);
+  if(row){
+    const sellInp = row.querySelector('.inv-inp-sell');
+    if(sellInp && (parseFloat(sellInp.value) === 0 || !sellInp.dataset.manualEdited)){
+      sellInp.value = Math.round(buyP * 1.35 * 100) / 100;
+    }
+  }
+  updateInvoiceCalculations();
+}
+
+function toggleAllInvoiceRows(checked){
+  document.querySelectorAll('.inv-row-check').forEach(chk => { chk.checked = checked; });
+  updateInvoiceCalculations();
+}
+
+function addManualInvoiceRow(){
+  const tbody = document.getElementById('inv-parsed-tbody');
+  if(!tbody) return;
+  if(tbody.querySelector('.empty')){
+    tbody.innerHTML = '';
+  }
+  const newRowItem = {
+    prodId: null,
+    name: 'Yeni Ürün',
+    barc: '',
+    cat: 'Genel',
+    qty: 1,
+    unit: 'Adet',
+    buyPrice: 0,
+    sellPrice: 0,
+    isNew: true
+  };
+  parsedInvoiceItems.push(newRowItem);
+  renderParsedInvoiceRows(parsedInvoiceItems);
+}
+
+function removeInvoiceRow(idx){
+  parsedInvoiceItems.splice(idx, 1);
+  renderParsedInvoiceRows(parsedInvoiceItems);
+}
+
+function updateInvoiceCalculations(){
+  let totalItems = 0;
+  let totalQty = 0;
+  let totalAmount = 0;
+
+  const rows = document.querySelectorAll('#inv-parsed-tbody tr[data-inv-idx]');
+  rows.forEach(r => {
+    const chk = r.querySelector('.inv-row-check')?.checked;
+    const qty = parseInt(r.querySelector('.inv-inp-qty')?.value) || 0;
+    const buyP = parseFloat(r.querySelector('.inv-inp-buy')?.value) || 0;
+    const rowTotal = qty * buyP;
+    
+    const rowTotEl = r.querySelector('.inv-row-total');
+    if(rowTotEl) rowTotEl.textContent = tl(rowTotal);
+
+    if(chk){
+      totalItems += 1;
+      totalQty += qty;
+      totalAmount += rowTotal;
+    }
+  });
+
+  const sumItemsEl = document.getElementById('inv-summary-items');
+  const sumQtyEl = document.getElementById('inv-summary-qty');
+  const sumTotEl = document.getElementById('inv-summary-total');
+
+  if(sumItemsEl) sumItemsEl.textContent = `${totalItems} Kalem`;
+  if(sumQtyEl) sumQtyEl.textContent = `${totalQty} Adet`;
+  if(sumTotEl) sumTotEl.textContent = tl(totalAmount);
+}
+
+function confirmBulkInvoiceStockin(){
+  const rows = document.querySelectorAll('#inv-parsed-tbody tr[data-inv-idx]');
+  if(rows.length === 0){
+    toast('w', 'Kalem Yok', 'Lütfen önce fatura okutun veya satır ekleyin.');
+    return;
+  }
+
+  const selectedEntries = [];
+  rows.forEach(r => {
+    const chk = r.querySelector('.inv-row-check')?.checked;
+    if(chk){
+      const idx = parseInt(r.getAttribute('data-inv-idx'));
+      const name = r.querySelector('.inv-inp-name')?.value?.trim() || 'İsimsiz Ürün';
+      const barc = r.querySelector('.inv-inp-barc')?.value?.trim() || '';
+      const qty = parseInt(r.querySelector('.inv-inp-qty')?.value) || 1;
+      const unit = r.querySelector('.inv-inp-unit')?.value || 'Adet';
+      const buyPrice = parseFloat(r.querySelector('.inv-inp-buy')?.value) || 0;
+      const sellPrice = parseFloat(r.querySelector('.inv-inp-sell')?.value) || (buyPrice * 1.35);
+      const original = parsedInvoiceItems[idx] || {};
+
+      selectedEntries.push({
+        prodId: original.prodId,
+        name,
+        barc,
+        qty,
+        unit,
+        buyPrice,
+        sellPrice
+      });
+    }
+  });
+
+  if(selectedEntries.length === 0){
+    toast('w', 'Seçim Yapılmadı', 'Lütfen stoğa eklenecek en az bir kalemi işaretleyin.');
+    return;
+  }
+
+  const supSelect = document.getElementById('inv-supplier-select');
+  const supId = supSelect?.value ? parseInt(supSelect.value) : null;
+  const invNo = document.getElementById('inv-no-input')?.value?.trim() || ('FAT-' + Date.now().toString().slice(-6));
+  const invDate = document.getElementById('inv-date-input')?.value || getTodayStr();
+  const invNote = document.getElementById('inv-note-input')?.value?.trim() || '';
+
+  const P = gp();
+  const inHist = gih();
+
+  selectedEntries.forEach(entry => {
+    let targetProd = null;
+    if(entry.prodId){
+      targetProd = P.find(p => p.id === entry.prodId);
+    }
+    if(!targetProd && entry.barc){
+      targetProd = P.find(p => p.barc === entry.barc);
+    }
+    if(!targetProd){
+      targetProd = P.find(p => p.name.toLowerCase() === entry.name.toLowerCase());
+    }
+
+    if(targetProd){
+      // Update existing stock
+      targetProd.stk += entry.qty;
+      if(entry.buyPrice > 0) targetProd.price = entry.buyPrice;
+      if(entry.sellPrice > 0) targetProd.sellPrice = entry.sellPrice;
+      if(supId) targetProd.sup = supId;
+      if(entry.barc && !targetProd.barc) targetProd.barc = entry.barc;
+    } else {
+      // Create new product
+      targetProd = {
+        id: nid(P),
+        name: entry.name,
+        barc: entry.barc || '',
+        cat: 'Genel',
+        unit: entry.unit,
+        stk: entry.qty,
+        min: Math.max(5, Math.round(entry.qty * 0.25)),
+        price: entry.buyPrice,
+        sellPrice: entry.sellPrice,
+        sup: supId,
+        note: invNote ? `${invNo} nolu fatura: ${invNote}` : `${invNo} nolu fatura ile eklendi`
+      };
+      P.push(targetProd);
+    }
+
+    // Add to stock in history log
+    const stockinRecord = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      prodId: targetProd.id,
+      name: targetProd.name,
+      barc: targetProd.barc || '',
+      cat: targetProd.cat || 'Genel',
+      qty: entry.qty,
+      unit: targetProd.unit || 'Adet',
+      buyPrice: entry.buyPrice,
+      sellPrice: entry.sellPrice,
+      totalValue: entry.qty * entry.buyPrice,
+      note: `Fatura No: ${invNo}${invNote ? ' (' + invNote + ')' : ''}`,
+      date: invDate,
+      time: getTimeStr(),
+      user: currentUser ? currentUser.name : 'Kullanıcı'
+    };
+    inHist.unshift(stockinRecord);
+  });
+
+  // Save to storage & Sync Cloud
+  sp(P);
+  sih(inHist);
+  updBadge();
+
+  // Clear invoice items & show celebration
+  parsedInvoiceItems = [];
+  renderParsedInvoiceRows([]);
+  toast('s', 'Toplu Stok Girişi Tamamlandı! 🚀', `${selectedEntries.length} kalem ürün başarıyla stoğa aktarıldı.`);
+
+  // Reset inputs
+  if(document.getElementById('inv-no-input')) document.getElementById('inv-no-input').value = '';
+  if(document.getElementById('inv-note-input')) document.getElementById('inv-note-input').value = '';
+}
+
+function loadSampleInvoice(){
+  const today = getTodayStr();
+  if(document.getElementById('inv-no-input')) document.getElementById('inv-no-input').value = 'GIB202608170042';
+  if(document.getElementById('inv-date-input')) document.getElementById('inv-date-input').value = today;
+  if(document.getElementById('inv-note-input')) document.getElementById('inv-note-input').value = 'Haftalık Tedarik Teslimatı';
+  
+  const sampleItems = [
+    { prodId: 1, name: 'A4 Fotokopi Kağıdı (500lü)', barc: '8690000000001', cat: 'Kırtasiye', qty: 25, unit: 'Koli', buyPrice: 185, sellPrice: 240, isNew: false },
+    { prodId: 3, name: 'Toner HP LaserJet 85A', barc: '8690000000003', cat: 'Bilgisayar', qty: 6, unit: 'Adet', buyPrice: 850, sellPrice: 1150, isNew: false },
+    { prodId: 5, name: 'Sıvı Sabun (5lt)', barc: '8690000000005', cat: 'Temizlik', qty: 10, unit: 'Bidon', buyPrice: 145, sellPrice: 195, isNew: false },
+    { prodId: null, name: 'Kablosuz Optik Mouse (Siyah)', barc: '8690000000011', cat: 'Bilgisayar', qty: 15, unit: 'Adet', buyPrice: 120, sellPrice: 175, isNew: true }
+  ];
+
+  renderParsedInvoiceRows(sampleItems);
+  toast('s', 'Örnek Fatura Yüklendi', '4 kalem ürün faturadan başarıyla ayrıştırıldı. Düzenleyip stoğa aktarabilirsiniz.');
+}
+
 function onStockinScan(code){
   document.getElementById('stockin-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 Barkod: ${code}</span>`;
   const p=gp().find(x=>x.barc===code);
@@ -2059,6 +2819,7 @@ function confirmStockin(){
 }
 function resetStockin(){
   stopCam('stockin');
+  stopCam('invoice');
   stockinProdId=null;
   document.getElementById('stockin-prod-card').style.display='none';
   document.getElementById('stockin-notfound').style.display='none';
@@ -2067,7 +2828,8 @@ function resetStockin(){
   document.getElementById('stockin-note').value='';
   document.getElementById('stockin-prod-id').value='';
   document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
-  initStockin();
+  if(stockinMode === 'barcode') initStockin();
+  else initStockinInvoice();
 }
 
 // ══════════════ SALES ══════════════
