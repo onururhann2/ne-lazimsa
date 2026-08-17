@@ -1489,6 +1489,7 @@ alter table public.company_inventory add column if not exists users jsonb defaul
 // ══════════════ DATA & CLOUD SYNC ══════════════
 const DEMO_USERS=[{id:1,name:'Admin Kullanıcı',email:'admin@nelazimsa.com',password:'123456'}];
 let currentUser=null;
+let currentTab=null; // go() ile atanır; giriş ekranındayken okunabilmesi için burada tanımlı
 const charts={};
 const readers={};
 let scanMode=null,lastCode=null;
@@ -1502,6 +1503,7 @@ let syncChannel = localStorage.getItem('nl_channel') || 'nelazimsa_ana_depo';
 let isCloudSyncing = false;
 let lastCloudSyncTime = Date.now();
 let cloudPollInterval = null;
+let usersRepairTimeout = null;
 let broadcastChan = null;
 
 // Initial Seed (Empty clean arrays for production use)
@@ -1598,7 +1600,13 @@ function tl(n){return'₺'+Number(n||0).toLocaleString('tr-TR',{minimumFractionD
 function sst(p){if(p.stk<=0||p.stk<=p.min)return'crit';if(p.stk<=p.min*1.5)return'warn';return'ok'}
 
 // ══════════════ USER & ROLE MANAGEMENT ══════════════
-function getUsers(){
+// Kullanıcı listesi cihazlar arası "alan bazlı birleştirme" (merge) ile senkronize edilir.
+// Her kayıtta uts (updated timestamp) tutulur; silinenler tombstone (deleted:true) olarak saklanır,
+// böylece eski listeye sahip bir cihaz push yaptığında yeni kullanıcıyı ezemez.
+const USER_TOMBSTONE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 gün
+
+// Ham liste: silinmiş (tombstone) kayıtları da içerir. Yalnızca senkronizasyon içindir.
+function getUsersRaw(){
   try{
     const raw = localStorage.getItem('nl_users');
     if(raw) {
@@ -1606,17 +1614,123 @@ function getUsers(){
       if(Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   }catch(e){}
+  const seedTs = Date.now();
   const defaultUsers = [
-    { id: 1, name: 'Admin Yönetici', email: 'admin@nelazimsa.com', username: 'admin', password: '123456', role: 'admin' },
-    { id: 2, name: 'Kasiyer 1', email: 'kasiyer@nelazimsa.com', username: 'kasiyer', password: '123456', role: 'cashier' }
+    { id: 1, name: 'Admin Yönetici', email: 'admin@nelazimsa.com', username: 'admin', password: '123456', role: 'admin', uts: seedTs },
+    { id: 2, name: 'Kasiyer 1', email: 'kasiyer@nelazimsa.com', username: 'kasiyer', password: '123456', role: 'cashier', uts: seedTs }
   ];
   localStorage.setItem('nl_users', JSON.stringify(defaultUsers));
   return defaultUsers;
 }
 
+// Uygulamanın her yerinde kullanılan liste: silinenler hariç.
+function getUsers(){
+  return getUsersRaw().filter(u => u && !u.deleted);
+}
+
+// Kullanıcı kimliği cihazlar arası e-posta/kullanıcı adı üzerinden eşleşir
+// (id'ler farklı cihazlarda çakışabildiği için tek başına güvenilir değildir).
+function userKey(u){
+  if(!u) return '';
+  const k = u.email || u.username;
+  return k ? String(k).trim().toLowerCase() : ('id:' + u.id);
+}
+
+// Yeni kullanıcıya cihazlar arası çakışmayan id üretir.
+// Zaman damgası tabanı + rastgele ek (cihazlar arası), artan garanti (cihaz içi).
+let lastIssuedUserId = 0;
+function newUserId(){
+  let id = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+  if(id <= lastIssuedUserId) id = lastIssuedUserId + 1;
+  lastIssuedUserId = id;
+  return id;
+}
+
+// İki listeyi kayıt bazında birleştirir; her anahtar için uts'i büyük olan kazanır.
+function mergeUsers(localList, remoteList){
+  const map = new Map();
+  const put = (u) => {
+    if(!u || typeof u !== 'object') return;
+    const k = userKey(u);
+    if(!k) return;
+    const prev = map.get(k);
+    if(!prev){ map.set(k, u); return; }
+    if(Number(u.uts || 0) >= Number(prev.uts || 0)) map.set(k, u);
+  };
+  (Array.isArray(localList) ? localList : []).forEach(put);
+  (Array.isArray(remoteList) ? remoteList : []).forEach(put);
+
+  const cutoff = Date.now() - USER_TOMBSTONE_TTL;
+  const merged = Array.from(map.values()).filter(u => !(u.deleted && Number(u.uts || 0) < cutoff));
+  // Güvenlik ağı: birleşme sonucu tek bir aktif hesap bile kalmıyorsa yereli koru
+  if(!merged.some(u => !u.deleted)) return Array.isArray(localList) ? localList : [];
+  return merged;
+}
+
+// Bir oturum/kullanıcı referansını ham listede bulur.
+// Önce e-posta anahtarı denenir; id eşleşmesi yalnızca yedek yoldur
+// (eski sürümlerde id'ler cihaz başına üretildiği için farklı kişilerde çakışabilir).
+function findUserRecord(ref){
+  if(!ref) return null;
+  const key = userKey(ref);
+  const all = getUsersRaw();
+  return all.find(u => userKey(u) === key) || all.find(u => u.id === ref.id) || null;
+}
+
 function saveUsers(users){
   localStorage.setItem('nl_users', JSON.stringify(users));
   triggerCloudPush('users', true);
+}
+
+// Uzaktan gelen kullanıcı listesini yereldekiyle birleştirip kaydeder.
+// changed  : yerel liste değişti (arayüz/oturum tazelenmeli)
+// needsPush: buluttaki liste eksik/eski, birleşmiş hali geri yazılmalı
+function applyRemoteUsers(remoteUsers){
+  if(!Array.isArray(remoteUsers) || remoteUsers.length === 0) return { changed: false, needsPush: false };
+
+  const before = JSON.stringify(getUsersRaw());
+  const merged = mergeUsers(JSON.parse(before), remoteUsers);
+  const after = JSON.stringify(merged);
+  const changed = (after !== before);
+  if(changed) localStorage.setItem('nl_users', after);
+
+  // Eski listeye sahip bir cihaz push yapıp yeni kullanıcıyı buluttan düşürmüşse
+  // birleşmiş listeyi geri yazarak yakınsamayı garanti et.
+  const remoteMap = new Map(remoteUsers.map(u => [userKey(u), Number(u.uts || 0)]));
+  const needsPush = merged.some(u => {
+    const k = userKey(u);
+    return !remoteMap.has(k) || remoteMap.get(k) < Number(u.uts || 0);
+  });
+
+  return { changed, needsPush };
+}
+
+// Birleştirme sonrası açık oturumu güncel kullanıcı kaydıyla tazeler.
+function refreshSessionFromUsers(){
+  if(!currentUser) return false;
+  const freshMe = findUserRecord(currentUser);
+
+  if(freshMe && freshMe.deleted){
+    toast('w', 'Hesap Kaldırıldı', 'Hesabınız yönetici tarafından silindi. Oturum kapatılıyor.');
+    doLogout();
+    return true; // oturum kapandı
+  }
+  if(!freshMe) return false;
+
+  currentUser = {...freshMe};
+  if(!currentUser.role) currentUser.role = 'admin';
+  if(currentUser.role !== 'admin' && !currentUser.permissions) currentUser.permissions = ['sales'];
+  localStorage.setItem('nl_sess', JSON.stringify(currentUser));
+  applyRolePermissions();
+  return false;
+}
+
+// Kullanıcı ekranı açıksa tabloyu anında tazele
+function refreshUsersViewIfVisible(){
+  const page = document.getElementById('page-users');
+  if(currentTab === 'users' || (page && page.classList.contains('active'))){
+    if(currentUser && currentUser.role === 'admin') renderUsers();
+  }
 }
 
 function renderUsers(){
@@ -1764,11 +1878,11 @@ function saveUser(e){
     return;
   }
 
-  let users = getUsers();
+  let users = getUsersRaw();
 
   if(fId){
     const uid = parseInt(fId);
-    const idx = users.findIndex(x => x.id === uid);
+    const idx = users.findIndex(x => x.id === uid && !x.deleted);
     if(idx >= 0){
       users[idx].name = fName;
       users[idx].email = fEmail;
@@ -1776,6 +1890,7 @@ function saveUser(e){
       users[idx].password = fPass;
       users[idx].role = fRole;
       users[idx].permissions = fPerms;
+      users[idx].uts = Date.now();
       if(currentUser && currentUser.id === uid){
         currentUser = users[idx];
         localStorage.setItem('nl_sess', JSON.stringify(currentUser));
@@ -1784,19 +1899,22 @@ function saveUser(e){
       toast('s', 'Kullanıcı Güncellendi', `${fName} başarıyla güncellendi.`);
     }
   } else {
-    if(users.some(x => (x.email?.toLowerCase() === fEmail.toLowerCase() || x.username?.toLowerCase() === fEmail.toLowerCase()))){
+    const emailKey = fEmail.toLowerCase();
+    if(users.some(x => !x.deleted && (x.email?.toLowerCase() === emailKey || x.username?.toLowerCase() === emailKey))){
       toast('w', 'Kullanıcı Zaten Var', 'Bu kullanıcı adı veya e-posta adresi ile kayıtlı bir hesap bulunmaktadır.');
       return;
     }
-    const newId = nid(users);
+    // Aynı e-posta daha önce silinmişse tombstone'u temizle ki yeni kayıt geri gelmesin
+    users = users.filter(x => !(x.deleted && (x.email?.toLowerCase() === emailKey || x.username?.toLowerCase() === emailKey)));
     const newUser = {
-      id: newId,
+      id: newUserId(),
       name: fName,
       email: fEmail,
       username: fEmail,
       password: fPass,
       role: fRole,
-      permissions: fPerms
+      permissions: fPerms,
+      uts: Date.now()
     };
     users.push(newUser);
     const permLabels = {sales:'Satış',dashboard:'Panel',products:'Stok',stockin:'Giriş',critical:'Kritik',suppliers:'Tedarikçi',reports:'Rapor'};
@@ -1818,12 +1936,16 @@ function delUser(id){
     toast('w', 'İşlem Engellendi', 'Kendi yönetici hesabınızı silemezsiniz.');
     return;
   }
-  let users = getUsers();
-  const target = users.find(x => x.id === id);
+  let users = getUsersRaw();
+  const target = users.find(x => x.id === id && !x.deleted);
   if(!target) return;
 
   if(confirm(`"${target.name}" kullanıcısını silmek istediğinize emin misiniz?`)){
-    users = users.filter(x => x.id !== id);
+    // Tamamen silmek yerine tombstone bırak: aksi halde eski listeye sahip
+    // başka bir cihaz push yaptığında kullanıcı geri gelir.
+    users = users.map(x => x.id === id
+      ? { id: x.id, email: x.email, username: x.username, name: x.name, deleted: true, uts: Date.now() }
+      : x);
     saveUsers(users);
     renderUsers();
     toast('i', 'Kullanıcı Silindi', `${target.name} sistemden kaldırıldı.`);
@@ -1831,16 +1953,28 @@ function delUser(id){
 }
 
 // ══════════════ AUTH & ROLES ══════════════
-function doLogin(){
-  const input = (document.getElementById('l-email').value || '').trim().toLowerCase();
-  const pass = String(document.getElementById('l-pass').value || '');
-  const users = getUsers();
-  const u = users.find(x => {
+function findLoginUser(input, pass){
+  return getUsers().find(x => {
     const matchEmail = x.email && x.email.toLowerCase() === input;
     const matchUser = x.username && x.username.toLowerCase() === input;
     return (matchEmail || matchUser) && String(x.password) === pass;
   });
+}
+
+async function doLogin(){
+  const input = (document.getElementById('l-email').value || '').trim().toLowerCase();
+  const pass = String(document.getElementById('l-pass').value || '');
   const err = document.getElementById('login-err');
+
+  let u = findLoginUser(input, pass);
+
+  // Kullanıcı yerelde yoksa buluttan taze listeyi çekip bir kez daha dene:
+  // yeni tanımlanan bir personel, poll turunu beklemeden hemen giriş yapabilsin.
+  if(!u){
+    const pulled = await pullRemoteUsers();
+    if(pulled) u = findLoginUser(input, pass);
+  }
+
   if(u){
     // Ensure permissions array exists for non-admin users
     if(u.role !== 'admin' && !u.permissions){
@@ -1856,6 +1990,23 @@ function doLogin(){
   }
 }
 
+// Buluttan yalnızca kullanıcı listesini çeker ve yereldekiyle birleştirir.
+async function pullRemoteUsers(){
+  try{
+    if(syncProvider === 'supabase' && sbClient){
+      const { data } = await sbClient.from('company_inventory').select('users').eq('channel', syncChannel).maybeSingle();
+      return applyRemoteUsers(data && data.users).changed;
+    }
+    if(syncProvider === 'firebase' && fbSyncRef){
+      const snap = await fbSyncRef.child('users').get();
+      return applyRemoteUsers(snap && snap.val()).changed;
+    }
+  }catch(e){
+    console.warn('Kullanıcı listesi çekilemedi:', e);
+  }
+  return false;
+}
+
 function doLogout(){
   currentUser = null;
   localStorage.removeItem('nl_sess');
@@ -1869,14 +2020,12 @@ function checkSess(){
     try{
       let sessUser = JSON.parse(s);
       // Always refresh from nl_users to get latest permissions & role
-      const users = getUsers();
-      const freshUser = users.find(x => {
-        if(x.id === sessUser.id) return true;
-        // Also match by email/username in case id changed (user was deleted & re-added)
-        if(sessUser.email && x.email && x.email.toLowerCase() === sessUser.email.toLowerCase()) return true;
-        if(sessUser.username && x.username && x.username.toLowerCase() === sessUser.username.toLowerCase()) return true;
-        return false;
-      });
+      const freshUser = findUserRecord(sessUser);
+      // Hesap başka bir cihazdan silinmişse oturumu kapat
+      if(freshUser && freshUser.deleted){
+        doLogout();
+        return;
+      }
       if(freshUser){
         currentUser = {...freshUser};
       } else {
@@ -5291,6 +5440,7 @@ async function initSupabase(){
             orders: payload.new.orders,
             salesHistory: payload.new.sales_history,
             stockinHistory: payload.new.stockin_history,
+            users: payload.new.users,
             updatedAt: payload.new.updated_at,
             updatedBy: payload.new.updated_by
           }, 'Supabase Realtime');
@@ -5427,7 +5577,7 @@ function triggerCloudPush(reason, immediate = false){
     orders: go2(),
     salesHistory: gsh(),
     stockinHistory: gih(),
-    users: getUsers(),
+    users: getUsersRaw(), // tombstone'lar dahil, aksi halde silinenler diğer cihazlardan geri gelir
     updatedAt: lastCloudSyncTime,
     updatedBy: currentUser ? currentUser.email : 'user',
     channel: syncChannel
@@ -5530,24 +5680,19 @@ function applyRemotePayload(payload, source){
       if(Array.isArray(payload.orders)){
         localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
       }
-      if(Array.isArray(payload.users) && payload.users.length > 0){
-        localStorage.setItem('nl_users', JSON.stringify(payload.users));
-        // Refresh current session with latest permissions from remote
-        if(currentUser){
-          const freshMe = payload.users.find(u => u.id === currentUser.id || 
-            (u.email && currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase()) ||
-            (u.username && currentUser.username && u.username.toLowerCase() === currentUser.username.toLowerCase())
-          );
-          if(freshMe){
-            currentUser = {...freshMe};
-            if(!currentUser.role) currentUser.role = 'admin';
-            if(currentUser.role !== 'admin' && !currentUser.permissions) currentUser.permissions = ['sales'];
-            localStorage.setItem('nl_sess', JSON.stringify(currentUser));
-            applyRolePermissions();
-          }
-        }
-        if(currentTab === 'users') renderUsers();
-      }
+    }
+
+    // Kullanıcılar isStale kontrolünden BAĞIMSIZ olarak birleştirilir.
+    // (Cihazlar arası saat farkı yüzünden yeni tanımlanan bir kullanıcı asla düşmemeli.)
+    const userSync = applyRemoteUsers(payload.users);
+    if(userSync.needsPush && source !== 'Local Tab'){
+      // Debounce'lu push: birleşmiş listeyi buluta geri yaz
+      if(usersRepairTimeout) clearTimeout(usersRepairTimeout);
+      usersRepairTimeout = setTimeout(() => triggerCloudPush('users_repair', true), 800);
+    }
+    if(userSync.changed){
+      if(refreshSessionFromUsers()) return; // hesap silindi, oturum kapatıldı
+      refreshUsersViewIfVisible();
     }
 
     // Lossless Merge for Sales History (prevents any sale from ever being overwritten or lost)
@@ -5637,6 +5782,9 @@ async function testAndPullCloud(){
           products: data.products,
           suppliers: data.suppliers,
           orders: data.orders,
+          salesHistory: data.sales_history,
+          stockinHistory: data.stockin_history,
+          users: data.users,
           updatedAt: data.updated_at,
           updatedBy: data.updated_by
         }, 'Supabase');
