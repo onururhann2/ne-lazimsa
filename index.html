@@ -7,6 +7,7 @@
 <meta name="description" content="Modern stok ve satın alma yönetim sistemi">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -186,13 +187,15 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 .toast-msg{font-size:11.5px;color:var(--txt2);margin-top:2px}
 
 /* ── SCANNER ── */
-.scan-frame{position:relative;border-radius:10px;overflow:hidden;background:#000}
-#barcode-video,#qc-video,#stockin-video,#sales-video{width:100%;max-height:240px;object-fit:cover;display:block}
-.scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.scan-frame{position:relative;border-radius:10px;overflow:hidden;background:#000;min-height:220px}
+.scan-frame video, #barcode-video, #qc-video, #stockin-video, #sales-video, .scan-frame > div video{width:100% !important;max-height:240px !important;object-fit:cover !important;display:block !important;border-radius:10px !important}
+.scan-frame canvas{display:none !important}
+#qr-shaded-region{border-color:var(--accent) !important}
+.scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:5}
 .scan-guide{width:220px;height:140px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);position:relative;overflow:hidden}
 .scan-laser{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ef4444,#3b82f6,transparent);box-shadow:0 0 8px #3b82f6;animation:scanLaserAnim 2s ease-in-out infinite}
 @keyframes scanLaserAnim{0%{top:10%;opacity:0.3}50%{top:90%;opacity:1}100%{top:10%;opacity:0.3}}
-.scan-cam-switch{position:absolute;top:8px;right:8px;z-index:15;pointer-events:auto;background:rgba(15,23,42,.75);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;backdrop-filter:blur(4px);transition:all .2s}
+.scan-cam-switch{position:absolute;top:8px;right:8px;z-index:15;pointer-events:auto;background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;backdrop-filter:blur(4px);transition:all .2s}
 .scan-cam-switch:hover{background:rgba(15,23,42,.95);transform:scale(1.03)}
 .scan-result{margin-top:12px;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;font-size:12.5px;min-height:38px;display:flex;align-items:center}
 /* ── PRODUCT CARD ── */
@@ -2141,7 +2144,7 @@ async function switchCamera(key){
 }
 
 async function startCam(videoId, key, cb){
-  stopCam(key);
+  await stopCam(key);
   const video=document.getElementById(videoId);
   if(!video)return;
 
@@ -2155,7 +2158,96 @@ async function startCam(videoId, key, cb){
   try{
     readers[key]={active:true, videoId, cb};
 
-    // 1. Setup ZXing Multi-Format hints (EAN-13, EAN-8, Code 128, Code 39, UPC, QR) with TRY_HARDER
+    // 1. Discover available cameras (including external USB webcams)
+    if(availableCamList.length === 0){
+      await refreshCameraDeviceList();
+    }
+
+    let selectedDeviceId = preferredCameraId;
+    if(!selectedDeviceId || !availableCamList.some(d => d.deviceId === selectedDeviceId)){
+      const extCam = availableCamList.find(d => /usb|external|logitech|c920|c922|brio|streamcam|droidcam/i.test(d.label));
+      const backCam = availableCamList.find(d => /back|rear|environment|ark/i.test(d.label));
+      const chosen = extCam || backCam || availableCamList[0];
+      selectedDeviceId = chosen ? chosen.deviceId : undefined;
+      if(selectedDeviceId){
+        preferredCameraId = selectedDeviceId;
+        localStorage.setItem('nl_preferred_cam_id', preferredCameraId);
+      }
+    }
+
+    // Sync select dropdowns
+    document.querySelectorAll('.scan-cam-select').forEach(sel => {
+      if(selectedDeviceId) sel.value = selectedDeviceId;
+    });
+
+    // 2. PRIMARY ENGINE: Html5Qrcode with hardware-accelerated BarcodeDetector & multi-format support
+    if(typeof Html5Qrcode !== 'undefined'){
+      try{
+        const parentContainer = video.parentElement;
+        const hostId = videoId + '-html5-host';
+        let hostEl = document.getElementById(hostId);
+        if(!hostEl){
+          hostEl = document.createElement('div');
+          hostEl.id = hostId;
+          hostEl.style.cssText = 'width:100%;height:100%;min-height:220px;border-radius:10px;overflow:hidden';
+          parentContainer.insertBefore(hostEl, video);
+        }
+        video.style.display = 'none';
+        hostEl.style.display = 'block';
+
+        const html5QrCode = new Html5Qrcode(hostId, {
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          verbose: false
+        });
+        readers[key].html5QrCode = html5QrCode;
+
+        const formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODABAR,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ] : undefined;
+
+        const cameraConfig = selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: 'environment' };
+
+        await html5QrCode.start(
+          cameraConfig,
+          {
+            fps: 25,
+            qrbox: (viewfinderWidth, viewfinderHeight) => ({
+              width: Math.min(viewfinderWidth, Math.max(220, Math.floor(viewfinderWidth * 0.85))),
+              height: Math.min(viewfinderHeight, Math.max(140, Math.floor(viewfinderHeight * 0.65)))
+            }),
+            aspectRatio: 1.777778,
+            formatsToSupport: formats,
+            disableFlip: false
+          },
+          (decodedText) => {
+            if(!readers[key]?.active) return;
+            if(decodedText && decodedText.trim()){
+              playBeep();
+              showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${decodedText.trim()}</span>`);
+              cb(decodedText.trim());
+            }
+          },
+          () => {}
+        );
+        return;
+      }catch(html5Err){
+        console.warn('Html5Qrcode failed, falling back to ZXing stream decoder:', html5Err);
+        video.style.display = 'block';
+      }
+    }
+
+    // 3. SECONDARY ENGINE: ZXing Browser Multi-Format Reader with TRY_HARDER
     const ZXingLib = (typeof ZXing !== 'undefined') ? ZXing : (typeof ZXingBrowser !== 'undefined' ? ZXingBrowser : null);
     let codeReader = null;
 
@@ -2182,30 +2274,7 @@ async function startCam(videoId, key, cb){
       readers[key].zxing = codeReader;
     }
 
-    // 2. Discover available cameras (including external USB webcams)
-    if(availableCamList.length === 0){
-      await refreshCameraDeviceList();
-    }
-
-    let selectedDeviceId = preferredCameraId;
-    if(!selectedDeviceId || !availableCamList.some(d => d.deviceId === selectedDeviceId)){
-      // If no preferred camera, favor external USB camera or environment camera
-      const extCam = availableCamList.find(d => /usb|external|logitech|c920|c922|brio|streamcam|droidcam/i.test(d.label));
-      const backCam = availableCamList.find(d => /back|rear|environment|ark/i.test(d.label));
-      const chosen = extCam || backCam || availableCamList[0];
-      selectedDeviceId = chosen ? chosen.deviceId : undefined;
-      if(selectedDeviceId){
-        preferredCameraId = selectedDeviceId;
-        localStorage.setItem('nl_preferred_cam_id', preferredCameraId);
-      }
-    }
-
-    // Sync select dropdowns
-    document.querySelectorAll('.scan-cam-select').forEach(sel => {
-      if(selectedDeviceId) sel.value = selectedDeviceId;
-    });
-
-    // 3. Stream Capture with HD constraints, continuous autofocus and exact device selection
+    // 4. Stream Capture with HD constraints and continuous autofocus
     let stream = null;
     try{
       const constraints = {
@@ -2235,30 +2304,30 @@ async function startCam(videoId, key, cb){
       readers[key].stream = stream;
     }
 
-    // 4. Primary Decoding: ZXing Continuous Video Stream Decoder
+    // 5. ZXing Continuous Video Stream Decoder
     if(codeReader){
       try{
         if(stream && typeof codeReader.decodeFromStream === 'function'){
-          codeReader.decodeFromStream(stream, video, (result, err) => {
+          codeReader.decodeFromStream(stream, video, (result) => {
             if(!readers[key]?.active) return;
             if(result){
               const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
               if(text && text.trim()){
                 playBeep();
-                showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${text}</span>`);
+                showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${text.trim()}</span>`);
                 cb(text.trim());
               }
             }
           });
           return;
         } else {
-          await codeReader.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+          await codeReader.decodeFromVideoDevice(selectedDeviceId, video, (result) => {
             if(!readers[key]?.active) return;
             if(result){
               const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
               if(text && text.trim()){
                 playBeep();
-                showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${text}</span>`);
+                showCamMsg(videoId, `<span style="color:var(--green);font-weight:600">✅ Barkod: ${text.trim()}</span>`);
                 cb(text.trim());
               }
             }
@@ -2270,7 +2339,7 @@ async function startCam(videoId, key, cb){
       }
     }
 
-    // 5. Secondary Native BarcodeDetector (Chrome Android / Supported OS)
+    // 6. Native BarcodeDetector
     if('BarcodeDetector' in window){
       try{
         const sup = await BarcodeDetector.getSupportedFormats();
@@ -2305,9 +2374,18 @@ async function startCam(videoId, key, cb){
   }
 }
 
-function stopCam(key){
+async function stopCam(key){
   if(!readers[key])return;
   readers[key].active=false;
+
+  if(readers[key].html5QrCode){
+    try{
+      if(readers[key].html5QrCode.isScanning){
+        await readers[key].html5QrCode.stop();
+      }
+      readers[key].html5QrCode.clear();
+    }catch(e){}
+  }
   if(readers[key].zxing){
     try{readers[key].zxing.reset();}catch(e){}
   }
@@ -2316,7 +2394,12 @@ function stopCam(key){
   }
   try{
     const video=document.getElementById(readers[key].videoId || (key+'-video'));
-    if(video)video.srcObject=null;
+    if(video){
+      video.srcObject=null;
+      video.style.display='block';
+    }
+    const hostEl = document.getElementById((readers[key].videoId || (key+'-video')) + '-html5-host');
+    if(hostEl) hostEl.style.display='none';
   }catch(e){}
   delete readers[key];
 }
