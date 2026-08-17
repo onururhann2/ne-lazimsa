@@ -1054,8 +1054,8 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       <div class="card" style="padding:14px 18px;margin-bottom:16px;background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);display:flex;align-items:center;gap:12px">
         <div style="font-size:24px">🔒</div>
         <div style="font-size:12px;color:var(--txt2)">
-          <strong style="color:var(--txt)">Yetki Kuralı:</strong> 
-          <strong style="color:var(--accent)">Kasiyer</strong> olarak tanımlanan kullanıcılar sisteme giriş yaptıklarında <u>yalnızca Satış Ekranı'na</u> erişebilirler. Stok takibi, kritik stoklar, alış fiyatları, raporlar veya kullanıcı yönetimini göremezler.
+          <strong style="color:var(--txt)">Esnek Yetki Sistemi:</strong> 
+          Personel eklerken hangi sayfalara erişebileceğini <strong style="color:var(--accent)">tek tek seçebilirsiniz</strong>. Satış ekranı her zaman açıktır. Kullanıcı yönetimi yalnızca Admin'e aittir.
         </div>
       </div>
       <div class="tbl-wrap">
@@ -1226,7 +1226,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 
 <!-- User / Cashier Modal -->
 <div class="overlay" id="m-user">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="max-width:540px">
     <div class="modal-hdr">
       <h2 class="modal-ttl" id="user-ttl">Kullanıcı / Kasiyer Ekle</h2>
       <button class="modal-x" onclick="closeM('m-user')">×</button>
@@ -1247,11 +1247,74 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         </div>
       </div>
       <div class="fg">
-        <label>Kullanıcı Rolü & Yetkisi *</label>
-        <select id="u-form-role" required style="width:100%;padding:9px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-weight:600">
-          <option value="cashier">🛒 Kasiyer (Yalnızca Satış Ekranı Yetkisi)</option>
-          <option value="admin">👑 Admin / Yönetici (Tüm Sisteme Tam Yetki)</option>
+        <label>Kullanıcı Tipi *</label>
+        <select id="u-form-role" required onchange="togglePermPanel()" style="width:100%;padding:9px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-weight:600">
+          <option value="cashier">🛒 Personel / Kasiyer</option>
+          <option value="admin">👑 Admin / Yönetici (Tüm Yetkiler)</option>
         </select>
+      </div>
+      <!-- Granular Permissions Panel -->
+      <div id="perm-panel" style="margin-top:6px">
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:12.5px;font-weight:700;color:var(--txt)">📋 Sayfa & Yetki İzinleri</div>
+            <div style="display:flex;gap:6px">
+              <button type="button" onclick="permCheckAll(true)" style="font-size:10.5px;padding:3px 8px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">Tümünü Seç</button>
+              <button type="button" onclick="permCheckAll(false)" style="font-size:10.5px;padding:3px 8px;border-radius:6px;background:var(--bg2);color:var(--txt2);border:1px solid var(--border);cursor:pointer;font-weight:600">Temizle</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="perm-checks">
+            <label class="perm-check-lbl" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:all .2s">
+              <input type="checkbox" value="sales" checked disabled style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:var(--txt)">🛒 Satış Ekranı</div>
+                <div style="font-size:10px;color:var(--txt3)">Her zaman açık</div>
+              </div>
+            </label>
+            <label class="perm-check-lbl" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:all .2s">
+              <input type="checkbox" class="perm-cb" value="dashboard" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:var(--txt)">📊 Dashboard</div>
+                <div style="font-size:10px;color:var(--txt3)">Panel & özet</div>
+              </div>
+            </label>
+            <label class="perm-check-lbl" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:all .2s">
+              <input type="checkbox" class="perm-cb" value="products" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:var(--txt)">📦 Stok Takibi</div>
+                <div style="font-size:10px;color:var(--txt3)">Ürün listesi</div>
+              </div>
+            </label>
+            <label class="perm-check-lbl" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:all .2s">
+              <input type="checkbox" class="perm-cb" value="stockin" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:var(--txt)">📥 Stok Girişi</div>
+                <div style="font-size:10px;color:var(--txt3)">Ürün ekleme</div>
+              </div>
+            </label>
+            <label class="perm-check-lbl" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:all .2s">
+              <input type="checkbox" class="perm-cb" value="critical" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:var(--txt)">⚠️ Kritik Stoklar</div>
+                <div style="font-size:10px;color:var(--txt3)">Azalan ürünler</div>
+              </div>
+            </label>
+            <label class="perm-check-lbl" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:all .2s">
+              <input type="checkbox" class="perm-cb" value="suppliers" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:var(--txt)">🏭 Tedarikçiler</div>
+                <div style="font-size:10px;color:var(--txt3)">Tedarikçi yönetimi</div>
+              </div>
+            </label>
+            <label class="perm-check-lbl" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:all .2s">
+              <input type="checkbox" class="perm-cb" value="reports" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:var(--txt)">📈 Raporlar</div>
+                <div style="font-size:10px;color:var(--txt3)">Satış & analiz</div>
+              </div>
+            </label>
+          </div>
+        </div>
       </div>
       <input type="hidden" id="u-form-id">
       <div class="modal-ftr">
@@ -1563,11 +1626,22 @@ function renderUsers(){
     return;
   }
 
+  const permLabels = {sales:'🛒 Satış',dashboard:'📊 Panel',products:'📦 Stok',stockin:'📥 Giriş',critical:'⚠️ Kritik',suppliers:'🏭 Tedarikçi',reports:'📈 Rapor'};
+
   tbody.innerHTML = users.map(u => {
     const isSelf = (currentUser && currentUser.id === u.id);
-    const roleBadge = (u.role === 'admin')
-      ? '<span class="badge b-purple" style="font-weight:700">👑 Admin (Yönetici)</span>'
-      : '<span class="badge b-blue" style="font-weight:700">🛒 Kasiyer (Sadece Satış)</span>';
+    const isAdmin = (u.role === 'admin');
+    const roleBadge = isAdmin
+      ? '<span class="badge b-purple" style="font-weight:700">👑 Admin</span>'
+      : '<span class="badge b-blue" style="font-weight:700">🛒 Personel</span>';
+    
+    let permBadges = '';
+    if(isAdmin){
+      permBadges = '<span style="font-size:10.5px;color:var(--txt3);font-style:italic">Tüm yetkiler</span>';
+    } else {
+      const perms = u.permissions || ['sales'];
+      permBadges = perms.map(p => `<span style="display:inline-block;font-size:9.5px;padding:2px 6px;border-radius:5px;background:var(--bg3);border:1px solid var(--border);color:var(--txt2);margin:1px 2px;font-weight:600">${permLabels[p]||p}</span>`).join('');
+    }
 
     return `<tr>
       <td>
@@ -1580,7 +1654,12 @@ function renderUsers(){
         </div>
       </td>
       <td><code style="font-size:12px;color:var(--accent);font-weight:600">${u.email || u.username}</code></td>
-      <td>${roleBadge}</td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${roleBadge}
+          <div style="display:flex;flex-wrap:wrap;gap:2px;max-width:200px">${permBadges}</div>
+        </div>
+      </td>
       <td>
         <span style="font-family:monospace;font-size:12px;background:var(--bg3);padding:3px 7px;border-radius:6px;border:1px solid var(--border)">${u.password}</span>
       </td>
@@ -1607,6 +1686,9 @@ function openUserModal(userId = null){
   const fPass = document.getElementById('u-form-pass');
   const fRole = document.getElementById('u-form-role');
 
+  // Reset all permission checkboxes
+  document.querySelectorAll('.perm-cb').forEach(cb => cb.checked = false);
+
   if(userId){
     const u = users.find(x => x.id === userId);
     if(!u) return;
@@ -1616,15 +1698,45 @@ function openUserModal(userId = null){
     fEmail.value = u.email || u.username || '';
     fPass.value = u.password || '';
     fRole.value = u.role || 'cashier';
+    // Set permission checkboxes
+    const perms = u.permissions || ['sales'];
+    document.querySelectorAll('.perm-cb').forEach(cb => {
+      cb.checked = perms.includes(cb.value);
+    });
   } else {
-    ttl.textContent = 'Yeni Kullanıcı / Kasiyer Ekle';
+    ttl.textContent = 'Yeni Kullanıcı / Personel Ekle';
     fId.value = '';
     fName.value = '';
     fEmail.value = '';
     fPass.value = '';
     fRole.value = 'cashier';
   }
+  togglePermPanel();
   openM('m-user');
+}
+
+function togglePermPanel(){
+  const role = document.getElementById('u-form-role').value;
+  const panel = document.getElementById('perm-panel');
+  if(panel){
+    if(role === 'admin'){
+      panel.style.display = 'none';
+    } else {
+      panel.style.display = 'block';
+    }
+  }
+}
+
+function permCheckAll(state){
+  document.querySelectorAll('.perm-cb').forEach(cb => cb.checked = state);
+}
+
+function getSelectedPerms(){
+  const perms = ['sales']; // Always included
+  document.querySelectorAll('.perm-cb').forEach(cb => {
+    if(cb.checked && !perms.includes(cb.value)) perms.push(cb.value);
+  });
+  return perms;
 }
 
 function saveUser(e){
@@ -1638,6 +1750,7 @@ function saveUser(e){
   const fEmail = document.getElementById('u-form-email').value.trim();
   const fPass = document.getElementById('u-form-pass').value.trim();
   const fRole = document.getElementById('u-form-role').value;
+  const fPerms = (fRole === 'admin') ? ['sales','dashboard','products','stockin','critical','suppliers','reports'] : getSelectedPerms();
 
   if(!fName || !fEmail || !fPass){
     toast('w', 'Eksik Alan', 'Lütfen tüm zorunlu alanları doldurun.');
@@ -1655,6 +1768,7 @@ function saveUser(e){
       users[idx].username = fEmail;
       users[idx].password = fPass;
       users[idx].role = fRole;
+      users[idx].permissions = fPerms;
       if(currentUser && currentUser.id === uid){
         currentUser = users[idx];
         localStorage.setItem('nl_sess', JSON.stringify(currentUser));
@@ -1674,10 +1788,11 @@ function saveUser(e){
       email: fEmail,
       username: fEmail,
       password: fPass,
-      role: fRole
+      role: fRole,
+      permissions: fPerms
     };
     users.push(newUser);
-    toast('s', 'Yeni Kullanıcı Oluşturuldu 🎉', `${fName} (${fRole === 'cashier' ? 'Kasiyer' : 'Admin'}) sisteme eklendi.`);
+    toast('s', 'Yeni Kullanıcı Oluşturuldu 🎉', `${fName} (${fRole === 'cashier' ? 'Personel' : 'Admin'}) sisteme eklendi.`);
   }
 
   saveUsers(users);
@@ -1755,37 +1870,70 @@ function applyRolePermissions(){
   if(!currentUser.role){
     currentUser.role = (currentUser.email === 'kasiyer@nelazimsa.com' || currentUser.username === 'kasiyer') ? 'cashier' : 'admin';
   }
-  const isCashier = (currentUser.role === 'cashier');
+  const isAdmin = (currentUser.role === 'admin');
+  const perms = isAdmin ? ['sales','dashboard','products','stockin','critical','suppliers','reports','users','sync'] : (currentUser.permissions || ['sales']);
 
-  // Show / Hide sidebar navigation based on role
-  document.querySelectorAll('.nav-admin-only, #nav-dashboard, #nav-products, #nav-critical, #nav-stockin, #nav-suppliers, #nav-reports, #nav-sync, #nav-users, .sidebar-nav .nav-sec').forEach(el => {
-    if(isCashier){
-      el.style.display = 'none';
-    } else {
-      el.style.display = '';
+  // Page-to-nav mapping
+  const navMap = {
+    dashboard: 'nav-dashboard',
+    products: 'nav-products',
+    critical: 'nav-critical',
+    stockin: 'nav-stockin',
+    suppliers: 'nav-suppliers',
+    reports: 'nav-reports',
+    sales: 'nav-sales',
+    users: 'nav-users',
+    sync: 'nav-sync'
+  };
+
+  // Hide all nav sections first for non-admin
+  document.querySelectorAll('.sidebar-nav .nav-sec').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+
+  // Show/hide nav items based on permissions
+  Object.entries(navMap).forEach(([page, navId]) => {
+    const el = document.getElementById(navId);
+    if(el){
+      if(isAdmin){
+        el.style.display = '';
+      } else if(page === 'users' || page === 'sync'){
+        el.style.display = 'none'; // Users & sync always admin-only
+      } else {
+        el.style.display = perms.includes(page) ? '' : 'none';
+      }
     }
   });
 
-  // Keep sales visible for cashier
-  const navSales = document.getElementById('nav-sales');
-  if(navSales) navSales.style.display = 'flex';
+  // Show section headers if at least one item in that section is visible
+  if(!isAdmin){
+    const navSections = document.querySelectorAll('.sidebar-nav .nav-sec');
+    navSections.forEach(sec => {
+      let next = sec.nextElementSibling;
+      let hasVisible = false;
+      while(next && !next.classList.contains('nav-sec')){
+        if(next.classList.contains('nav-item') && next.style.display !== 'none'){
+          hasVisible = true;
+          break;
+        }
+        next = next.nextElementSibling;
+      }
+      sec.style.display = hasVisible ? '' : 'none';
+    });
+  }
 
   // Bottom nav adjustments
-  const bnavDash = document.getElementById('bnav-dashboard');
-  const bnavProd = document.getElementById('bnav-products');
-  const bnavStockin = document.getElementById('bnav-stockin');
-  const bnavCrit = document.getElementById('bnav-critical');
-  if(isCashier){
-    if(bnavDash) bnavDash.style.display = 'none';
-    if(bnavProd) bnavProd.style.display = 'none';
-    if(bnavStockin) bnavStockin.style.display = 'none';
-    if(bnavCrit) bnavCrit.style.display = 'none';
-  } else {
-    if(bnavDash) bnavDash.style.display = '';
-    if(bnavProd) bnavProd.style.display = '';
-    if(bnavStockin) bnavStockin.style.display = '';
-    if(bnavCrit) bnavCrit.style.display = '';
-  }
+  const bnavMap = {dashboard:'bnav-dashboard', products:'bnav-products', stockin:'bnav-stockin', critical:'bnav-critical', sales:'bnav-sales'};
+  Object.entries(bnavMap).forEach(([page, bnavId]) => {
+    const el = document.getElementById(bnavId);
+    if(el){
+      el.style.display = (isAdmin || perms.includes(page)) ? '' : 'none';
+    }
+  });
+
+  // Dashboard quick-access buttons visibility
+  const dashUsersBtn = document.querySelector('.page-actions [onclick="go(\'users\')"]');
+  if(dashUsersBtn) dashUsersBtn.style.display = isAdmin ? '' : 'none';
 
   // Update profile
   const uAv = document.getElementById('u-av');
@@ -1794,11 +1942,17 @@ function applyRolePermissions(){
   if(uAv) uAv.textContent = (currentUser.name || 'U')[0].toUpperCase();
   if(uName) uName.textContent = currentUser.name;
   if(uEmail) {
-    const roleBadge = isCashier
-      ? '<span class="badge b-blue" style="font-size:9.5px;padding:2px 6px;margin-top:3px;display:inline-block">🛒 Kasiyer</span>'
-      : '<span class="badge b-purple" style="font-size:9.5px;padding:2px 6px;margin-top:3px;display:inline-block">👑 Yönetici (Admin)</span>';
+    const roleBadge = isAdmin
+      ? '<span class="badge b-purple" style="font-size:9.5px;padding:2px 6px;margin-top:3px;display:inline-block">👑 Yönetici (Admin)</span>'
+      : '<span class="badge b-blue" style="font-size:9.5px;padding:2px 6px;margin-top:3px;display:inline-block">🛒 Personel</span>';
     uEmail.innerHTML = `<div style="color:var(--txt2);font-size:11px">${currentUser.email || currentUser.username}</div>${roleBadge}`;
   }
+}
+
+function getUserPerms(){
+  if(!currentUser) return ['sales'];
+  if(currentUser.role === 'admin') return ['sales','dashboard','products','stockin','critical','suppliers','reports','users','sync'];
+  return currentUser.permissions || ['sales'];
 }
 
 function showApp(){
@@ -1808,14 +1962,21 @@ function showApp(){
   setupRealtimeSync();
   applyRolePermissions();
 
-  const isCashier = (currentUser && currentUser.role === 'cashier');
-  const defaultPage = isCashier ? 'sales' : (localStorage.getItem('nl_last_page') || 'dashboard');
-  go(defaultPage);
+  const perms = getUserPerms();
+  const defaultPage = perms.includes('dashboard') ? 'dashboard' : 'sales';
+  const lastPage = localStorage.getItem('nl_last_page') || defaultPage;
+  go(perms.includes(lastPage) ? lastPage : defaultPage);
 }
 
 // ══════════════ NAVIGATION ══════════════
 function go(page){
-  if(currentUser && currentUser.role === 'cashier' && page !== 'sales'){
+  const perms = getUserPerms();
+  // Users & sync are always admin-only
+  if((page === 'users' || page === 'sync') && currentUser && currentUser.role !== 'admin'){
+    page = 'sales';
+  }
+  // Check if user has permission to the requested page
+  if(!perms.includes(page) && page !== 'users' && page !== 'sync'){
     page = 'sales';
   }
   localStorage.setItem('nl_last_page', page);
