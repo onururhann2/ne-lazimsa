@@ -581,7 +581,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
           <p class="page-sub">Tarih aralığı, kategori ve ürün bazında tüm hareketler</p>
         </div>
         <div class="page-actions">
-          <button class="btn btn-ghost" onclick="csvDailyReport()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Raporu CSV İndir</button>
+          <button class="btn btn-ghost" onclick="openReportExportModal()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Excel / CSV İndir</button>
           <button class="btn btn-ghost" onclick="window.print()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Yazdır</button>
         </div>
       </div>
@@ -1028,6 +1028,54 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 </nav>
 
 <!-- ═══ MODALS ═══ -->
+
+<!-- Export Report Options Modal -->
+<div class="overlay" id="m-report-export">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-hdr">
+      <h2 class="modal-ttl">📊 Excel / CSV Raporu Aktar</h2>
+      <button class="modal-x" onclick="closeM('m-report-export')">×</button>
+    </div>
+    <div style="padding:4px 0 16px">
+      <p style="font-size:12.5px;color:var(--txt2);margin-bottom:16px">Lütfen Excel'e (.CSV) aktarmak istediğiniz rapor içeriğini seçin:</p>
+      
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <!-- 1. Günlük / Dönem Satış Raporu -->
+        <div onclick="exportReportByType('sales')" style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--bg3);cursor:pointer;display:flex;align-items:center;gap:14px;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:26px;width:44px;height:44px;border-radius:10px;background:rgba(59,130,246,.12);display:flex;align-items:center;justify-content:center">🛒</div>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:13.5px;color:var(--txt)">1. Dönem / Günlük Satış Raporu</div>
+            <div style="font-size:11.5px;color:var(--txt2);margin-top:2px">Seçilen tarih aralığındaki tüm satış fişleri, satılan ürünler, ciro ve net kârlar</div>
+          </div>
+          <span class="btn btn-sm btn-primary" style="pointer-events:none">İndir →</span>
+        </div>
+
+        <!-- 2. Günlük / Dönem Ürün & Stok Girişleri -->
+        <div onclick="exportReportByType('stockin')" style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--bg3);cursor:pointer;display:flex;align-items:center;gap:14px;transition:all .2s" onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:26px;width:44px;height:44px;border-radius:10px;background:rgba(16,185,129,.12);display:flex;align-items:center;justify-content:center">📥</div>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:13.5px;color:var(--txt)">2. Dönem / Günlük Ürün & Stok Girişleri</div>
+            <div style="font-size:11.5px;color:var(--txt2);margin-top:2px">Seçilen tarih aralığında stoğa eklenen ürünler, adetler, birim alış/satış fiyatları ve maliyetler</div>
+          </div>
+          <span class="btn btn-sm btn-success" style="pointer-events:none">İndir →</span>
+        </div>
+
+        <!-- 3. Güncel Stok Durumu & Kategori Analizi -->
+        <div onclick="exportReportByType('inventory')" style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--bg3);cursor:pointer;display:flex;align-items:center;gap:14px;transition:all .2s" onmouseover="this.style.borderColor='var(--purple,#8b5cf6)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:26px;width:44px;height:44px;border-radius:10px;background:rgba(139,92,246,.12);display:flex;align-items:center;justify-content:center">📦</div>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:13.5px;color:var(--txt)">3. Güncel Stok Durumu & Kategori Analizi</div>
+            <div style="font-size:11.5px;color:var(--txt2);margin-top:2px">Tüm ürünlerin anlık stokları, alış/satış fiyatları ve tüm stok satılırsa oluşacak ciro & kâr potansiyeli</div>
+          </div>
+          <span class="btn btn-sm" style="background:var(--purple,#8b5cf6);color:#fff;pointer-events:none">İndir →</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button type="button" class="btn btn-ghost" onclick="closeM('m-report-export')">Vazgeç</button>
+    </div>
+  </div>
+</div>
 
 <!-- Product -->
 <div class="overlay" id="m-prod">
@@ -1967,72 +2015,119 @@ function renderRep(){
   }
 }
 
-function csvDailyReport(){
+function openReportExportModal(){
+  openM('m-report-export');
+}
+
+function exportReportByType(type){
+  closeM('m-report-export');
   const startEl = document.getElementById('rep-date-start');
   const endEl = document.getElementById('rep-date-end');
   const startDate = startEl ? startEl.value : '';
   const endDate = endEl ? endEl.value : '';
 
   const P = gp();
-  const sHist = gsh().filter(s => {
+  const rawSales = gsh();
+  const rawStockin = gih();
+
+  const sHist = rawSales.filter(s => {
     if(startDate && s.date < startDate) return false;
     if(endDate && s.date > endDate) return false;
     return true;
   });
-  const inHist = gih().filter(i => {
+
+  const inHist = rawStockin.filter(i => {
     if(startDate && i.date < startDate) return false;
     if(endDate && i.date > endDate) return false;
     return true;
   });
 
-  const headers = ['İşlem Türü', 'Tarih', 'Saat', 'Fiş/İşlem No', 'Ürün Adı', 'Kategori', 'Miktar', 'Birim', 'Alış Fiyatı (₺)', 'Satış Fiyatı (₺)', 'Toplam Tutar (₺)', 'Elde Edilen Kâr (₺)', 'Kullanıcı / Not'];
-  const rows = [];
+  const dateSuffix = (startDate && endDate) ? `${startDate}_${endDate}` : (startDate || endDate || 'tum_zamanlar');
 
-  // Add Sales
-  sHist.forEach(s => {
-    (s.items || []).forEach(item => {
-      const prod = P.find(x => x.id === item.prodId);
+  if(type === 'sales'){
+    const headers = ['Tarih', 'Saat', 'Fiş/İşlem No', 'Ürün Adı', 'Kategori', 'Satılan Miktar', 'Birim', 'Alış Fiyatı (₺)', 'Satış Fiyatı (₺)', 'Toplam Satış Cirosu (₺)', 'Elde Edilen Kâr (₺)', 'Kullanıcı'];
+    const rows = [];
+    sHist.forEach(s => {
+      (s.items || []).forEach(item => {
+        const prod = P.find(x => x.id === item.prodId);
+        rows.push([
+          s.date,
+          s.time || '',
+          s.receiptNo || ('#' + s.id),
+          item.name,
+          item.cat || (prod ? prod.cat : ''),
+          item.qty,
+          item.unit || 'Adet',
+          item.buyPrice || 0,
+          item.sellPrice || 0,
+          item.total || 0,
+          item.profit || 0,
+          s.user || ''
+        ]);
+      });
+    });
+    dlCSV(`satis_raporu_${dateSuffix}.csv`, headers, rows);
+    toast('s', 'Satış Raporu İndirildi 🚀', `${rows.length} kalem satış hareketi Excel (.CSV) olarak indirildi.`);
+
+  } else if(type === 'stockin'){
+    const headers = ['Tarih', 'Saat', 'Giriş No', 'Ürün Adı', 'Kategori', 'Eklenen Stok Miktarı', 'Birim', 'Alış Fiyatı (₺)', 'Satış Fiyatı (₺)', 'Toplam Giriş Maliyeti (₺)', 'Not / Açıklama'];
+    const rows = [];
+    inHist.forEach(i => {
+      const prod = P.find(x => x.id === i.prodId);
       rows.push([
-        'SATIŞ',
-        s.date,
-        s.time || '',
-        s.receiptNo || ('#' + s.id),
-        item.name,
-        item.cat || (prod ? prod.cat : ''),
-        item.qty,
-        item.unit,
-        item.buyPrice,
-        item.sellPrice,
-        item.total,
-        item.profit,
-        s.user || ''
+        i.date || '',
+        i.time || '',
+        '#' + i.id,
+        i.name,
+        i.cat || (prod ? prod.cat : ''),
+        '+' + i.qty,
+        i.unit || 'Adet',
+        i.buyPrice || 0,
+        i.sellPrice || 0,
+        i.totalValue || (i.qty * (i.buyPrice || 0)),
+        i.note || ''
       ]);
     });
-  });
+    dlCSV(`stok_girisleri_raporu_${dateSuffix}.csv`, headers, rows);
+    toast('s', 'Stok Giriş Raporu İndirildi 🚀', `${rows.length} adet stok girişi Excel (.CSV) olarak indirildi.`);
 
-  // Add Stock-in
-  inHist.forEach(inItem => {
-    const prod = P.find(x => x.id === inItem.prodId);
-    rows.push([
-      'STOK GİRİŞİ',
-      inItem.date,
-      inItem.time || '',
-      '#' + inItem.id,
-      inItem.name,
-      inItem.cat || (prod ? prod.cat : ''),
-      '+' + inItem.qty,
-      inItem.unit,
-      inItem.buyPrice,
-      inItem.sellPrice,
-      inItem.totalValue,
-      '0.00',
-      inItem.note || ''
-    ]);
-  });
+  } else if(type === 'inventory'){
+    const headers = ['Kategori', 'Ürün Adı', 'Ana Barkod', 'Alt Barkodlar', 'Mevcut Stok', 'Birim', 'Kritik Seviye', 'Alış Fiyatı (₺)', 'Satış Fiyatı (₺)', 'Mevcut Stok Maliyeti (₺)', 'Tüm Stok Satılırsa Toplam Tutar (₺)', 'Tüm Stok Satılırsa Beklenen Kâr (₺)', 'Durum'];
+    const rows = [];
+    P.forEach(p => {
+      const stk = parseInt(p.stk || 0);
+      const buyP = parseFloat(p.price) || 0;
+      const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? parseFloat(p.sellPrice) : buyP;
+      const totalCost = stk * buyP;
+      const totalSell = stk * sellP;
+      const totalProfit = totalSell - totalCost;
+      const altStr = Array.isArray(p.altBarcodes) ? p.altBarcodes.join(', ') : (p.altBarcodes || '');
+      const st = sst(p);
+      const stLabel = st === 'ok' ? 'Normal' : (st === 'warn' ? 'Düşük' : 'Kritik');
 
-  const rangeStr = (startDate && endDate) ? `${startDate}_${endDate}` : (startDate || endDate || 'tum_zamanlar');
-  const filename = `hareket_ve_kategori_raporu_${rangeStr}.csv`;
-  dlCSV(filename, headers, rows);
+      rows.push([
+        p.cat || 'Genel',
+        p.name,
+        p.barc || '',
+        altStr,
+        stk,
+        p.unit || 'Adet',
+        p.min || 0,
+        buyP,
+        sellP,
+        totalCost,
+        totalSell,
+        totalProfit,
+        stLabel
+      ]);
+    });
+    dlCSV(`guncel_stok_ve_potansiyel_raporu_${getTodayStr()}.csv`, headers, rows);
+    toast('s', 'Güncel Stok Raporu İndirildi 🚀', `${rows.length} çeşit ürünün güncel stok ve ciro potansiyeli indirildi.`);
+  }
+}
+
+function csvDailyReport(){
+  openReportExportModal();
 }
 
 function mkChart(id,type,data,opts){
