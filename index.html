@@ -1024,7 +1024,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
       </div>
       <div class="form-row">
         <div class="fg"><label>Ana Kategori *</label><input type="text" id="p-cat2" list="catlist" required placeholder="Örn: Kırtasiye" oninput="updateSubCatDatalist(this.value)"><datalist id="catlist"></datalist></div>
-        <div class="fg"><label>Alt Kategori</label><input type="text" id="p-subcat" list="subcatlist" placeholder="Örn: Kağıt Ürünleri"><datalist id="subcatlist"></datalist></div>
+        <div class="fg"><label>Alt Kategori</label><input type="text" id="p-subcat2" list="subcatlist" placeholder="Örn: Kağıt Ürünleri"><datalist id="subcatlist"></datalist></div>
       </div>
       <div class="form-row">
         <div class="fg"><label>Birim</label><select id="p-unit"><option>Adet</option><option>Kg</option><option>Litre</option><option>Metre</option><option>Kutu</option><option>Paket</option><option>Koli</option><option>Bidon</option><option>Çift</option></select></div>
@@ -1480,13 +1480,23 @@ function renderProds(){
   const stF=document.getElementById('p-status')?.value||'';
   let P=gp();
 
-  // Populate Main Category filter & datalists
+  // Populate Main Category filter
   const mainCats=[...new Set(P.map(p=>p.cat).filter(Boolean))].sort();
   const catEl=document.getElementById('p-cat');
-  if(catEl && !catEl.children.length > 1){
+  if(catEl){
     const prev=catEl.value;
     catEl.innerHTML='<option value="">Tüm Ana Kategoriler</option>'+mainCats.map(c=>`<option value="${c}" ${c===prev?'selected':''}>${c}</option>`).join('');
   }
+  
+  // Populate Sub Category filter for current Main Category
+  const subCatEl=document.getElementById('p-subcat');
+  if(subCatEl){
+    const prevSub=subCatEl.value;
+    const subCats=[...new Set(P.filter(p => !catF || p.cat === catF).map(p => p.subCat).filter(Boolean))].sort();
+    subCatEl.innerHTML='<option value="">Tüm Alt Kategoriler</option>'+subCats.map(sc=>`<option value="${sc}" ${sc===prevSub?'selected':''}>${sc}</option>`).join('');
+  }
+
+  // Populate Datalists for Modal Autocomplete
   const dl=document.getElementById('catlist');
   if(dl) dl.innerHTML=mainCats.map(c=>`<option value="${c}">`).join('');
   
@@ -1569,7 +1579,7 @@ function openProdModal(id){
     const altArr = Array.isArray(p.altBarcodes) ? p.altBarcodes : (typeof p.altBarcodes === 'string' ? p.altBarcodes.split(',') : []);
     document.getElementById('p-alt-barc').value = altArr.map(x => x.trim()).filter(Boolean).join(', ');
     document.getElementById('p-cat2').value=p.cat || '';
-    document.getElementById('p-subcat').value=p.subCat || '';
+    document.getElementById('p-subcat2').value=p.subCat || '';
     updateSubCatDatalist(p.cat || '');
     document.getElementById('p-unit').value=p.unit;
     document.getElementById('p-stk').value=p.stk;
@@ -1584,7 +1594,7 @@ function openProdModal(id){
     document.querySelector('#m-prod form').reset();
     document.getElementById('p-id').value='';
     document.getElementById('p-alt-barc').value='';
-    document.getElementById('p-subcat').value='';
+    document.getElementById('p-subcat2').value='';
     updateSubCatDatalist('');
     calcProdProfit();
     if(lastCode){document.getElementById('p-barc').value=lastCode;lastCode=null;}
@@ -1604,7 +1614,7 @@ function saveProd(e){
     barc:document.getElementById('p-barc').value.trim(),
     altBarcodes: altBarcodes,
     cat:document.getElementById('p-cat2').value.trim() || 'Genel',
-    subCat:document.getElementById('p-subcat').value.trim(),
+    subCat:document.getElementById('p-subcat2').value.trim(),
     unit:document.getElementById('p-unit').value,
     stk:parseInt(document.getElementById('p-stk').value)||0,
     min:parseInt(document.getElementById('p-min').value)||0,
