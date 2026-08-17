@@ -2101,6 +2101,48 @@ try {
   }
 }
 
+function getGuideCropCoordinates(video, guideEl){
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if(!vw || !vh) return null;
+
+  if(guideEl){
+    const vRect = video.getBoundingClientRect();
+    const gRect = guideEl.getBoundingClientRect();
+    if(vRect.width > 0 && vRect.height > 0 && gRect.width > 0 && gRect.height > 0){
+      const scale = Math.max(vRect.width / vw, vRect.height / vh);
+      const renderedW = vw * scale;
+      const renderedH = vh * scale;
+      const offsetX = (vRect.width - renderedW) / 2;
+      const offsetY = (vRect.height - renderedH) / 2;
+
+      const relLeft = (gRect.left - vRect.left) - offsetX;
+      const relTop = (gRect.top - vRect.top) - offsetY;
+
+      let sx = Math.round(relLeft / scale);
+      let sy = Math.round(relTop / scale);
+      let sw = Math.round(gRect.width / scale);
+      let sh = Math.round(gRect.height / scale);
+
+      sx = Math.max(0, sx);
+      sy = Math.max(0, sy);
+      sw = Math.min(vw - sx, sw);
+      sh = Math.min(vh - sy, sh);
+
+      if(sw > 20 && sh > 20){
+        return { sx, sy, sw, sh };
+      }
+    }
+  }
+
+  // Fallback central box
+  const sw = Math.round(vw * 0.55);
+  const sh = Math.round(vh * 0.45);
+  const sx = Math.round((vw - sw) / 2);
+  const sy = Math.round((vh - sh) / 2);
+  return { sx, sy, sw, sh };
+}
+
 async function startCam(videoId, key, cb){
   await stopCam(key);
   const video=document.getElementById(videoId);
@@ -2181,6 +2223,8 @@ async function startCam(videoId, key, cb){
       console.warn('BarcodeDetector init error:', detErr);
     }
 
+    const guideEl = video.parentElement?.querySelector('.scan-guide');
+
     if(detector){
       let isDetecting = false;
       const cropCanvas = document.createElement('canvas');
@@ -2192,23 +2236,19 @@ async function startCam(videoId, key, cb){
         if(!isDetecting && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0){
           isDetecting = true;
           try{
-            // Strictly crop the frame to the central blue rectangle (76% width, 66% height)
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-            const sw = Math.round(vw * 0.76);
-            const sh = Math.round(vh * 0.66);
-            const sx = Math.round((vw - sw) / 2);
-            const sy = Math.round((vh - sh) / 2);
+            const crop = getGuideCropCoordinates(video, guideEl);
+            if(crop){
+              if(cropCanvas.width !== crop.sw || cropCanvas.height !== crop.sh){
+                cropCanvas.width = crop.sw;
+                cropCanvas.height = crop.sh;
+              }
+              // Draw ONLY what is physically visible inside the blue reticle box
+              cropCtx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
 
-            if(cropCanvas.width !== sw || cropCanvas.height !== sh){
-              cropCanvas.width = sw;
-              cropCanvas.height = sh;
-            }
-            cropCtx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-
-            const barcodes = await detector.detect(cropCanvas);
-            if(barcodes && barcodes.length > 0 && barcodes[0].rawValue){
-              processValidatedBarcode(barcodes[0].rawValue, key, videoId, cb);
+              const barcodes = await detector.detect(cropCanvas);
+              if(barcodes && barcodes.length > 0 && barcodes[0].rawValue){
+                processValidatedBarcode(barcodes[0].rawValue, key, videoId, cb);
+              }
             }
           }catch(e){}
           isDetecting = false;
@@ -2219,7 +2259,7 @@ async function startCam(videoId, key, cb){
       };
       readers[key].animId = requestAnimationFrame(detectLoop);
     } else {
-      // 3. FALLBACK ENGINE: ZXing Browser Multi-Format Decoder on cropped canvas (ONLY when native detector is unavailable)
+      // 3. FALLBACK ENGINE: ZXing Browser Multi-Format Decoder on cropped blue box (ONLY when native detector is unavailable)
       const ZXingLib = (typeof ZXing !== 'undefined') ? ZXing : (typeof ZXingBrowser !== 'undefined' ? ZXingBrowser : null);
       if(ZXingLib && (ZXingLib.BrowserMultiFormatReader || ZXingLib.BrowserBarcodeReader)){
         try{
@@ -2251,23 +2291,19 @@ async function startCam(videoId, key, cb){
             if(!isZxingBusy && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0){
               isZxingBusy = true;
               try{
-                const vw = video.videoWidth;
-                const vh = video.videoHeight;
-                const sw = Math.round(vw * 0.76);
-                const sh = Math.round(vh * 0.66);
-                const sx = Math.round((vw - sw) / 2);
-                const sy = Math.round((vh - sh) / 2);
+                const crop = getGuideCropCoordinates(video, guideEl);
+                if(crop){
+                  if(cropCanvas.width !== crop.sw || cropCanvas.height !== crop.sh){
+                    cropCanvas.width = crop.sw;
+                    cropCanvas.height = crop.sh;
+                  }
+                  cropCtx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.sw, crop.sh);
 
-                if(cropCanvas.width !== sw || cropCanvas.height !== sh){
-                  cropCanvas.width = sw;
-                  cropCanvas.height = sh;
-                }
-                cropCtx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-
-                const result = await codeReader.decodeFromCanvas(cropCanvas);
-                if(result && readers[key]?.active){
-                  const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
-                  processValidatedBarcode(text, key, videoId, cb);
+                  const result = await codeReader.decodeFromCanvas(cropCanvas);
+                  if(result && readers[key]?.active){
+                    const text = (typeof result.getText === 'function') ? result.getText() : (result.text || '');
+                    processValidatedBarcode(text, key, videoId, cb);
+                  }
                 }
               }catch(e){}
               isZxingBusy = false;
