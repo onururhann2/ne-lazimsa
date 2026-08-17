@@ -1226,7 +1226,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 
 <!-- User / Cashier Modal -->
 <div class="overlay" id="m-user">
-  <div class="modal" style="max-width:540px">
+  <div class="modal" style="max-width:540px;overflow-y:auto">
     <div class="modal-hdr">
       <h2 class="modal-ttl" id="user-ttl">Kullanıcı / Kasiyer Ekle</h2>
       <button class="modal-x" onclick="closeM('m-user')">×</button>
@@ -1792,7 +1792,9 @@ function saveUser(e){
       permissions: fPerms
     };
     users.push(newUser);
-    toast('s', 'Yeni Kullanıcı Oluşturuldu 🎉', `${fName} (${fRole === 'cashier' ? 'Personel' : 'Admin'}) sisteme eklendi.`);
+    const permLabels = {sales:'Satış',dashboard:'Panel',products:'Stok',stockin:'Giriş',critical:'Kritik',suppliers:'Tedarikçi',reports:'Rapor'};
+    const permStr = fPerms.map(p => permLabels[p] || p).join(', ');
+    toast('s', 'Yeni Kullanıcı Oluşturuldu 🎉', `${fName} sisteme eklendi. Yetkiler: ${permStr}`);
   }
 
   saveUsers(users);
@@ -1833,9 +1835,14 @@ function doLogin(){
   });
   const err = document.getElementById('login-err');
   if(u){
-    currentUser = u;
-    localStorage.setItem('nl_sess', JSON.stringify(u));
+    // Ensure permissions array exists for non-admin users
+    if(u.role !== 'admin' && !u.permissions){
+      u.permissions = ['sales'];
+    }
+    currentUser = {...u}; // Fresh copy
+    localStorage.setItem('nl_sess', JSON.stringify(currentUser));
     err.style.display = 'none';
+    console.log('[NE LAZIMSA] Login:', currentUser.name, 'Role:', currentUser.role, 'Permissions:', currentUser.permissions);
     showApp();
   } else {
     err.style.display = 'block';
@@ -1854,18 +1861,28 @@ function checkSess(){
   if(s){
     try{
       let sessUser = JSON.parse(s);
-      // Always refresh from nl_users to get latest permissions
+      // Always refresh from nl_users to get latest permissions & role
       const users = getUsers();
-      const freshUser = users.find(x => x.id === sessUser.id);
+      const freshUser = users.find(x => {
+        if(x.id === sessUser.id) return true;
+        // Also match by email/username in case id changed (user was deleted & re-added)
+        if(sessUser.email && x.email && x.email.toLowerCase() === sessUser.email.toLowerCase()) return true;
+        if(sessUser.username && x.username && x.username.toLowerCase() === sessUser.username.toLowerCase()) return true;
+        return false;
+      });
       if(freshUser){
-        currentUser = freshUser;
+        currentUser = {...freshUser};
       } else {
         currentUser = sessUser;
       }
       if(!currentUser.role){
         currentUser.role = (currentUser.email === 'kasiyer@nelazimsa.com' || currentUser.username === 'kasiyer') ? 'cashier' : 'admin';
       }
+      if(currentUser.role !== 'admin' && !currentUser.permissions){
+        currentUser.permissions = ['sales'];
+      }
       localStorage.setItem('nl_sess', JSON.stringify(currentUser));
+      console.log('[NE LAZIMSA] Session restored:', currentUser.name, 'Role:', currentUser.role, 'Permissions:', currentUser.permissions);
       showApp();
     }catch(e){
       doLogout();
