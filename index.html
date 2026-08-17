@@ -617,10 +617,15 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <!-- LEFT: Camera + Result -->
         <div>
           <div class="card" style="padding:18px">
-            <div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:12px">📷 Kamera / Barkod Okuyucu</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div style="font-size:13px;font-weight:600;color:var(--txt2)">📷 Kamera / Barkod Okuyucu</div>
+              <select class="scan-cam-select" data-cam-key="stockin" onchange="onCameraSelectChange('stockin', this.value)" style="padding:4px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:11px;max-width:185px">
+                <option value="">Kamera Aranıyor...</option>
+              </select>
+            </div>
             <div class="scan-frame">
               <video id="stockin-video" autoplay playsinline muted></video>
-              <button type="button" class="scan-cam-switch" onclick="switchCamera('stockin')" title="Kamerayı Değiştir">🔄 Kamera Değiştir</button>
+              <button type="button" class="scan-cam-switch" onclick="switchCamera('stockin')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
               <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
             </div>
             <div class="scan-result" id="stockin-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
@@ -683,9 +688,14 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <div class="grid-2" style="margin-bottom:20px">
           <!-- Camera / Upload Card -->
           <div class="card" style="padding:20px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
               <div style="font-size:14px;font-weight:700">📷 Fatura & İrsaliye Okut / Yükle</div>
-              <button class="btn btn-primary btn-sm" onclick="loadSampleInvoice()">✨ Örnek Fatura Dene</button>
+              <div style="display:flex;align-items:center;gap:6px">
+                <select class="scan-cam-select" data-cam-key="invoice" onchange="onCameraSelectChange('invoice', this.value)" style="padding:4px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:11px;max-width:185px">
+                  <option value="">Kamera Aranıyor...</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="loadSampleInvoice()">✨ Örnek Fatura Dene</button>
+              </div>
             </div>
             
             <!-- Live Camera Frame for Invoice -->
@@ -838,10 +848,15 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
         <!-- LEFT: Camera + Add to cart -->
         <div>
           <div class="card" style="padding:18px">
-            <div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:12px">📷 Kamera / Barkod Okuyucu</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div style="font-size:13px;font-weight:600;color:var(--txt2)">📷 Kamera / Barkod Okuyucu</div>
+              <select class="scan-cam-select" data-cam-key="sales" onchange="onCameraSelectChange('sales', this.value)" style="padding:4px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:11px;max-width:185px">
+                <option value="">Kamera Aranıyor...</option>
+              </select>
+            </div>
             <div class="scan-frame">
               <video id="sales-video" autoplay playsinline muted></video>
-              <button type="button" class="scan-cam-switch" onclick="switchCamera('sales')" title="Kamerayı Değiştir">🔄 Kamera Değiştir</button>
+              <button type="button" class="scan-cam-switch" onclick="switchCamera('sales')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
               <div class="scan-overlay"><div class="scan-guide"><div class="scan-laser"></div></div></div>
             </div>
             <div class="scan-result" id="sales-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
@@ -1010,7 +1025,15 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 <!-- Barcode Scanner -->
 <div class="overlay" id="m-scan">
   <div class="modal modal-lg">
-    <div class="modal-hdr"><h2 class="modal-ttl" id="scan-ttl">Barkod Tara</h2><button class="modal-x" onclick="closeScanner()">×</button></div>
+    <div class="modal-hdr">
+      <h2 class="modal-ttl" id="scan-ttl">Barkod Tara</h2>
+      <div style="display:flex;align-items:center;gap:8px">
+        <select class="scan-cam-select" data-cam-key="scan" onchange="onCameraSelectChange('scan', this.value)" style="padding:4px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:11px;max-width:170px">
+          <option value="">Kamera Aranıyor...</option>
+        </select>
+        <button class="modal-x" onclick="closeScanner()">×</button>
+      </div>
+    </div>
     <div class="scan-frame">
       <video id="barcode-video" autoplay playsinline muted></video>
       <button type="button" class="scan-cam-switch" onclick="switchCamera('scan')" title="Kamerayı Değiştir">🔄 Kamera Değiştir</button>
@@ -1032,7 +1055,15 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 <!-- Quick Count -->
 <div class="overlay" id="m-qc">
   <div class="modal modal-lg">
-    <div class="modal-hdr"><h2 class="modal-ttl">🔢 Hızlı Sayım Modu</h2><button class="modal-x" onclick="closeQC()">×</button></div>
+    <div class="modal-hdr">
+      <h2 class="modal-ttl">🔢 Hızlı Sayım Modu</h2>
+      <div style="display:flex;align-items:center;gap:8px">
+        <select class="scan-cam-select" data-cam-key="qc" onchange="onCameraSelectChange('qc', this.value)" style="padding:4px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:11px;max-width:170px">
+          <option value="">Kamera Aranıyor...</option>
+        </select>
+        <button class="modal-x" onclick="closeQC()">×</button>
+      </div>
+    </div>
     <p style="color:var(--txt2);font-size:13px;margin-bottom:14px">Barkod okutunca ürün stoğu otomatik +1 artar.</p>
     <div class="scan-frame">
       <video id="qc-video" autoplay playsinline muted></video>
@@ -1966,9 +1997,9 @@ function addQCLog(name,stk,unit,ok){
   document.getElementById('qc-log').prepend(el);
 }
 
-// ══════════════ CAMERA & BARCODE ENGINE ══════════════
-let currentCamIndex = 0;
+// ══════════════ CAMERA & HARDWARE USB SCANNER ENGINE ══════════════
 let availableCamList = [];
+let preferredCameraId = localStorage.getItem('nl_preferred_cam_id') || '';
 
 function playBeep(){
   try{
@@ -1995,13 +2026,118 @@ function showCamMsg(videoId,html){
   if(el)el.innerHTML=html;
 }
 
+// ── ENUMERATE ALL INTERNAL & EXTERNAL USB CAMERAS ──
+async function refreshCameraDeviceList(currentSelectedId){
+  try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+
+    let devices = await navigator.mediaDevices.enumerateDevices();
+    let videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+    // If camera labels are blank (browser privacy before first permission prompt), request temporary stream to read hardware names
+    if(videoDevices.length > 0 && !videoDevices[0].label){
+      try{
+        const tmpStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        devices = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = devices.filter(d => d.kind === 'videoinput');
+        tmpStream.getTracks().forEach(t => t.stop());
+      }catch(e){}
+    }
+
+    availableCamList = videoDevices;
+    const targetId = currentSelectedId || preferredCameraId || (videoDevices[0]?.deviceId || '');
+
+    // Update all <select class="scan-cam-select"> in the UI
+    document.querySelectorAll('.scan-cam-select').forEach(sel => {
+      if(videoDevices.length === 0){
+        sel.innerHTML = '<option value="">Kamera Bulunamadı</option>';
+        return;
+      }
+      sel.innerHTML = videoDevices.map((d, i) => {
+        let label = d.label || `Kamera ${i + 1}`;
+        // Mark USB / External webcams clearly with icons
+        if(/usb|external|logitech|droidcam|obs|c920|c922|brio|streamcam|hd webcam/i.test(label)){
+          label = `🔌 ${label}`;
+        } else if(/back|rear|environment|ark/i.test(label)){
+          label = `📱 Arka Kamera (${label})`;
+        } else if(/front|user|ön/i.test(label)){
+          label = `📱 Ön Kamera (${label})`;
+        } else {
+          label = `📷 ${label}`;
+        }
+        const isSel = (d.deviceId === targetId) ? 'selected' : '';
+        return `<option value="${d.deviceId}" ${isSel}>${label}</option>`;
+      }).join('');
+    });
+
+    return videoDevices;
+  }catch(err){
+    console.warn('Camera enumeration error:', err);
+    return [];
+  }
+}
+
+// Auto-detect when a USB camera is plugged in or unplugged
+if(navigator.mediaDevices && navigator.mediaDevices.addEventListener){
+  navigator.mediaDevices.addEventListener('devicechange', async () => {
+    toast('i', 'Kamera Donanımı Değişti', 'Yeni USB veya harici kameralar algılandı.');
+    await refreshCameraDeviceList();
+  });
+}
+
+async function onCameraSelectChange(key, deviceId){
+  preferredCameraId = deviceId;
+  localStorage.setItem('nl_preferred_cam_id', deviceId);
+
+  // Sync other selects
+  document.querySelectorAll('.scan-cam-select').forEach(sel => {
+    sel.value = deviceId;
+  });
+
+  toast('s', 'Kamera Seçildi', 'Seçilen kamera aktif edildi.');
+
+  if(readers[key]){
+    const videoId = readers[key].videoId;
+    const cb = readers[key].cb;
+    await startCam(videoId, key, cb);
+  } else if(key === 'invoice'){
+    startCamPreview('invoice-cam-video', 'invoice');
+  }
+}
+
 async function switchCamera(key){
-  if(!readers[key]) return;
-  const videoId = readers[key].videoId;
-  const cb = readers[key].cb;
-  currentCamIndex++;
-  toast('i', 'Kamera Değiştiriliyor', 'Diğer kameraya geçiliyor...');
-  await startCam(videoId, key, cb);
+  if(availableCamList.length === 0){
+    await refreshCameraDeviceList();
+  }
+
+  if(availableCamList.length <= 1){
+    toast('i', 'Tek Kamera Bulundu', 'Sistemde sadece 1 adet kamera algılandı.');
+    return;
+  }
+
+  let curIdx = availableCamList.findIndex(d => d.deviceId === preferredCameraId);
+  if(curIdx < 0) curIdx = 0;
+  const nextIdx = (curIdx + 1) % availableCamList.length;
+  const nextDev = availableCamList[nextIdx];
+
+  preferredCameraId = nextDev.deviceId;
+  localStorage.setItem('nl_preferred_cam_id', preferredCameraId);
+
+  // Sync select dropdowns
+  document.querySelectorAll('.scan-cam-select').forEach(sel => {
+    sel.value = preferredCameraId;
+  });
+
+  const devLabel = nextDev.label ? nextDev.label.replace(/^🔌 |^📱 |^📷 /, '') : `Kamera ${nextIdx + 1}`;
+  toast('s', 'Kamera Değiştirildi', `Aktif: ${devLabel}`);
+
+  if(readers[key]){
+    const videoId = readers[key].videoId;
+    const cb = readers[key].cb;
+    await startCam(videoId, key, cb);
+  } else if(key === 'invoice'){
+    startCamPreview('invoice-cam-video', 'invoice');
+  }
 }
 
 async function startCam(videoId, key, cb){
@@ -2046,23 +2182,30 @@ async function startCam(videoId, key, cb){
       readers[key].zxing = codeReader;
     }
 
-    // 2. Discover available cameras
-    let selectedDeviceId = undefined;
-    try{
-      if(codeReader && typeof codeReader.listVideoInputDevices === 'function'){
-        availableCamList = await codeReader.listVideoInputDevices();
-      } else if(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices){
-        const devs = await navigator.mediaDevices.enumerateDevices();
-        availableCamList = devs.filter(d => d.kind === 'videoinput');
-      }
+    // 2. Discover available cameras (including external USB webcams)
+    if(availableCamList.length === 0){
+      await refreshCameraDeviceList();
+    }
 
-      if(availableCamList && availableCamList.length > 0){
-        const idx = currentCamIndex % availableCamList.length;
-        selectedDeviceId = availableCamList[idx].deviceId;
+    let selectedDeviceId = preferredCameraId;
+    if(!selectedDeviceId || !availableCamList.some(d => d.deviceId === selectedDeviceId)){
+      // If no preferred camera, favor external USB camera or environment camera
+      const extCam = availableCamList.find(d => /usb|external|logitech|c920|c922|brio|streamcam|droidcam/i.test(d.label));
+      const backCam = availableCamList.find(d => /back|rear|environment|ark/i.test(d.label));
+      const chosen = extCam || backCam || availableCamList[0];
+      selectedDeviceId = chosen ? chosen.deviceId : undefined;
+      if(selectedDeviceId){
+        preferredCameraId = selectedDeviceId;
+        localStorage.setItem('nl_preferred_cam_id', preferredCameraId);
       }
-    }catch(e){}
+    }
 
-    // 3. Fallback or Stream Capture with HD constraints and continuous autofocus
+    // Sync select dropdowns
+    document.querySelectorAll('.scan-cam-select').forEach(sel => {
+      if(selectedDeviceId) sel.value = selectedDeviceId;
+    });
+
+    // 3. Stream Capture with HD constraints, continuous autofocus and exact device selection
     let stream = null;
     try{
       const constraints = {
@@ -2078,8 +2221,12 @@ async function startCam(videoId, key, cb){
       stream = await navigator.mediaDevices.getUserMedia(constraints);
     }catch(e){
       try{
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      }catch(err2){}
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+        });
+      }catch(err2){
+        try{ stream = await navigator.mediaDevices.getUserMedia({ video: true }); }catch(err3){}
+      }
     }
 
     if(stream){
@@ -2088,7 +2235,7 @@ async function startCam(videoId, key, cb){
       readers[key].stream = stream;
     }
 
-    // 4. Primary Decoding: ZXing Continuous Video Decoder
+    // 4. Primary Decoding: ZXing Continuous Video Stream Decoder
     if(codeReader){
       try{
         if(stream && typeof codeReader.decodeFromStream === 'function'){
@@ -2359,16 +2506,49 @@ async function startCamPreview(videoId, key){
   if(!video) return;
   try{
     readers[key] = { active: true, videoId };
-    const constraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 } } };
+
+    if(availableCamList.length === 0){
+      await refreshCameraDeviceList();
+    }
+
+    let selectedDeviceId = preferredCameraId;
+    if(!selectedDeviceId || !availableCamList.some(d => d.deviceId === selectedDeviceId)){
+      const extCam = availableCamList.find(d => /usb|external|logitech|c920|c922|brio|streamcam|droidcam/i.test(d.label));
+      const backCam = availableCamList.find(d => /back|rear|environment|ark/i.test(d.label));
+      const chosen = extCam || backCam || availableCamList[0];
+      selectedDeviceId = chosen ? chosen.deviceId : undefined;
+    }
+
+    // Sync select dropdowns
+    document.querySelectorAll('.scan-cam-select').forEach(sel => {
+      if(selectedDeviceId) sel.value = selectedDeviceId;
+    });
+
+    const constraints = {
+      video: {
+        deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+        facingMode: selectedDeviceId ? undefined : { ideal: 'environment' },
+        width: { ideal: 1920, min: 1280 },
+        height: { ideal: 1080, min: 720 }
+      }
+    };
     let stream = null;
     try{
       stream = await navigator.mediaDevices.getUserMedia(constraints);
     }catch(e){
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+        });
+      }catch(err2){
+        try{ stream = await navigator.mediaDevices.getUserMedia({ video: true }); }catch(err3){}
+      }
     }
-    video.srcObject = stream;
-    await video.play().catch(()=>{});
-    readers[key].stream = stream;
+    if(stream){
+      video.srcObject = stream;
+      await video.play().catch(()=>{});
+      readers[key].stream = stream;
+    }
   }catch(err){
     console.warn('Cam Preview Error:', err);
   }
