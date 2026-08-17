@@ -7,6 +7,7 @@
 <meta name="description" content="Modern stok ve satın alma yönetim sistemi">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
 <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -2311,10 +2312,75 @@ async function startCam(videoId, key, cb){
       if(selectedDeviceId) sel.value = selectedDeviceId;
     });
 
-    // 1. PRIMARY ENGINE: Html5Qrcode with STRICT RETAIL FORMATS (NO FALSE READS)
+    const parentContainer = video.parentElement;
+
+    // 1. PRIMARY ENGINE: Quagga2 (OpenCV/ZBar Style Sub-Pixel Patch Locator & Scanline Decoder)
+    if(typeof Quagga !== 'undefined'){
+      try{
+        await new Promise((resolve, reject) => {
+          Quagga.init({
+            inputStream: {
+              name: "Live",
+              type: "LiveStream",
+              target: parentContainer,
+              constraints: {
+                deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+                facingMode: selectedDeviceId ? undefined : "environment",
+                width: { ideal: 1280, min: 640 },
+                height: { ideal: 720, min: 480 }
+              },
+              area: {
+                top: "0%",
+                right: "0%",
+                left: "0%",
+                bottom: "0%"
+              }
+            },
+            locator: {
+              patchSize: "medium",
+              halfSample: true
+            },
+            numOfWorkers: navigator.hardwareConcurrency || 4,
+            frequency: 25,
+            decoder: {
+              readers: [
+                "ean_reader",
+                "ean_8_reader",
+                "code_128_reader",
+                "code_39_reader",
+                "upc_reader",
+                "upc_e_reader"
+              ],
+              multiple: false
+            },
+            locate: true
+          }, function(err){
+            if(err) return reject(err);
+            Quagga.start();
+            readers[key].quagga = true;
+            resolve();
+          });
+        });
+
+        const onDetectedHandler = function(result){
+          if(!readers[key]?.active) return;
+          if(result && result.codeResult && result.codeResult.code){
+            processValidatedBarcode(result.codeResult.code, key, videoId, cb);
+          }
+        };
+        Quagga.onDetected(onDetectedHandler);
+        readers[key].quaggaHandler = onDetectedHandler;
+
+        setTimeout(() => applyCamZoom(key, camZoomLevels[key] || 1.5), 200);
+        return;
+      }catch(quaggaErr){
+        console.warn('Quagga2 init error, falling back to ZXing / Html5Qrcode:', quaggaErr);
+      }
+    }
+
+    // 2. SECONDARY ENGINE: Html5Qrcode
     if(typeof Html5Qrcode !== 'undefined'){
       try{
-        const parentContainer = video.parentElement;
         const hostId = videoId + '-html5-host';
         let hostEl = document.getElementById(hostId);
         if(!hostEl){
@@ -2332,7 +2398,6 @@ async function startCam(videoId, key, cb){
         });
         readers[key].html5QrCode = html5QrCode;
 
-        // ONLY REAL RETAIL BARCODE FORMATS (Excludes noisy ITF and Codabar to eliminate false reads)
         const formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
@@ -2361,7 +2426,6 @@ async function startCam(videoId, key, cb){
           () => {}
         );
 
-        // Apply default digital zoom (1.5x) for crystal-clear barcode view on laptops
         setTimeout(() => applyCamZoom(key, camZoomLevels[key] || 1.5), 200);
         return;
       }catch(html5Err){
@@ -2370,7 +2434,7 @@ async function startCam(videoId, key, cb){
       }
     }
 
-    // 2. SECONDARY ENGINE: ZXing Multi-Format Reader with Strict Formats & TRY_HARDER
+    // 3. TERTIARY ENGINE: ZXing Multi-Format Reader with TRY_HARDER
     const ZXingLib = (typeof ZXing !== 'undefined') ? ZXing : (typeof ZXingBrowser !== 'undefined' ? ZXingBrowser : null);
     let codeReader = null;
 
@@ -2394,7 +2458,7 @@ async function startCam(videoId, key, cb){
       readers[key].zxing = codeReader;
     }
 
-    // 3. Stream Capture with HD constraints and continuous autofocus
+    // 4. Stream Capture with HD constraints and continuous autofocus
     let stream = null;
     try{
       const constraints = {
@@ -2425,7 +2489,7 @@ async function startCam(videoId, key, cb){
       setTimeout(() => applyCamZoom(key, camZoomLevels[key] || 1.5), 200);
     }
 
-    // 4. ZXing Continuous Video Stream Decoder
+    // 5. ZXing Continuous Video Stream Decoder
     if(codeReader){
       try{
         if(stream && typeof codeReader.decodeFromStream === 'function'){
@@ -2452,31 +2516,6 @@ async function startCam(videoId, key, cb){
       }
     }
 
-    // 5. Native BarcodeDetector
-    if('BarcodeDetector' in window){
-      try{
-        const sup = await BarcodeDetector.getSupportedFormats();
-        if(sup && sup.length > 0){
-          const det = new BarcodeDetector({ formats: sup });
-          const scanNative = async () => {
-            if(!readers[key]?.active) return;
-            try{
-              if(video.readyState >= 2){
-                const r = await det.detect(video);
-                if(r && r.length > 0 && r[0].rawValue){
-                  processValidatedBarcode(r[0].rawValue, key, videoId, cb);
-                }
-              }
-            }catch(e){}
-            if(readers[key]?.active) requestAnimationFrame(scanNative);
-          };
-          if(video.readyState >= 2) scanNative();
-          else video.addEventListener('loadeddata', scanNative, { once: true });
-          return;
-        }
-      }catch(e){}
-    }
-
   }catch(err){
     console.error('Camera Init Error:', err);
     const msg = (err.name==='NotAllowedError'||err.name==='PermissionDeniedError')
@@ -2490,6 +2529,16 @@ async function stopCam(key){
   if(!readers[key])return;
   readers[key].active=false;
 
+  if(readers[key].quagga){
+    try{
+      if(readers[key].quaggaHandler && typeof Quagga !== 'undefined'){
+        Quagga.offDetected(readers[key].quaggaHandler);
+      }
+      if(typeof Quagga !== 'undefined'){
+        Quagga.stop();
+      }
+    }catch(e){}
+  }
   if(readers[key].html5QrCode){
     try{
       if(readers[key].html5QrCode.isScanning){
