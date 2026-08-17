@@ -2478,15 +2478,6 @@ async function refreshCameraDeviceList(currentSelectedId){
     let devices = await navigator.mediaDevices.enumerateDevices();
     let videoDevices = devices.filter(d => d.kind === 'videoinput');
 
-    if(videoDevices.length > 0 && !videoDevices[0].label){
-      try{
-        const tmpStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        devices = await navigator.mediaDevices.enumerateDevices();
-        videoDevices = devices.filter(d => d.kind === 'videoinput');
-        tmpStream.getTracks().forEach(t => t.stop());
-      }catch(e){}
-    }
-
     availableCamList = videoDevices;
     const targetId = currentSelectedId || preferredCameraId || (videoDevices[0]?.deviceId || '');
 
@@ -2513,16 +2504,14 @@ async function refreshCameraDeviceList(currentSelectedId){
 
     return videoDevices;
   }catch(err){
-    console.warn('Camera enumeration error:', err);
     return [];
   }
 }
 
-// Auto-detect when a USB camera is plugged in or unplugged
+// Auto-detect when a USB camera is plugged in or unplugged (silent background refresh)
 if(navigator.mediaDevices && navigator.mediaDevices.addEventListener){
   navigator.mediaDevices.addEventListener('devicechange', async () => {
-    toast('i', 'Kamera Donanımı Değişti', 'Yeni USB veya harici kameralar algılandı.');
-    await refreshCameraDeviceList();
+    try{ await refreshCameraDeviceList(); }catch(e){}
   });
 }
 
@@ -2533,8 +2522,6 @@ async function onCameraSelectChange(key, deviceId){
   document.querySelectorAll('.scan-cam-select').forEach(sel => {
     sel.value = deviceId;
   });
-
-  toast('s', 'Kamera Seçildi', 'Seçilen kamera aktif edildi.');
 
   if(readers[key]){
     const videoId = readers[key].videoId;
@@ -2551,7 +2538,6 @@ async function switchCamera(key){
   }
 
   if(availableCamList.length <= 1){
-    toast('i', 'Tek Kamera Bulundu', 'Sistemde sadece 1 adet kamera algılandı.');
     return;
   }
 
@@ -2566,9 +2552,6 @@ async function switchCamera(key){
   document.querySelectorAll('.scan-cam-select').forEach(sel => {
     sel.value = preferredCameraId;
   });
-
-  const devLabel = nextDev.label ? nextDev.label.replace(/^🔌 |^📱 |^📷 /, '') : `Kamera ${nextIdx + 1}`;
-  toast('s', 'Kamera Değiştirildi', `Aktif: ${devLabel}`);
 
   if(readers[key]){
     const videoId = readers[key].videoId;
@@ -2695,7 +2678,7 @@ async function startCam(videoId, key, cb){
     }
 
     if(!stream){
-      showCamMsg(videoId, '<span style="color:var(--red)">❌ Kamera akışı başlatılamadı.</span>');
+      showCamMsg(videoId, '<span style="color:var(--txt3);font-size:11.5px">📷 Kamera kapalı • USB Barkod Okuyucu veya klavye girişi aktif</span>');
       return;
     }
 
@@ -2711,9 +2694,7 @@ async function startCam(videoId, key, cb){
           formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code']
         });
       }
-    }catch(detErr){
-      console.warn('BarcodeDetector init error:', detErr);
-    }
+    }catch(detErr){}
 
     if(detector){
       let isDetecting = false;
@@ -2803,18 +2784,12 @@ async function startCam(videoId, key, cb){
             }
           };
           readers[key].animId = requestAnimationFrame(zxingLoop);
-        }catch(zxingErr){
-          console.warn('ZXing fallback error:', zxingErr);
-        }
+        }catch(zxingErr){}
       }
     }
 
   }catch(err){
-    console.error('Camera Init Error:', err);
-    const msg = (err.name==='NotAllowedError'||err.name==='PermissionDeniedError')
-      ? '<span style="color:var(--red)">❌ Kamera izni verilmedi. Chrome adres çubuğundaki kilit simgesinden kameraya izin verin.</span>'
-      : '<span style="color:var(--red)">❌ Kamera başlatılamadı: '+(err.message||err.name)+'</span>';
-    showCamMsg(videoId,msg);
+    showCamMsg(videoId, '<span style="color:var(--txt3);font-size:11.5px">📷 Kamera kapalı • USB Barkod Okuyucu veya klavye girişi aktif</span>');
   }
 }
 
