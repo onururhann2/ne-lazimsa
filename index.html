@@ -595,6 +595,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <button class="btn btn-sm" id="btn-rep-today" style="background:var(--accent);color:#fff" onclick="setRepDate('today')">Bugün</button>
             <button class="btn btn-sm btn-ghost" id="btn-rep-yesterday" onclick="setRepDate('yesterday')">Dün</button>
             <button class="btn btn-sm btn-ghost" id="btn-rep-all" onclick="setRepDate('all')">Tüm Zamanlar</button>
+            <button class="btn btn-sm btn-danger" style="margin-left:8px;font-size:11px;padding:4px 9px" onclick="resetAllSalesHistory()" title="Stoklarınızı koruyarak tüm satışları sıfırlar">🗑️ Satışları Sıfırla</button>
           </div>
         </div>
         <div id="rep-date-badge" style="font-size:12px;font-weight:600;color:var(--accent)"></div>
@@ -658,13 +659,6 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             </table>
           </div>
         </div>
-      </div>
-
-      <!-- Charts for Selected Day and Inventory Health -->
-      <div class="charts-grid">
-        <div class="chart-card"><div class="chart-ttl">📊 Günün Kategori Bazlı Satış Dağılımı</div><canvas id="ch-day-cat" height="190"></canvas></div>
-        <div class="chart-card"><div class="chart-ttl">📈 Günün Saatlik Satış Yoğunluğu</div><canvas id="ch-day-hourly" height="190"></canvas></div>
-        <div class="chart-card col-2"><div class="chart-ttl">💰 En Yüksek Değerli Stoklar (Mevcut Envanter)</div><canvas id="ch-val" height="120"></canvas></div>
       </div>
     </div>
 
@@ -1317,9 +1311,14 @@ function initData(){
         localStorage.setItem('nl_stockin_hist', JSON.stringify(curStockin));
       }
     }catch(e){}
-
     localStorage.setItem('nl_mock_sanitized_v4', 'true');
-    setTimeout(() => triggerCloudPush('purge_mock_data', true), 500);
+  }
+
+  // Reset all sales while preserving all products/stocks
+  if(!localStorage.getItem('nl_sales_reset_v2')){
+    localStorage.setItem('nl_sales_hist', '[]');
+    localStorage.setItem('nl_sales_reset_v2', 'true');
+    setTimeout(() => triggerCloudPush('sales_reset', true), 300);
   }
 
   if(!ls('nl_sup')) ls('nl_sup', '[]');
@@ -1836,80 +1835,17 @@ function renderRep(){
       </tr>`).join('');
     }
   }
+}
 
-  // Charts
-  // Day categories sold
-  const dayCatMap = {};
-  sHist.forEach(s => {
-    (s.items || []).forEach(item => {
-      const prod = P.find(x => x.id === item.prodId);
-      const cat = prod ? prod.cat : 'Diğer';
-      dayCatMap[cat] = (dayCatMap[cat] || 0) + item.total;
-    });
-  });
-  if(Object.keys(dayCatMap).length === 0){
-    P.forEach(p => { dayCatMap[p.cat] = (dayCatMap[p.cat] || 0) + p.stk; });
-  }
-  mkChart('ch-day-cat', 'doughnut', {
-    labels: Object.keys(dayCatMap),
-    datasets: [{
-      data: Object.values(dayCatMap),
-      backgroundColor: ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#84CC16'],
-      borderWidth: 0
-    }]
-  }, {
-    plugins: { legend: { position: 'right', labels: { color: '#94A3B8', boxWidth: 10, font: { size: 10.5 } } } }
-  });
-
-  // Hourly or Sales by Hour Chart
-  const hourlySales = { '09:00': 0, '11:00': 0, '13:00': 0, '15:00': 0, '17:00': 0, '19:00': 0 };
-  sHist.forEach(s => {
-    if(s.time){
-      const h = parseInt(s.time.split(':')[0]);
-      if(h <= 10) hourlySales['09:00'] += (s.totalAmount || 0);
-      else if(h <= 12) hourlySales['11:00'] += (s.totalAmount || 0);
-      else if(h <= 14) hourlySales['13:00'] += (s.totalAmount || 0);
-      else if(h <= 16) hourlySales['15:00'] += (s.totalAmount || 0);
-      else if(h <= 18) hourlySales['17:00'] += (s.totalAmount || 0);
-      else hourlySales['19:00'] += (s.totalAmount || 0);
-    }
-  });
-  mkChart('ch-day-hourly', 'bar', {
-    labels: Object.keys(hourlySales),
-    datasets: [{
-      label: 'Satış Tutarı (₺)',
-      data: Object.values(hourlySales),
-      backgroundColor: 'rgba(16,185,129,.7)',
-      borderRadius: 5,
-      borderWidth: 0
-    }]
-  }, {
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { color: '#94A3B8' }, grid: { color: 'rgba(148,163,184,.08)' } },
-      y: { ticks: { color: '#94A3B8', callback: v => '₺'+v.toLocaleString('tr-TR') }, grid: { color: 'rgba(148,163,184,.08)' } }
-    }
-  });
-
-  // Top Value Chart
-  const top = [...P].map(p => ({ name: p.name, v: p.stk * (p.price || 0) })).sort((a, b) => b.v - a.v).slice(0, 8);
-  mkChart('ch-val', 'bar', {
-    labels: top.map(p => p.name.length > 22 ? p.name.slice(0, 22) + '…' : p.name),
-    datasets: [{
-      label: 'Stok Değeri',
-      data: top.map(p => p.v),
-      backgroundColor: 'rgba(59,130,246,.7)',
-      borderRadius: 5,
-      borderWidth: 0
-    }]
-  }, {
-    indexAxis: 'y',
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { color: '#94A3B8', callback: v => '₺'+v.toLocaleString('tr-TR') }, grid: { color: 'rgba(148,163,184,.08)' } },
-      y: { ticks: { color: '#94A3B8', font: { size: 10.5 } }, grid: { display: false } }
-    }
-  });
+function resetAllSalesHistory(){
+  if(!confirm('DİKKAT: Mevcut ürün stoklarınız KORUNACAK, sadece geçmiş satış kayıtları ve ciro/kazanç istatistikleri sıfırlanacaktır. Devam etmek istiyor musunuz?')) return;
+  localStorage.setItem('nl_sales_hist', '[]');
+  salesCart = [];
+  triggerCloudPush('sales_reset', true);
+  renderDash();
+  renderSalesHistory();
+  renderReports();
+  toast('s', 'Satışlar Sıfırlandı', 'Ürün stoklarınız korundu, satış geçmişi sıfırlandı.');
 }
 
 function csvDailyReport(){
