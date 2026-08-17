@@ -1928,14 +1928,119 @@ function onScan(code){
   const btn=document.getElementById('scan-act-btn');
   if(p){
     const st=sst(p);
-    info.innerHTML=`<div class="card" style="padding:14px"><div style="font-weight:700;margin-bottom:8px">${p.name}</div><div style="display:flex;gap:14px;font-size:13px"><span><span style="color:var(--txt2)">Stok:</span> <strong>${p.stk} ${p.unit}</strong></span><span><span style="color:var(--txt2)">Min:</span> ${p.min}</span><span><span style="color:var(--txt2)">Fiyat:</span> ${tl(p.price)}</span></div><div style="margin-top:8px"><span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'Düşük Stok':'Kritik Stok'}</span></div></div>`;
+    const altArr = Array.isArray(p.altBarcodes) ? p.altBarcodes : (typeof p.altBarcodes === 'string' ? p.altBarcodes.split(',') : []);
+    const altBadges = altArr.map(x => x.trim()).filter(Boolean).map(b => `<span style="background:rgba(59,130,246,.15);color:var(--accent);font-size:10.5px;padding:1px 6px;border-radius:4px">${b}</span>`).join(' ');
+
+    info.innerHTML=`
+      <div class="card" style="padding:14px">
+        <div style="font-weight:700;font-size:14px;margin-bottom:6px">${p.name}</div>
+        <div style="display:flex;gap:14px;font-size:13px;flex-wrap:wrap">
+          <span><span style="color:var(--txt2)">Kategori:</span> <strong>${p.cat}</strong></span>
+          <span><span style="color:var(--txt2)">Stok:</span> <strong>${p.stk} ${p.unit}</strong></span>
+          <span><span style="color:var(--txt2)">Min:</span> ${p.min}</span>
+          <span><span style="color:var(--txt2)">Satış Fiyatı:</span> <strong style="color:var(--accent)">${tl(p.sellPrice||p.price)}</strong></span>
+        </div>
+        ${altBadges ? `<div style="margin-top:8px;font-size:11.5px;color:var(--txt2)">Alt Barkodlar: ${altBadges}</div>` : ''}
+        <div style="margin-top:8px"><span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'Düşük Stok':'Kritik Stok'}</span></div>
+      </div>`;
     btn.textContent='✏️ '+(scanMode==='add'?'Ürünü Düzenle':'Ürün Detayı');
+    btn.style.display='inline-flex';
   }else{
-    info.innerHTML=`<div class="card" style="padding:14px;border-color:rgba(245,158,11,.3)"><div style="color:var(--yellow);font-weight:600;margin-bottom:4px">⚠️ Ürün bulunamadı</div><div style="color:var(--txt2);font-size:12px">Barkod ${code} sisteme kayıtlı değil.</div></div>`;
-    btn.textContent='➕ Yeni Ürün Olarak Ekle';
+    const P = gp();
+    const cats = [...new Set(P.map(p => p.cat).filter(Boolean))].sort();
+    
+    info.innerHTML = `
+      <div class="card" style="padding:14px;border:1px solid rgba(245,158,11,.35);background:var(--bg3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="color:var(--yellow);font-weight:700;font-size:13px">⚠️ Barkod Kayıtlı Değil</div>
+          <span class="mono" style="font-size:11.5px;background:var(--bg);padding:2px 8px;border-radius:4px;border:1px solid var(--border)">${code}</span>
+        </div>
+        
+        <!-- OPTION 1: LINK AS SUB-BARCODE TO EXISTING PRODUCT -->
+        <div style="background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:5px">
+            <span>🔗</span> Mevcut Bir Ürüne Alt Barkod Olarak Ekle
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:4px">1. Kategori Seçin</label>
+              <select id="scan-link-cat" onchange="onScanCatFilterChange('${code}')" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
+                <option value="">Tüm Kategoriler (${P.length})</option>
+                ${cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:4px">2. Ürünü Seçin</label>
+              <select id="scan-link-prod" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
+                <option value="">Ürün Seçiniz...</option>
+                ${P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkScannedBarcodeToProduct('${code}')" style="font-weight:600">
+            🔗 Bu Ürüne Alt Barkod Olarak Kaydet
+          </button>
+        </div>
+
+        <!-- OPTION 2: CREATE NEW PRODUCT -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:9px 12px">
+          <span style="font-size:11.5px;color:var(--txt2)">Bu ürün sistemde hiç yoksa:</span>
+          <button type="button" class="btn btn-primary btn-sm" onclick="openNewProdWithBarcode('${code}')">➕ Yeni Ürün Oluştur</button>
+        </div>
+      </div>`;
+    btn.style.display='none';
   }
-  info.style.display='block';btn.style.display='inline-flex';
+  info.style.display='block';
 }
+
+function onScanCatFilterChange(code){
+  const selCat = document.getElementById('scan-link-cat')?.value;
+  const prodSelect = document.getElementById('scan-link-prod');
+  if(!prodSelect) return;
+  let P = gp();
+  if(selCat){
+    P = P.filter(p => p.cat === selCat);
+  }
+  prodSelect.innerHTML = '<option value="">Ürün Seçiniz...</option>' + 
+    P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('');
+}
+
+function linkScannedBarcodeToProduct(code){
+  const prodId = parseInt(document.getElementById('scan-link-prod')?.value);
+  if(!prodId){
+    toast('w', 'Ürün Seçilmedi', 'Lütfen alt barkodu bağlamak istediğiniz ürünü seçin.');
+    return;
+  }
+  const P = gp();
+  const prod = P.find(p => p.id === prodId);
+  if(!prod){
+    toast('e', 'Hata', 'Seçilen ürün bulunamadı.');
+    return;
+  }
+  
+  if(!Array.isArray(prod.altBarcodes)){
+    prod.altBarcodes = prod.altBarcodes ? String(prod.altBarcodes).split(',').map(s=>s.trim()).filter(Boolean) : [];
+  }
+  
+  if(!prod.altBarcodes.includes(code) && prod.barc !== code){
+    prod.altBarcodes.push(code);
+  }
+  
+  sp(P);
+  renderProds();
+  updBadge();
+  closeScanner();
+  toast('s', 'Alt Barkod Kaydedildi! 🚀', `"${code}" barkodu "${prod.name}" ürününe başarıyla bağlandı.`);
+}
+
+function openNewProdWithBarcode(code){
+  const selCat = document.getElementById('scan-link-cat')?.value || '';
+  closeScanner();
+  openProdModal();
+  document.getElementById('p-barc').value = code;
+  if(selCat) document.getElementById('p-cat2').value = selCat;
+}
+
 function doScanAction(){
   const p=findProductByBarcode(lastCode);
   closeScanner();
@@ -3258,7 +3363,7 @@ function loadSampleInvoice(){
 }
 
 function onStockinScan(code){
-  document.getElementById('stockin-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">\u2705 Barkod: ${code}</span>`;
+  document.getElementById('stockin-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">✅ Barkod: ${code}</span>`;
   const p=findProductByBarcode(code);
   if(p){
     stockinProdId=p.id;
@@ -3271,7 +3376,7 @@ function onStockinScan(code){
     document.getElementById('stockin-prod-sellprice').textContent=tl(sellP);
     document.getElementById('stockin-prod-unit').textContent=p.unit;
     const st=sst(p);
-    document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'D\u00fc\u015f\u00fck Stok':'Kritik Stok'}</span>`;
+    document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'Düşük Stok':'Kritik Stok'}</span>`;
     document.getElementById('stockin-prod-card').style.display='block';
     document.getElementById('stockin-notfound').style.display='none';
     // ── Miktara odaklanıp seç, kullanıcı direkt yazıyor ──
@@ -3281,8 +3386,88 @@ function onStockinScan(code){
   }else{
     stockinProdId=null;
     document.getElementById('stockin-prod-card').style.display='none';
-    document.getElementById('stockin-notfound').style.display='block';
+    const notfoundEl = document.getElementById('stockin-notfound');
+    notfoundEl.style.display='block';
+    const P = gp();
+    const cats = [...new Set(P.map(p => p.cat).filter(Boolean))].sort();
+
+    notfoundEl.innerHTML = `
+      <div style="color:var(--yellow);font-weight:700;font-size:13px;margin-bottom:4px">⚠️ Barkod Kayıtlı Değil</div>
+      <div style="color:var(--txt2);font-size:11.5px;margin-bottom:10px">Okutulan: <strong class="mono" style="color:var(--txt)">${code}</strong></div>
+      
+      <!-- LINK AS SUB-BARCODE -->
+      <div style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="font-size:11.5px;font-weight:700;color:var(--accent);margin-bottom:6px">🔗 Mevcut Ürüne Alt Barkod Yap</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+          <div>
+            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">1. Kategori</label>
+            <select id="stockin-link-cat" onchange="onStockinCatFilterChange('${code}')" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
+              <option value="">Tüm Kategoriler (${P.length})</option>
+              ${cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">2. Ürün</label>
+            <select id="stockin-link-prod" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
+              <option value="">Ürün Seçiniz...</option>
+              ${P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkStockinBarcodeToProduct('${code}')" style="font-weight:600;font-size:11.5px;padding:6px">
+          🔗 Alt Barkod Olarak Kaydet & Stoğa Al
+        </button>
+      </div>
+
+      <!-- CREATE NEW PRODUCT -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:7px 10px">
+        <span style="font-size:11px;color:var(--txt2)">Sıfırdan ürün aç:</span>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openNewProdWithBarcode('${code}')" style="font-size:11px;padding:4px 8px">➕ Yeni Ürün Oluştur</button>
+      </div>
+    `;
   }
+}
+
+function onStockinCatFilterChange(code){
+  const selCat = document.getElementById('stockin-link-cat')?.value;
+  const prodSelect = document.getElementById('stockin-link-prod');
+  if(!prodSelect) return;
+  let P = gp();
+  if(selCat){
+    P = P.filter(p => p.cat === selCat);
+  }
+  prodSelect.innerHTML = '<option value="">Ürün Seçiniz...</option>' + 
+    P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('');
+}
+
+function linkStockinBarcodeToProduct(code){
+  const prodId = parseInt(document.getElementById('stockin-link-prod')?.value);
+  if(!prodId){
+    toast('w', 'Ürün Seçilmedi', 'Lütfen alt barkodu bağlamak istediğiniz ürünü seçin.');
+    return;
+  }
+  const P = gp();
+  const prod = P.find(p => p.id === prodId);
+  if(!prod){
+    toast('e', 'Hata', 'Seçilen ürün bulunamadı.');
+    return;
+  }
+  
+  if(!Array.isArray(prod.altBarcodes)){
+    prod.altBarcodes = prod.altBarcodes ? String(prod.altBarcodes).split(',').map(s=>s.trim()).filter(Boolean) : [];
+  }
+  
+  if(!prod.altBarcodes.includes(code) && prod.barc !== code){
+    prod.altBarcodes.push(code);
+  }
+  
+  sp(P);
+  renderProds();
+  updBadge();
+  toast('s', 'Alt Barkod Bağlandı! 🚀', `"${code}" barkodu "${prod.name}" ürününe kaydedildi.`);
+  
+  // Immediately switch to this product in Stock-in form
+  onStockinScan(code);
 }
 function confirmStockin(){
   const id=parseInt(document.getElementById('stockin-prod-id').value);
