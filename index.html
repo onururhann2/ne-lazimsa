@@ -2231,17 +2231,68 @@ let scanConsensusMap = {};
 
 function playBeep(){
   try{
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if(ctx.state === 'suspended') ctx.resume();
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(1400, ctx.currentTime);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+
+    // Crisp high-pitch POS supermarket laser scanner beep (2093 Hz - C7)
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(2093, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(2489, ctx.currentTime + 0.09);
+
+    // Boosted, clear volume (0.85)
+    gain.gain.setValueAtTime(0.85, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.13);
+
     osc.connect(gain);
     gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.13);
+  }catch(e){}
+}
+
+function playChaChing(){
+  try{
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if(ctx.state === 'suspended') ctx.resume();
+
+    const now = ctx.currentTime;
+
+    function playTone(freq, start, dur, vol, type = 'sine'){
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(vol, start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + dur);
+    }
+
+    // 1. "Cha" - Cash register metal drawer pull & mechanical click
+    playTone(520, now, 0.06, 0.5, 'square');
+    playTone(920, now + 0.04, 0.08, 0.45, 'triangle');
+    playTone(1350, now + 0.07, 0.09, 0.4, 'sine');
+
+    // 2. "Ching!" - Cash register bell resonance
+    playTone(2349.32, now + 0.12, 0.8, 0.8, 'sine'); // D7
+    playTone(2793.83, now + 0.14, 0.7, 0.6, 'sine'); // F7
+    playTone(3520.00, now + 0.16, 0.9, 0.7, 'sine'); // A7
+    playTone(4698.63, now + 0.18, 1.0, 0.5, 'sine'); // D8
+
+    // 3. Shimmering coins landing in drawer
+    playTone(3135.96, now + 0.28, 0.55, 0.4, 'triangle'); // G7
+    playTone(3951.07, now + 0.36, 0.65, 0.35, 'sine');    // B7
+    playTone(4978.03, now + 0.44, 0.75, 0.3, 'sine');     // D#8
   }catch(e){}
 }
 
@@ -4226,6 +4277,9 @@ function completeSale(){
   broadcastSaleComplete(saleRecord);
   renderSalesHistory();
 
+  // Play satisfying Cha-Ching cash register sound!
+  playChaChing();
+
   const items=salesCart.length;
   salesCart=[];
   renderCart();
@@ -4234,7 +4288,7 @@ function completeSale(){
   document.getElementById('sales-prod-card').style.display='none';
   document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
   updBadge();
-  toast('s','Sat\u0131\u015f Tamamland\u0131',`${items} kalem, toplam ${tl(tot)} (Kâr: +${tl(totalProfit)})`);
+  toast('s','Sat\u0131\u015f Tamamland\u0131 💰',`${items} kalem, toplam ${tl(tot)} (Kâr: +${tl(totalProfit)})`);
 }
 function resetSales(){
   salesCart=[];
