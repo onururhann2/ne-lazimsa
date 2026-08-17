@@ -1313,11 +1313,14 @@ function showApp(){
   document.getElementById('u-email').textContent=currentUser.email;
   applyTheme(ls('nl_theme')||'dark');
   setupRealtimeSync();
-  go('dashboard');
+  const lastPage = localStorage.getItem('nl_last_page') || 'dashboard';
+  go(lastPage);
 }
 
 // ══════════════ NAVIGATION ══════════════
 function go(page){
+  localStorage.setItem('nl_last_page', page);
+  currentTab = page;
   // Stop cameras when leaving stockin/sales pages
   if(page!=='stockin'){ stopCam('stockin'); stopCam('invoice'); }
   if(page!=='sales')stopCam('sales');
@@ -3537,29 +3540,63 @@ function addToCart(){
   broadcastCartUpdate(salesCart);
   toast('s','Sepete Eklendi',`${p.name} x${qty}`);
 }
+function changeCartQty(prodId, delta){
+  const item = salesCart.find(c => c.prodId === prodId);
+  if(!item) return;
+
+  if(delta > 0){
+    const p = gp().find(x => x.id === prodId);
+    const maxStk = p ? p.stk : 999999;
+    if(item.qty + delta > maxStk){
+      toast('w', 'Yetersiz Stok', `Maksimum ${maxStk} ${item.unit} eklenebilir.`);
+      return;
+    }
+    item.qty += delta;
+    item.total = item.qty * item.price;
+  } else if(delta < 0){
+    if(item.qty <= 1){
+      removeFromCart(prodId);
+      return;
+    }
+    item.qty += delta;
+    item.total = item.qty * item.price;
+  }
+
+  renderCart();
+  broadcastCartUpdate(salesCart);
+}
+
 function removeFromCart(prodId){
   salesCart=salesCart.filter(c=>c.prodId!==prodId);
   renderCart();
   broadcastCartUpdate(salesCart);
 }
+
 function renderCart(){
   const cart=document.getElementById('sales-cart');
   const totalBar=document.getElementById('sales-total-bar');
   const emptyEl=document.getElementById('sales-cart-empty');
   if(!cart) return;
   if(salesCart.length===0){
-    cart.innerHTML='<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px" id="sales-cart-empty">Sepet bo\u015f \u2014 \u00fcr\u00fcn okutun</div>';
+    cart.innerHTML='<div style="color:var(--txt3);font-size:13px;text-align:center;padding:24px" id="sales-cart-empty">Sepet boş — ürün okutun</div>';
     if(totalBar) totalBar.style.display='none';
     return;
   }
   cart.innerHTML=salesCart.map((c,i)=>`
-    <div class="cart-item">
-      <div style="flex:1">
-        <div style="font-weight:600;font-size:13px">${c.name}</div>
-        <div style="font-size:12px;color:var(--txt2);margin-top:2px">${c.qty} ${c.unit} \u00d7 ${tl(c.price)}</div>
+    <div class="cart-item" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);margin-bottom:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+        <div style="font-size:11.5px;color:var(--txt2);margin-top:2px">Birim: ${tl(c.price)} / ${c.unit}</div>
       </div>
-      <div style="font-weight:700;color:var(--accent)">${tl(c.total)}</div>
-      <button class="btn btn-ghost btn-sm" onclick="removeFromCart(${c.prodId})" style="padding:5px 8px">\u2715</button>
+      <div style="display:flex;align-items:center;gap:4px">
+        <div style="display:flex;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:2px">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="changeCartQty(${c.prodId}, -1)" style="padding:3px 7px;font-size:14px;font-weight:800;line-height:1;min-width:26px" title="Azalt">−</button>
+          <span style="font-weight:700;font-size:13px;min-width:26px;text-align:center;padding:0 3px">${c.qty}</span>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="changeCartQty(${c.prodId}, 1)" style="padding:3px 7px;font-size:14px;font-weight:800;line-height:1;min-width:26px" title="Arttır">+</button>
+        </div>
+        <div style="font-weight:800;color:var(--accent);font-size:13.5px;min-width:65px;text-align:right">${tl(c.total)}</div>
+        <button class="btn btn-ghost btn-sm" onclick="removeFromCart(${c.prodId})" style="padding:4px 7px;color:var(--txt3)" title="Kaldır">✕</button>
+      </div>
     </div>
   `).join('');
   const tot=salesCart.reduce((s,c)=>s+c.total,0);
