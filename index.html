@@ -188,16 +188,19 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 .toast-msg{font-size:11.5px;color:var(--txt2);margin-top:2px}
 
 /* ── SCANNER ── */
-.scan-frame{position:relative;border-radius:10px;overflow:hidden;background:#000;min-height:220px}
-.scan-frame video, #barcode-video, #qc-video, #stockin-video, #sales-video, .scan-frame > div video{width:100% !important;max-height:240px !important;object-fit:cover !important;display:block !important;border-radius:10px !important}
+.scan-frame{position:relative;border-radius:12px;overflow:hidden;background:#090d16;width:100%;height:280px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center}
+.scan-frame video, #barcode-video, #qc-video, #stockin-video, #sales-video, .scan-frame > div video{width:100% !important;height:100% !important;max-height:100% !important;object-fit:cover !important;display:block !important;border-radius:12px !important}
 .scan-frame canvas{display:none !important}
-#qr-shaded-region{border-color:var(--accent) !important}
+#qr-shaded-region, #qr-canvas-visible{display:none !important}
+#stockin-video-html5-host, #sales-video-html5-host, #barcode-video-html5-host, #qc-video-html5-host{width:100% !important;height:100% !important;position:absolute !important;inset:0 !important}
+#stockin-video-html5-host video, #sales-video-html5-host video, #barcode-video-html5-host video, #qc-video-html5-host video{width:100% !important;height:100% !important;object-fit:cover !important}
 .scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:5}
-.scan-guide{width:220px;height:140px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);position:relative;overflow:hidden}
-.scan-laser{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ef4444,#3b82f6,transparent);box-shadow:0 0 8px #3b82f6;animation:scanLaserAnim 2s ease-in-out infinite}
-@keyframes scanLaserAnim{0%{top:10%;opacity:0.3}50%{top:90%;opacity:1}100%{top:10%;opacity:0.3}}
-.scan-cam-switch{position:absolute;top:8px;right:8px;z-index:15;pointer-events:auto;background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;backdrop-filter:blur(4px);transition:all .2s}
-.scan-cam-switch:hover{background:rgba(15,23,42,.95);transform:scale(1.03)}
+.scan-guide{width:88%;height:78%;border:2px dashed rgba(59,130,246,.7);border-radius:12px;position:relative;overflow:hidden;box-shadow:0 0 25px rgba(59,130,246,.12) inset}
+.scan-guide::before{content:"Barkodu kameranın herhangi bir yerine gösterin";position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);background:rgba(15,23,42,.65);padding:4px 0;border-radius:4px}
+.scan-laser{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ef4444,#3b82f6,transparent);box-shadow:0 0 10px #3b82f6;animation:scanLaserAnim 2s ease-in-out infinite}
+@keyframes scanLaserAnim{0%{top:10%;opacity:0.3}50%{top:85%;opacity:1}100%{top:10%;opacity:0.3}}
+.scan-cam-switch{position:absolute;top:10px;right:10px;z-index:15;pointer-events:auto;background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 12px;border-radius:8px;font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:5px;backdrop-filter:blur(6px);transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.scan-cam-switch:hover{background:rgba(15,23,42,1);transform:scale(1.04)}
 .scan-result{margin-top:12px;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;font-size:12.5px;min-height:38px;display:flex;align-items:center}
 /* ── PRODUCT CARD ── */
 .prod-card{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-top:10px}
@@ -2223,11 +2226,8 @@ async function startCam(videoId, key, cb){
           cameraConfig,
           {
             fps: 25,
-            qrbox: (viewfinderWidth, viewfinderHeight) => ({
-              width: Math.min(viewfinderWidth, Math.max(220, Math.floor(viewfinderWidth * 0.85))),
-              height: Math.min(viewfinderHeight, Math.max(140, Math.floor(viewfinderHeight * 0.65)))
-            }),
-            aspectRatio: 1.777778,
+            qrbox: undefined,
+            aspectRatio: undefined,
             formatsToSupport: formats,
             disableFlip: false
           },
