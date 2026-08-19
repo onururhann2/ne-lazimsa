@@ -3925,8 +3925,17 @@ document.addEventListener('keydown', (e) => {
 
   const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
 
+  // If focus is on a numeric input (qty, price fields) don't accumulate barcode there
+  const isNumericInput = isInput && target && (
+    target.id === 'stockin-qty' ||
+    target.id === 'stockin-price' ||
+    target.id === 'stockin-buyprice' ||
+    target.getAttribute('type') === 'number' ||
+    target.classList.contains('qty-input')
+  );
+
   if(e.key === 'Enter'){
-    if(globalBarcodeBuffer.length >= 3){
+    if(globalBarcodeBuffer.length >= 3 && !isNumericInput){
       const scannedCode = globalBarcodeBuffer.trim();
       globalBarcodeBuffer = '';
       
@@ -3947,9 +3956,14 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
       }
       isHardwareScanGun = false;
+    } else {
+      globalBarcodeBuffer = '';
     }
   } else if(e.key.length === 1){
-    globalBarcodeBuffer += e.key;
+    // Don't add to barcode buffer if user is typing in a numeric/qty field
+    if(!isNumericInput){
+      globalBarcodeBuffer += e.key;
+    }
   }
 });
 
@@ -4714,9 +4728,17 @@ function onStockinScan(code){
     document.getElementById('stockin-prod-card').style.display='block';
     document.getElementById('stockin-notfound').style.display='none';
     // ── Miktara odaklanıp seç, kullanıcı direkt yazıyor ──
-    const qtyEl=document.getElementById('stockin-qty');
-    qtyEl.value=1;
-    setTimeout(()=>{qtyEl.focus();qtyEl.select();},120);
+    const qtyEl = document.getElementById('stockin-qty');
+    qtyEl.value = 1;
+    // Clear global barcode buffer so scanner tail chars don't land in qty field
+    globalBarcodeBuffer = '';
+    isHardwareScanGun = false;
+    // Longer delay so hardware scanner finishes sending all its characters first
+    setTimeout(() => {
+      qtyEl.value = 1;
+      qtyEl.focus();
+      qtyEl.select();
+    }, 350);
   }else{
     stockinProdId=null;
     document.getElementById('stockin-prod-card').style.display='none';
