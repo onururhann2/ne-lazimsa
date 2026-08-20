@@ -3476,6 +3476,33 @@ function confirmQuickStockModal(){
   toast('s', 'Stok Eklendi! 🚀', `"${p.name}" stoğuna +${qty} ${p.unit} eklendi. Güncel Stok: ${P[pi].stk} ${p.unit}`);
 }
 
+// ── BARKOD OKUTULDUĞUNDA ÇALIŞAN MERKEZİ FONKSİYON ──
+function onScan(code){
+  if(!code) return;
+  code = String(code).trim();
+  if(!code) return;
+  lastCode = code;
+  
+  // 1. Okuma/Kamera ekranını derhal kapat
+  closeScanner();
+  closeAllModals();
+  
+  const p = findProductByBarcode(code);
+  triggerScanFeedback(code, p, 'general');
+  
+  if(p){
+    // 2. KAYITLI ÜRÜN İSE: Ürün bilgisi ve miktar girme penceresini aç
+    openQuickStockModal(p);
+  } else {
+    // 3. YENİ ÜRÜN İSE: Ürün Ekleme penceresini aç ve barkodu yaz
+    openProdModal();
+    const bEl = document.getElementById('p-barc');
+    if(bEl) bEl.value = code;
+    toast('w', 'Yeni Barkod Okundu ⚠️', `"${code}" barkodu forma işlendi. Ürün bilgilerini girip kaydedebilirsiniz.`);
+  }
+}
+
+
 function saveQuickProductFromScan(code){
   const name = document.getElementById('scan-quick-name')?.value?.trim();
   const cat = document.getElementById('scan-quick-cat')?.value?.trim() || 'Genel';
