@@ -1781,19 +1781,108 @@ function initData(){
 }
 
 function ls(k,v){if(v!==undefined)localStorage.setItem(k,v);else return localStorage.getItem(k)}
-function gp(){try{return JSON.parse(ls('nl_prod')||'[]')}catch(e){return[]}}
-function gs(){try{return JSON.parse(ls('nl_sup')||'[]')}catch(e){return[]}}
-function go2(){try{return JSON.parse(ls('nl_ord')||'[]')}catch(e){return[]}}
+
+// ── KAYIT BAZINDA SENKRONİZASYON ──
+// Ürün/tedarikçi/sipariş listeleri eskiden tek blok halinde "son yazan kazanır"
+// mantığıyla aktarılıyordu ve cihaz saatleri karşılaştırılıyordu. Saati birkaç
+// yüz milisaniye ileri olan tek bir cihaz, diğer herkesin güncellemelerini
+// "bayat" gösterip düşürüyordu. Artık her kayıt kendi uts damgasıyla ayrı ayrı
+// birleştiriliyor; silinenler tombstone olarak taşınıyor.
+const TOMBSTONE_TTL = 30 * 24 * 60 * 60 * 1000; // silinen kayıtlar 30 gün taşınır
+
+// ── MANTIKSAL SAAT (hybrid logical clock) ──
+// Düz duvar saati yetmiyor: saati ileri olan bir cihaz, kendisinden SONRA
+// yapılmış düzenlemeleri bile "daha yeni" görünerek eziyordu.
+// nextUts() her zaman "şimdiye kadar görülen en büyük damga"nın üstüne çıkar;
+// böylece uzak veriyi gördükten SONRA yapılan her düzenleme onu kesin yener.
+let hlcLast = Number(localStorage.getItem('nl_hlc') || 0);
+function nextUts(){
+  hlcLast = Math.max(Date.now(), hlcLast + 1);
+  try{ localStorage.setItem('nl_hlc', String(hlcLast)); }catch(e){}
+  return hlcLast;
+}
+function observeUts(t){
+  const n = Number(t) || 0;
+  if(n > hlcLast){
+    hlcLast = n;
+    try{ localStorage.setItem('nl_hlc', String(hlcLast)); }catch(e){}
+  }
+}
+
+function readRaw(key){try{const v=JSON.parse(ls(key)||'[]');return Array.isArray(v)?v:[]}catch(e){return[]}}
+function live(list){return list.filter(x => x && !x.deleted)}
+
+// Değişen/yeni kayıtlara uts basar, silinenler için tombstone bırakır
+function writeRaw(key, next){
+  const prevRaw = readRaw(key);
+  const prevById = new Map(prevRaw.map(r => [String(r.id), r]));
+  const now = nextUts();
+  const norm = r => { const {uts, ...rest} = r || {}; return JSON.stringify(rest); };
+
+  const out = (Array.isArray(next) ? next : []).map(r => {
+    if(!r || r.id === undefined) return r;
+    const before = prevById.get(String(r.id));
+    if(!before) return {...r, uts: now};                 // yeni kayıt
+    if(norm(before) !== norm(r)) return {...r, uts: now}; // değişmiş kayıt
+    return {...r, uts: before.uts || now};                // aynı → damgayı koru
+  });
+
+  // Listeden çıkarılanlar: silindi olarak işaretle ki diğer cihazlarda da düşsün
+  const keptIds = new Set(out.map(r => String(r && r.id)));
+  prevRaw.forEach(r => {
+    if(!r || r.id === undefined) return;
+    if(keptIds.has(String(r.id))) return;
+    out.push(r.deleted ? r : { id: r.id, deleted: true, uts: now });
+  });
+
+  const cutoff = now - TOMBSTONE_TTL;
+  localStorage.setItem(key, JSON.stringify(out.filter(r => !(r && r.deleted && Number(r.uts||0) < cutoff))));
+}
+
+// İki listeyi id bazında birleştirir; uts'i büyük olan kazanır
+function mergeRecords(localRaw, remoteRaw){
+  const map = new Map();
+  const put = r => {
+    if(!r || r.id === undefined) return;
+    observeUts(r.uts);  // mantıksal saati uzak damgaların üstüne taşı
+    const k = String(r.id);
+    const prev = map.get(k);
+    if(!prev || Number(r.uts || 0) >= Number(prev.uts || 0)) map.set(k, r);
+  };
+  (Array.isArray(localRaw) ? localRaw : []).forEach(put);
+  (Array.isArray(remoteRaw) ? remoteRaw : []).forEach(put);
+  const cutoff = Date.now() - TOMBSTONE_TTL;
+  return Array.from(map.values()).filter(r => !(r.deleted && Number(r.uts||0) < cutoff));
+}
+
+// Uzaktan gelen listeyi yereldekiyle birleştirip kaydeder. Değiştiyse true döner.
+function applyRemoteList(key, remoteRaw){
+  if(!Array.isArray(remoteRaw)) return false;
+  const before = JSON.stringify(readRaw(key));
+  const merged = JSON.stringify(mergeRecords(JSON.parse(before), remoteRaw));
+  if(merged === before) return false;
+  localStorage.setItem(key, merged);
+  return true;
+}
+
+function gpRaw(){return readRaw('nl_prod')}
+function gsRaw(){return readRaw('nl_sup')}
+function goRaw(){return readRaw('nl_ord')}
+function gp(){return live(gpRaw())}
+function gs(){return live(gsRaw())}
+function go2(){return live(goRaw())}
 function gsh(){try{return JSON.parse(ls('nl_sales_hist')||'[]')}catch(e){return[]}}
 function gih(){try{return JSON.parse(ls('nl_stockin_hist')||'[]')}catch(e){return[]}}
 
 // Save and sync data immediately
-function sp(d){localStorage.setItem('nl_prod',JSON.stringify(d));triggerCloudPush('products', true);}
-function ss(d){localStorage.setItem('nl_sup',JSON.stringify(d));triggerCloudPush('suppliers', true);}
-function so(d){localStorage.setItem('nl_ord',JSON.stringify(d));triggerCloudPush('orders', true);}
+function sp(d){writeRaw('nl_prod',d);triggerCloudPush('products', true);}
+function ss(d){writeRaw('nl_sup',d);triggerCloudPush('suppliers', true);}
+function so(d){writeRaw('nl_ord',d);triggerCloudPush('orders', true);}
 function ssh(d){localStorage.setItem('nl_sales_hist',JSON.stringify(d));triggerCloudPush('sales_history', true);}
 function sih(d){localStorage.setItem('nl_stockin_hist',JSON.stringify(d));triggerCloudPush('stockin_history', true);}
-function nid(a){return a.length?Math.max(...a.map(x=>x.id))+1:1}
+// id üretimi tombstone'lar dahil TÜM kayıtlara bakmalı; aksi halde silinen bir id
+// yeniden kullanılır ve eski tombstone yeni kaydı öldürür.
+function nid(a){const all=[...(a||[]),...gpRaw(),...gsRaw(),...goRaw()].filter(x=>x&&typeof x.id==='number');return all.length?Math.max(...all.map(x=>x.id))+1:1}
 function fd(d){return d.toISOString().split('T')[0]}
 function tl(n){return'₺'+Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function sst(p){if(p.stk<=0||p.stk<=p.min)return'crit';if(p.stk<=p.min*1.5)return'warn';return'ok'}
@@ -1802,7 +1891,6 @@ function sst(p){if(p.stk<=0||p.stk<=p.min)return'crit';if(p.stk<=p.min*1.5)retur
 // Kullanıcı listesi cihazlar arası "alan bazlı birleştirme" (merge) ile senkronize edilir.
 // Her kayıtta uts (updated timestamp) tutulur; silinenler tombstone (deleted:true) olarak saklanır,
 // böylece eski listeye sahip bir cihaz push yaptığında yeni kullanıcıyı ezemez.
-const USER_TOMBSTONE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 gün
 
 // Ham liste: silinmiş (tombstone) kayıtları da içerir. Yalnızca senkronizasyon içindir.
 function getUsersRaw(){
@@ -1853,6 +1941,7 @@ function mergeUsers(localList, remoteList){
   const map = new Map();
   const put = (u) => {
     if(!u || typeof u !== 'object') return;
+    observeUts(u.uts);  // ürünlerle aynı mantıksal saat
     const k = userKey(u);
     if(!k) return;
     const prev = map.get(k);
@@ -1862,7 +1951,7 @@ function mergeUsers(localList, remoteList){
   (Array.isArray(localList) ? localList : []).forEach(put);
   (Array.isArray(remoteList) ? remoteList : []).forEach(put);
 
-  const cutoff = Date.now() - USER_TOMBSTONE_TTL;
+  const cutoff = Date.now() - TOMBSTONE_TTL;
   const merged = Array.from(map.values()).filter(u => !(u.deleted && Number(u.uts || 0) < cutoff));
   // Güvenlik ağı: birleşme sonucu tek bir aktif hesap bile kalmıyorsa yereli koru
   if(!merged.some(u => !u.deleted)) return Array.isArray(localList) ? localList : [];
@@ -2099,7 +2188,7 @@ function saveUser(e){
       users[idx].password = fPass;
       users[idx].role = fRole;
       users[idx].permissions = fPerms;
-      users[idx].uts = Date.now();
+      users[idx].uts = nextUts();
       delete users[idx].seed; // artık gerçek bir kayıt, fabrika ayarı değil
       if(currentUser && currentUser.id === uid){
         currentUser = users[idx];
@@ -2124,7 +2213,7 @@ function saveUser(e){
       password: fPass,
       role: fRole,
       permissions: fPerms,
-      uts: Date.now()
+      uts: nextUts()
     };
     users.push(newUser);
     const permLabels = {sales:'Satış',dashboard:'Panel',products:'Stok',stockin:'Giriş',critical:'Kritik',suppliers:'Tedarikçi',reports:'Rapor'};
@@ -2154,7 +2243,7 @@ function delUser(id){
     // Tamamen silmek yerine tombstone bırak: aksi halde eski listeye sahip
     // başka bir cihaz push yaptığında kullanıcı geri gelir.
     users = users.map(x => x.id === id
-      ? { id: x.id, email: x.email, username: x.username, name: x.name, deleted: true, uts: Date.now() }
+      ? { id: x.id, email: x.email, username: x.username, name: x.name, deleted: true, uts: nextUts() }
       : x);
     saveUsers(users);
     renderUsers();
@@ -4962,7 +5051,9 @@ function confirmBulkInvoiceStockin(){
   });
 
   // Save to storage & Sync Cloud atomically
-  localStorage.setItem('nl_prod', JSON.stringify(P));
+  // writeRaw kullanılır: değişen ürünlere uts damgası basılmazsa bu değişiklik
+  // diğer cihazlarda birleştirmede kaybolur.
+  writeRaw('nl_prod', P);
   if(inHist.length > 500) inHist.length = 500;
   localStorage.setItem('nl_stockin_hist', JSON.stringify(inHist));
   triggerCloudPush('invoice_stockin_complete', true);
@@ -5459,7 +5550,8 @@ function completeSale(){
     const pi=P.findIndex(p=>p.id===c.prodId);
     P[pi].stk = Math.max(0, parseInt(P[pi].stk || 0) - c.qty);
   });
-  localStorage.setItem('nl_prod', JSON.stringify(P));
+  // Satışta düşen stoklar da uts damgası almalı, aksi halde diğer cihazlara geçmez
+  writeRaw('nl_prod', P);
 
   const saleItems = salesCart.map(c => {
     const p = P.find(x => x.id === c.prodId);
@@ -5597,9 +5689,12 @@ function setSyncStatusUI(status, text){
 
 function clearAllTestData(){
   if(!confirm('Tüm ürünler, tedarikçiler, siparişler ve satış geçmişi sıfırlanacaktır. Emin misiniz?')) return;
-  localStorage.setItem('nl_prod', '[]');
-  localStorage.setItem('nl_sup', '[]');
-  localStorage.setItem('nl_ord', '[]');
+  // writeRaw ile boşaltılır: silinen her kayıt için tombstone bırakılır, böylece
+  // temizlik diğer cihazlara da geçer. Doğrudan '[]' yazılsaydı diğer cihazlar
+  // kendi listelerini geri göndererek her şeyi diriltirdi.
+  writeRaw('nl_prod', []);
+  writeRaw('nl_sup', []);
+  writeRaw('nl_ord', []);
   localStorage.setItem('nl_sales_hist', '[]');
   localStorage.setItem('nl_stockin_hist', '[]');
   salesCart = [];
@@ -5923,9 +6018,11 @@ function triggerCloudPush(reason, immediate = false){
   lastCloudSyncTime = Date.now();
   
   const payload = {
-    products: gp(),
-    suppliers: gs(),
-    orders: go2(),
+    // Raw listeler gönderilir: tombstone'lar olmadan silinen kayıtlar
+    // diğer cihazlardan geri döner.
+    products: gpRaw(),
+    suppliers: gsRaw(),
+    orders: goRaw(),
     salesHistory: gsh(),
     stockinHistory: gih(),
     users: getUsersRaw(), // tombstone'lar dahil, aksi halde silinenler diğer cihazlardan geri gelir
@@ -6029,31 +6126,41 @@ function triggerCloudPush(reason, immediate = false){
   }
 }
 
+// Başka bir cihazdan gelen veri değişikliğini kullanıcıya bildirir.
+// Yalnızca birleştirme gerçekten bir şey değiştirdiğinde çağrılır; kendi
+// yazdığımız satır geri geldiğinde birleştirme fark üretmediği için
+// kendi kendimize bildirim göstermeyiz.
+let lastRemoteNotifyAt = 0;
+function notifyRemoteChange(payload, source){
+  const now = Date.now();
+  if(now - lastRemoteNotifyAt < 2500) return; // arka arkaya gelen paketlerde tek bildirim
+  lastRemoteNotifyAt = now;
+
+  const who = payload.updatedBy || payload.updated_by || '';
+  toast('i', '🔄 Veriler Güncellendi',
+    (who ? who + ' tarafından yapılan' : 'Başka bir cihazda yapılan') + ' değişiklik bu cihaza işlendi.');
+}
+
 function applyRemotePayload(payload, source){
   if(!payload || isRemoteApplying) return;
 
   const remoteTime = Number(payload.updatedAt || payload.updated_at || 0);
 
-  // If remote payload is older than our latest local modification, do not overwrite products/suppliers/orders
-  const isStale = (remoteTime > 0 && lastCloudSyncTime > 0 && remoteTime < lastCloudSyncTime);
-
   isRemoteApplying = true;
-  
-  try{
-    if(!isStale){
-      if(Array.isArray(payload.products)){
-        localStorage.setItem('nl_prod', JSON.stringify(payload.products));
-      }
-      if(Array.isArray(payload.suppliers)){
-        localStorage.setItem('nl_sup', JSON.stringify(payload.suppliers));
-      }
-      if(Array.isArray(payload.orders)){
-        localStorage.setItem('nl_ord', JSON.stringify(payload.orders));
-      }
-    }
 
-    // Kullanıcılar isStale kontrolünden BAĞIMSIZ olarak birleştirilir.
-    // (Cihazlar arası saat farkı yüzünden yeni tanımlanan bir kullanıcı asla düşmemeli.)
+  try{
+    // ── ARTIK CİHAZ SAATLERİ KARŞILAŞTIRILMIYOR ──
+    // Eskiden burada bir "isStale" kontrolü vardı: uzak paketin updatedAt'i
+    // lastCloudSyncTime'dan küçükse ürün/tedarikçi/sipariş verisi TAMAMEN
+    // yok sayılıyordu. lastCloudSyncTime tüm cihazların damgalarının
+    // maksimumunu tuttuğu için, saati birkaç yüz milisaniye ileri olan tek bir
+    // cihaz diğer herkesin güncellemelerini kalıcı olarak susturuyordu.
+    // Bunun yerine her kayıt kendi uts damgasıyla ayrı ayrı birleştiriliyor.
+    const prodChanged = applyRemoteList('nl_prod', payload.products);
+    const supChanged  = applyRemoteList('nl_sup',  payload.suppliers);
+    const ordChanged  = applyRemoteList('nl_ord',  payload.orders);
+
+    // Kullanıcılar da aynı şekilde kayıt bazında birleştirilir
     const userSync = applyRemoteUsers(payload.users);
     if(userSync.needsPush && source !== 'Local Tab'){
       // Debounce'lu push: birleşmiş listeyi buluta geri yaz
@@ -6099,9 +6206,11 @@ function applyRemotePayload(payload, source){
       localStorage.setItem('nl_stockin_hist', JSON.stringify(mergedIn));
     }
 
-    if(remoteTime > 0){
-      lastCloudSyncTime = Math.max(lastCloudSyncTime, remoteTime);
-    }
+    // Yalnızca "son veri akışı" göstergesi için tutulur; artık hiçbir veriyi
+    // eleme kararında kullanılmaz (cihaz saatleri karşılaştırılamaz).
+    if(remoteTime > 0) lastCloudSyncTime = remoteTime;
+
+    if(prodChanged || supChanged || ordChanged) notifyRemoteChange(payload, source);
 
     refreshActiveViewSilently();
     updBadge();
