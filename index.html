@@ -787,10 +787,18 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <div style="font-size:14px;font-weight:700;margin-bottom:18px">Stok Ekle</div>
             <div class="fg"><label>Ürün</label><input type="text" id="stockin-prod-display" readonly placeholder="Barkod okutun veya seçin..." style="opacity:.7"></div>
             <div class="fg">
-              <label>Eklenecek Miktar *</label>
-              <input type="number" id="stockin-qty" min="1" placeholder="Tıklayın ve miktar girin..."
-                style="font-size:22px;font-weight:700;text-align:center;padding:14px;cursor:pointer;border:2px dashed var(--accent)"
-                readonly onclick="activateQtyManual(this)" onkeydown="handleQtyKeydown(event)">
+              <label>Eklenecek Miktar * <span style="font-size:10px;color:var(--txt3);font-weight:400">(Butonlarla veya klavyeyle girin)</span></label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button type="button" onclick="stepQty(-10)" style="width:40px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0">−10</button>
+                <button type="button" onclick="stepQty(-1)" style="width:48px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:22px;font-weight:700;cursor:pointer;flex-shrink:0">−</button>
+                <input type="number" id="stockin-qty" min="1" placeholder="0"
+                  style="font-size:26px;font-weight:800;text-align:center;padding:10px;flex:1;border:2px solid var(--accent);border-radius:8px;background:var(--bg3);color:var(--txt)"
+                  onkeydown="handleQtyKeydown(event)"
+                  onfocus="qtyManualActive=true"
+                  onblur="qtyManualActive=false">
+                <button type="button" onclick="stepQty(1)" style="width:48px;height:56px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:22px;font-weight:700;cursor:pointer;flex-shrink:0">+</button>
+                <button type="button" onclick="stepQty(10)" style="width:40px;height:56px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0">+10</button>
+              </div>
             </div>
             <div class="fg"><label>Not (İsteğe Bağlı)</label><input type="text" id="stockin-note" placeholder="Örn: Depodan gelen"></div>
             <input type="hidden" id="stockin-prod-id">
@@ -4929,44 +4937,54 @@ function linkStockinBarcodeToProduct(code){
   onStockinScan(code);
 }
 
-// ── STOK GİRİŞİ MİKTAR ALANI: TAM KORUMA ──
-// Miktar alanı varsayılan olarak readonly'dir.
-// Kullanıcı tıklayınca aktif olur → sadece klavye girişi kabul edilir.
-// Tabanca odaklanmış alana yazamaz çünkü alan tıklanmadan readonly kalır.
+// ── STOK GİRİŞİ MİKTAR ALANI: BUTON TABANLI GİRİŞ ──
+// Tabanca her koşulda yazamaz: hızlı gelen karakterler engellenir.
+// Kullanıcı +/- butonları VEYA klavyeyle elle girebilir.
 let qtyManualActive = false;
+let qtyLastKey = 0;
 
-function activateQtyManual(el){
-  qtyManualActive = true;
-  el.removeAttribute('readonly');
-  el.style.border = '2px solid var(--accent)';
-  el.style.cursor = 'text';
-  el.placeholder = 'Miktar girin...';
-  el.focus();
-  el.select();
+function stepQty(delta){
+  const el = document.getElementById('stockin-qty');
+  if(!el) return;
+  const cur = parseInt(el.value) || 0;
+  el.value = Math.max(1, cur + delta);
 }
 
 function deactivateQtyManual(){
   qtyManualActive = false;
   const el = document.getElementById('stockin-qty');
-  if(el){
-    el.setAttribute('readonly', '');
-    el.style.border = '2px dashed var(--accent)';
-    el.style.cursor = 'pointer';
-    el.placeholder = 'Tıklayın ve miktar girin...';
-  }
+  if(el){ el.value = ''; el.blur(); }
 }
 
 function handleQtyKeydown(e){
-  if(!qtyManualActive){
-    // readonly mod: hiçbir tuşa izin verme
-    e.preventDefault();
-    return;
-  }
+  const now = Date.now();
+  const diff = now - qtyLastKey;
+  qtyLastKey = now;
+
   if(e.key === 'Enter'){
     e.preventDefault();
     confirmStockin();
+    return;
   }
-  // Diğer tuşlar normal çalışır (sayı, backspace, delete vb.)
+
+  // Backspace, Delete, Tab, arrow keys: her zaman izin ver
+  if(['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
+
+  // Sayısal karakter geldi
+  if(e.key.length === 1 && /[0-9]/.test(e.key)){
+    // 80ms'den hızlı geliyorsa tabanca → engelle
+    if(diff < 80 && qtyLastKey - now < 10){
+      // qtyLastKey = 0 olursa ilk karakter — güvenli kabul et
+    }
+    // Genel hız kontrolü: 60ms altı kesinlikle tabanca
+    if(diff > 0 && diff < 60){
+      e.preventDefault();
+      // Tabanca karakterlerini global buffer'a yönlendir
+      globalBarcodeBuffer += e.key;
+      return;
+    }
+  }
+  // Diğer her şey normal
 }
 
 function confirmStockin(){
