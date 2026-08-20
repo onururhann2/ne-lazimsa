@@ -2900,7 +2900,7 @@ function saveProd(e){
     triggerScanFeedback(d.barc || '', d, 'prod_save');
     toast('s', 'Yeni Ürün Eklendi! 🚀', `"${d.name}" (${d.cat}) ${d.stk} ${d.unit} stok ile sisteme eklendi.`);
   }
-  sp(P);closeM('m-prod');renderProds();updBadge();
+  sp(P);closeScanner();closeM('m-prod');renderProds();updBadge();
 }
 function delProd(id){if(!confirm('Bu ürünü silmek istediğinize emin misiniz?'))return;sp(gp().filter(p=>p.id!==id));renderProds();updBadge();toast('s','Silindi','Ürün silindi');}
 
