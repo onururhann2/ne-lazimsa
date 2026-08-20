@@ -3306,13 +3306,22 @@ function mkChart(id,type,data,opts){
 
 // ══════════════ BARCODE ══════════════
 async function openScanner(mode){
-  scanMode=mode;lastCode=null;
-  document.getElementById('scan-res').innerHTML='<span style="color:var(--txt3)">Barkodu kamera önüne tutun...</span>';
-  document.getElementById('scan-info').style.display='none';
-  document.getElementById('scan-act-btn').style.display='none';
-  document.getElementById('scan-ttl').textContent=mode==='add'?'Barkod ile Ürün Ekle':'Barkod Tara';
+  scanMode = mode;
+  lastCode = null;
+  document.getElementById('scan-res').innerHTML = '<span style="color:var(--txt3)">Barkodu okutun veya kameraya tutun...</span>';
+  document.getElementById('scan-info').style.display = 'none';
+  document.getElementById('scan-act-btn').style.display = 'none';
+  document.getElementById('scan-ttl').textContent = mode === 'add' ? 'Barkod ile Ürün Ekle' : 'Barkod Tara';
+  
   openM('m-scan');
-  await startCam('barcode-video','scan',(code)=>onScan(code));
+  
+  // Tabanca için manuel barkod alanına otomatik odaklan
+  setTimeout(() => {
+    const mInput = document.getElementById('m-scan-manual');
+    if(mInput){ mInput.value = ''; mInput.focus(); }
+  }, 100);
+  
+  await startCam('barcode-video', 'scan', (code) => onScan(code));
 }
 function closeScanner(){stopCam('scan');closeM('m-scan');}
 
@@ -4130,13 +4139,13 @@ document.addEventListener('keydown', (e) => {
   lastKeyTime = now;
 
   // 500ms'den uzun süre tuşa basılmadıysa ve basılan tuş Enter değilse buffer'ı temizle
-  if(timeDiff > 500 && e.key !== 'Enter'){
+  if(timeDiff > 500 && e.key !== 'Enter' && e.keyCode !== 13){
     globalBarcodeBuffer = '';
   }
 
   const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
 
-  // Miktar/sayı alanlarında focus varken tabanca mı okuyor?
+  // Stok girişindeki miktar alanında tabanca koruması
   const isQtyField = isInput && target && (
     target.id === 'stockin-qty' ||
     target.id === 'stockin-price' ||
@@ -4145,14 +4154,17 @@ document.addEventListener('keydown', (e) => {
     target.classList.contains('qty-input')
   );
 
-  // Tabanca hızında gelen karakterleri miktar alanına yazdırma
   const isScannerTypingInQty = isQtyField && timeDiff < 60;
 
   if(e.key === 'Enter' || e.keyCode === 13){
     let scannedCode = '';
+    
+    // 1. Buffer'dan oku
     if(globalBarcodeBuffer.length >= 3){
       scannedCode = globalBarcodeBuffer.trim();
-    } else if(target && (target.id === 'm-scan-manual' || target.id === 'sales-manual-barc' || target.id === 'stockin-manual-barc') && target.value.trim().length >= 3){
+    } 
+    // 2. Veya odaklı inputtan oku
+    else if(target && typeof target.value === 'string' && target.value.trim().length >= 3){
       scannedCode = target.value.trim();
       target.value = '';
     }
@@ -4165,37 +4177,32 @@ document.addEventListener('keydown', (e) => {
       const qcOpen = document.getElementById('m-qc')?.classList.contains('open');
       const scanOpen = document.getElementById('m-scan')?.classList.contains('open');
       const prodOpen = document.getElementById('m-prod')?.classList.contains('open');
+      const quickStockOpen = document.getElementById('m-quick-stock')?.classList.contains('open');
 
       playBeep();
 
       if(scanOpen){
-        // 1. Barkod Tara / Barkod ile Ekle modalı açık
+        // Barkod Tara / Barkod ile Ekle modalı açıkken
         onScan(scannedCode);
         const mInput = document.getElementById('m-scan-manual');
         if(mInput) mInput.value = '';
       } else if(qcOpen){
-        // 2. Hızlı Sayım Modu açık
+        // Hızlı Sayım Modu açık
         handleQCGunScan(scannedCode);
       } else if(prodOpen){
-        // 3. Ürün Ekle/Düzenle modalı açık
+        // Ürün Ekle/Düzenle modalı açık
         const bEl = document.getElementById('p-barc');
         if(bEl){ bEl.value = scannedCode; bEl.focus(); }
+      } else if(quickStockOpen){
+        // Quick stock modal açıkken başka barkod okutulursa o barkodu işle
+        onScan(scannedCode);
       } else if(pageId === 'sales'){
         onSalesScan(scannedCode);
       } else if(pageId === 'stockin'){
         onStockinScan(scannedCode);
-      } else if(pageId === 'products'){
-        const p = findProductByBarcode(scannedCode);
-        if(p){
-          // Kayıtlı barkod: sadece ürün bilgisi ve miktar giriş ekranını aç
-          openQuickStockModal(p);
-        } else {
-          // Yeni barkod: doğrudan Ürün Ekle penceresini aç ve barkodu yaz
-          openProdModal();
-          const bEl = document.getElementById('p-barc');
-          if(bEl) bEl.value = scannedCode;
-          toast('s', 'Yeni Barkod Okundu ✅', `"${scannedCode}" barkodu için ürün ekleme penceresi açıldı.`);
-        }
+      } else {
+        // Stok Takibi, Dashboard veya herhangi bir sayfada barkod okutulduğunda onScan çağır
+        onScan(scannedCode);
       }
 
       if(isInput) e.preventDefault();
