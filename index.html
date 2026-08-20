@@ -3976,11 +3976,22 @@ document.addEventListener('keydown', (e) => {
       const pageId = activePage ? activePage.id.replace('page-', '') : '';
       const qcOpen = document.getElementById('m-qc')?.classList.contains('open');
       const scanOpen = document.getElementById('m-scan')?.classList.contains('open');
+      const prodOpen = document.getElementById('m-prod')?.classList.contains('open');
 
       playBeep();
 
-      if(qcOpen){
+      if(scanOpen){
+        // 1. Barkod Tara / Barkod ile Ekle modalı açıkken öncelikli çalış
+        onScan(scannedCode);
+        const mInput = document.getElementById('m-scan-manual');
+        if(mInput) mInput.value = '';
+      } else if(qcOpen){
+        // 2. Hızlı Sayım Modu açık
         handleQCGunScan(scannedCode);
+      } else if(prodOpen){
+        // 3. Ürün Ekle/Düzenle modalı açık
+        const bEl = document.getElementById('p-barc');
+        if(bEl){ bEl.value = scannedCode; bEl.focus(); }
       } else if(pageId === 'sales'){
         onSalesScan(scannedCode);
       } else if(pageId === 'stockin'){
@@ -3989,8 +4000,6 @@ document.addEventListener('keydown', (e) => {
       } else if(pageId === 'products'){
         const searchEl = document.getElementById('p-search');
         if(searchEl){ searchEl.value = scannedCode; renderProds(); searchEl.focus(); }
-      } else if(scanOpen){
-        onScan(scannedCode);
       }
 
       if(isHardwareScanGun && isInput) e.preventDefault();
