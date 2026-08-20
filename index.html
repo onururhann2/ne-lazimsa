@@ -763,101 +763,15 @@ body.scan-pulse-active {
       <div class="page-header">
         <div>
           <h1 class="page-title">Stok Girişi</h1>
-          <p class="page-sub">Barkod veya Fatura/İrsaliye okutarak hızlı stok ekleyin</p>
+          <p class="page-sub">Fatura / İrsaliye okutarak toplu stok ekleyin</p>
         </div>
         <div class="page-actions">
-          <div style="display:flex;background:var(--bg3);padding:3px;border-radius:9px;border:1px solid var(--border2)">
-            <button class="btn btn-sm" id="btn-stockin-mode-barcode" style="background:var(--accent);color:#fff;border-radius:7px" onclick="setStockinMode('barcode')">🏷️ Tekli Barkod Girişi</button>
-            <button class="btn btn-sm btn-ghost" id="btn-stockin-mode-invoice" style="border-radius:7px" onclick="setStockinMode('invoice')">📄 Fatura / İrsaliye Okuma (OCR)</button>
-          </div>
           <button class="btn btn-ghost" onclick="resetStockin()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>Sıfırla</button>
         </div>
       </div>
 
-      <!-- 1. BARCODE MODE VIEW -->
-      <div id="stockin-barcode-view" class="page-2col">
-        <!-- LEFT: Camera + Result -->
-        <div>
-          <div class="card" style="padding:18px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-              <div style="font-size:13px;font-weight:600;color:var(--txt2)">📷 Kamera / Barkod Okuyucu</div>
-              <select class="scan-cam-select" data-cam-key="stockin" onchange="onCameraSelectChange('stockin', this.value)" style="padding:4px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:11px;max-width:185px">
-                <option value="">Kamera Aranıyor...</option>
-              </select>
-            </div>
-            <div class="scan-frame">
-              <video id="stockin-video" autoplay playsinline muted></video>
-              <div class="scan-laser"></div>
-              <div class="scan-tag">Barkod Okuma Alanı</div>
-              <button type="button" class="scan-cam-switch" onclick="switchCamera('stockin')" title="Sonraki Kameraya Geç">🔄 Değiştir</button>
-            </div>
-            <div class="scan-result" id="stockin-scan-res"><span style="color:var(--txt3)">Kameraya gösterin veya barkod yazın...</span></div>
-            <div style="display:flex;gap:7px;margin-top:10px">
-              <input type="text" id="stockin-manual-barc" placeholder="Barkod no yazın veya okutun..." style="flex:1;padding:8px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border2);color:var(--txt);font-size:12px;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();if(this.value.trim()){onStockinScan(this.value.trim());this.value='';}}">
-              <button class="btn btn-primary btn-sm" onclick="const v=document.getElementById('stockin-manual-barc').value.trim();if(v){onStockinScan(v);document.getElementById('stockin-manual-barc').value='';}">Bul</button>
-            </div>
-          </div>
-          <!-- Found product card -->
-          <div id="stockin-prod-card" style="display:none" class="prod-card">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-              <div class="prod-card-name" id="stockin-prod-name"></div>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="if(stockinProdId)openProdModal(stockinProdId)" style="font-size:11px;padding:3px 8px">✏️ Ürünü Düzenle</button>
-            </div>
-            <div class="prod-card-meta">
-              <span><span style="color:var(--txt2)">Kategori:</span> <strong id="stockin-prod-cat-text"></strong></span>
-              <span><span style="color:var(--txt2)">Mevcut Stok:</span> <strong id="stockin-prod-stk"></strong></span>
-              <span><span style="color:var(--txt2)">Alış Fiyatı:</span> <strong id="stockin-prod-price"></strong></span>
-              <span><span style="color:var(--txt2)">Satış Fiyatı:</span> <strong id="stockin-prod-sellprice" style="color:var(--accent)"></strong></span>
-              <span><span style="color:var(--txt2)">Birim:</span> <span id="stockin-prod-unit"></span></span>
-            </div>
-            <div style="margin-top:10px" id="stockin-prod-badge"></div>
-          </div>
-          <!-- Not found -->
-          <div id="stockin-notfound" style="display:none;margin-top:12px" class="prod-card">
-            <div style="color:var(--yellow);font-weight:600;margin-bottom:4px">⚠️ Ürün bulunamadı</div>
-            <div style="color:var(--txt2);font-size:13px">Bu barkod sisteme kayıtlı değil.</div>
-            <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openProdModal()">➕ Yeni Ürün Olarak Ekle</button>
-          </div>
-        </div>
-        <!-- RIGHT: Add stock form -->
-        <div>
-          <div class="card" style="padding:22px">
-            <div style="font-size:14px;font-weight:700;margin-bottom:18px">Stok Ekle</div>
-            <div class="fg"><label>Ürün</label><input type="text" id="stockin-prod-display" readonly placeholder="Barkod okutun veya seçin..." style="opacity:.7"></div>
-            <div class="fg">
-              <label>Eklenecek Miktar * <span style="font-size:10px;color:var(--txt3);font-weight:400">(Butonlarla veya klavyeyle girin)</span></label>
-              <div style="display:flex;align-items:center;gap:8px">
-                <button type="button" onclick="stepQty(-10)" style="width:42px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">−10</button>
-                <button type="button" onclick="stepQty(-1)" style="width:48px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:22px;font-weight:700;cursor:pointer;flex-shrink:0">−</button>
-                <input type="number" id="stockin-qty" readonly tabindex="-1"
-                  style="font-size:26px;font-weight:800;text-align:center;padding:10px;flex:1;border:2px solid var(--accent);border-radius:8px;background:var(--bg3);color:var(--txt);cursor:default;pointer-events:none" value="">
-                <button type="button" onclick="stepQty(1)" style="width:48px;height:56px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:22px;font-weight:700;cursor:pointer;flex-shrink:0">+</button>
-                <button type="button" onclick="stepQty(10)" style="width:42px;height:56px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">+10</button>
-                <button type="button" onclick="promptQty()" title="Sayı gir" style="width:42px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--accent);font-size:18px;cursor:pointer;flex-shrink:0">✏️</button>
-              </div>
-            </div>
-            <div class="fg"><label>Not (İsteğe Bağlı)</label><input type="text" id="stockin-note" placeholder="Örn: Depodan gelen"></div>
-            <input type="hidden" id="stockin-prod-id">
-            <button class="btn btn-success btn-full" onclick="confirmStockin()" style="margin-top:6px">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              Stoğa Ekle
-            </button>
-          </div>
-          <!-- Session log -->
-          <div class="card" style="padding:18px;margin-top:16px">
-            <div style="font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-              <span>Oturum Geçmişi</span>
-              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('stockin-log').innerHTML=''">Temizle</button>
-            </div>
-            <div id="stockin-log" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto">
-              <div style="color:var(--txt3);font-size:13px;text-align:center;padding:20px">Henüz işlem yok</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. INVOICE OCR MODE VIEW -->
-      <div id="stockin-invoice-view" style="display:none">
+      <!-- FATURA / İRSALİYE OKUMA (OCR) — Stok Girişi sayfasındaki tek giriş yöntemi -->
+      <div id="stockin-invoice-view">
         <div class="grid-2" style="margin-bottom:20px">
           <!-- Camera / Upload Card -->
           <div class="card" style="padding:20px">
@@ -4330,10 +4244,9 @@ document.addEventListener('keydown', (e) => {
       onScan(scannedCode);
     } else if(pageId === 'sales'){
       onSalesScan(scannedCode);
-    } else if(pageId === 'stockin'){
-      onStockinScan(scannedCode);
     } else {
-      // Stok Takibi, Dashboard veya herhangi bir sayfada barkod okutulduğunda onScan çağır
+      // Stok Girişi sayfasında artık barkod bölümü yok; oradaki okutmalar da
+      // dahil olmak üzere her sayfada standart "Stoğa Miktar Ekle" akışı çalışır
       onScan(scannedCode);
     }
 
@@ -4467,56 +4380,13 @@ function applyTheme(t){
 }
 
 // ══════════════ STOCK IN (BARCODE & INVOICE OCR) ══════════════
-let stockinMode = 'barcode';
 let parsedInvoiceItems = [];
 
-function setStockinMode(mode){
-  stockinMode = mode;
-  const btnB = document.getElementById('btn-stockin-mode-barcode');
-  const btnI = document.getElementById('btn-stockin-mode-invoice');
-  const viewB = document.getElementById('stockin-barcode-view');
-  const viewI = document.getElementById('stockin-invoice-view');
-
-  if(mode === 'barcode'){
-    if(btnB){ btnB.style.background='var(--accent)'; btnB.style.color='#fff'; btnB.classList.remove('btn-ghost'); }
-    if(btnI){ btnI.style.background='transparent'; btnI.style.color='var(--txt2)'; btnI.classList.add('btn-ghost'); }
-    if(viewB) viewB.style.display = 'grid';
-    if(viewI) viewI.style.display = 'none';
-    stopCam('invoice');
-    initStockin();
-  } else {
-    if(btnI){ btnI.style.background='var(--accent)'; btnI.style.color='#fff'; btnI.classList.remove('btn-ghost'); }
-    if(btnB){ btnB.style.background='transparent'; btnB.style.color='var(--txt2)'; btnB.classList.add('btn-ghost'); }
-    if(viewB) viewB.style.display = 'none';
-    if(viewI) viewI.style.display = 'block';
-    stopCam('stockin');
-    initStockinInvoice();
-  }
-}
-
+// Stok Girişi sayfasında yalnızca fatura/irsaliye okuma var.
+// Tekli barkod girişi bölümü kaldırıldı; barkod ile stok eklemek için
+// Stok Takibi sayfasındaki "Barkod ile Ekle" kullanılır.
 function initStockin(){
-  if(stockinMode === 'invoice'){
-    initStockinInvoice();
-    return;
-  }
-  stockinProdId=null;
-  document.getElementById('stockin-prod-display').value='';
-  document.getElementById('stockin-qty').value='';
-  document.getElementById('stockin-note').value='';
-  document.getElementById('stockin-prod-id').value='';
-  document.getElementById('stockin-prod-card').style.display='none';
-  document.getElementById('stockin-notfound').style.display='none';
-  document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
-  // start camera with 5.0s cooldown for identical item, 2.5s for different item
-  let lastSI=null,lastSIt=0;
-  startCam('stockin-video','stockin',(code)=>{
-    const now=Date.now();
-    if(code===lastSI && now-lastSIt < 5000) return;
-    if(now-lastSIt < 2500) return;
-    lastSI=code;
-    lastSIt=now;
-    onStockinScan(code);
-  });
+  initStockinInvoice();
 }
 
 function initStockinInvoice(){
@@ -5124,322 +4994,38 @@ function loadSampleInvoice(){
   renderParsedInvoiceRows(sampleItems);
   toast('s', 'Örnek Fatura Yüklendi', '4 kalem ürün faturadan başarıyla ayrıştırıldı. Düzenleyip stoğa aktarabilirsiniz.');
 }
+// Fatura/irsaliye formunu boşaltır. Tüm alanlar null korumalı:
+// eksik bir element yüzünden fonksiyonun ortada kesilmesi istenmiyor.
+function clearInvoiceForm(){
+  parsedInvoiceItems = [];
+  renderParsedInvoiceRows([]);
 
-function onStockinScan(code){
-  document.getElementById('stockin-scan-res').innerHTML=`<span style="color:var(--green);font-weight:600">✅ Barkod: ${code}</span>`;
-  const p=findProductByBarcode(code);
-  if(p){
-    stockinProdId=p.id;
-    document.getElementById('stockin-prod-id').value=p.id;
-    document.getElementById('stockin-prod-display').value=p.name;
-    document.getElementById('stockin-prod-name').textContent=p.name;
-    document.getElementById('stockin-prod-stk').textContent=p.stk+' '+p.unit;
-    const sellP = p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '' ? p.sellPrice : p.price;
-    document.getElementById('stockin-prod-price').textContent=tl(p.price);
-    document.getElementById('stockin-prod-sellprice').textContent=tl(sellP);
-    document.getElementById('stockin-prod-unit').textContent=p.unit;
-    const catTextEl = document.getElementById('stockin-prod-cat-text');
-    if(catTextEl) catTextEl.textContent = p.cat || 'Genel';
+  ['inv-no-input', 'inv-note-input', 'inv-paste-textarea'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
 
-    const st=sst(p);
-    document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'Düşük Stok':'Kritik Stok'}</span>`;
-    document.getElementById('stockin-prod-card').style.display='block';
-    document.getElementById('stockin-notfound').style.display='none';
-    // ── Miktara odaklan — kullanıcı ELLE girmek zorunda ──
-    const qtyEl = document.getElementById('stockin-qty');
-    qtyEl.value = '';
-    qtyEl.placeholder = 'Miktar girin...';
-    // Buffer temizle: barkodun kalan karakterleri miktar alanına girmesin
-    globalBarcodeBuffer = '';
-    isHardwareScanGun = false;
-    // 400ms bekle: tabanca Enter gönderdikten sonra tüm karakterler gelsin
-    setTimeout(() => {
-      qtyEl.value = '';   // Boş bırak, focus YOK
-      deactivateQtyManual();
-    }, 400);
-  }else{
-    stockinProdId=null;
-    document.getElementById('stockin-prod-card').style.display='none';
-    const notfoundEl = document.getElementById('stockin-notfound');
-    notfoundEl.style.display='block';
-    const P = gp();
-    const cats = [...new Set(P.map(p => p.cat).filter(Boolean))].sort();
+  const supSel = document.getElementById('inv-supplier-select');
+  if(supSel) supSel.value = '';
 
-    notfoundEl.innerHTML = `
-      <div style="color:var(--yellow);font-weight:700;font-size:13px;margin-bottom:4px">⚠️ Barkod Kayıtlı Değil</div>
-      <div style="color:var(--txt2);font-size:11.5px;margin-bottom:10px">Okutulan: <strong class="mono" style="color:var(--txt)">${code}</strong></div>
-      
-      <!-- OPTION 1: CREATE NEW PRODUCT AND STOCK-IN -->
-      <div style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">➕ Bu Barkodla Yeni Ürün Oluştur & Stoğa Al</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-          <div>
-            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Ürün Adı *</label>
-            <input type="text" id="stockin-quick-name" placeholder="Örn: A4 Kağıt" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px;font-weight:600">
-          </div>
-          <div>
-            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Kategori</label>
-            <input type="text" id="stockin-quick-cat" list="catlist" placeholder="Örn: Kırtasiye" value="${cats[0] || 'Genel'}" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-          <div>
-            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Alış Fiyatı (₺)</label>
-            <input type="number" id="stockin-quick-buyprice" placeholder="0.00" step="0.01" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
-          </div>
-          <div>
-            <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Satış Fiyatı (₺)</label>
-            <input type="number" id="stockin-quick-price" placeholder="0.00" step="0.01" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
-          </div>
-        </div>
-        <button type="button" class="btn btn-success btn-sm btn-full" onclick="saveStockinQuickProduct('${code}')" style="font-weight:700;font-size:11.5px;padding:6px">
-          💾 Ürünü Ekle & Stoğa Başla
-        </button>
-      </div>
+  const dateEl = document.getElementById('inv-date-input');
+  if(dateEl) dateEl.value = getTodayStr();
 
-      <!-- OPTION 2: LINK AS SUB-BARCODE -->
-      <details style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:11px">
-        <summary style="font-weight:600;color:var(--accent);cursor:pointer;user-select:none">
-          🔗 Veya Mevcut Bir Ürüne Alt Barkod Olarak Bağla
-        </summary>
-        <div style="margin-top:6px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-            <div>
-              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">1. Kategori</label>
-              <select id="stockin-link-cat" onchange="onStockinCatFilterChange('${code}')" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
-                <option value="">Tüm Kategoriler (${P.length})</option>
-                ${cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('')}
-              </select>
-            </div>
-            <div>
-              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">2. Ürün</label>
-              <select id="stockin-link-prod" style="width:100%;padding:5px 7px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11px">
-                <option value="">Ürün Seçiniz...</option>
-                ${P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('')}
-              </select>
-            </div>
-          </div>
-          <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkStockinBarcodeToProduct('${code}')" style="font-weight:600;font-size:11px;padding:5px">
-            🔗 Bu Ürüne Alt Barkod Yap & Seç
-          </button>
-        </div>
-      </details>
-    `;
-  }
+  const fileEl = document.getElementById('inv-file-input');
+  if(fileEl) fileEl.value = '';
+
+  const selAll = document.getElementById('inv-select-all');
+  if(selAll) selAll.checked = false;
+
+  const prog = document.getElementById('inv-ocr-progress-card');
+  if(prog) prog.style.display = 'none';
 }
 
-function saveStockinQuickProduct(code){
-  const name = document.getElementById('stockin-quick-name')?.value?.trim();
-  const cat = document.getElementById('stockin-quick-cat')?.value?.trim() || 'Genel';
-  const buyPrice = parseFloat(document.getElementById('stockin-quick-buyprice')?.value) || 0;
-  const sellPrice = parseFloat(document.getElementById('stockin-quick-price')?.value) || buyPrice;
-
-  if(!name){
-    toast('w', 'Ürün Adı Gerekli', 'Lütfen ürün adını yazın.');
-    document.getElementById('stockin-quick-name')?.focus();
-    return;
-  }
-
-  const P = gp();
-  const newProd = {
-    id: nid(P),
-    name: name,
-    barc: code,
-    altBarcodes: [],
-    cat: cat,
-    unit: 'Adet',
-    stk: 0,
-    min: 5,
-    price: buyPrice,
-    sellPrice: sellPrice,
-    sup: null,
-    note: ''
-  };
-
-  P.push(newProd);
-  sp(P);
-  renderProds();
-  updBadge();
-  toast('s', 'Ürün Oluşturuldu! 🚀', `"${name}" (${cat}) oluşturuldu. Şimdi stok adedini girin.`);
-  onStockinScan(code);
-}
-
-function onStockinCatFilterChange(code){
-  const selCat = document.getElementById('stockin-link-cat')?.value;
-  const prodSelect = document.getElementById('stockin-link-prod');
-  if(!prodSelect) return;
-  let P = gp();
-  if(selCat){
-    P = P.filter(p => p.cat === selCat);
-  }
-  prodSelect.innerHTML = '<option value="">Ürün Seçiniz...</option>' + 
-    P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('');
-}
-
-function linkStockinBarcodeToProduct(code){
-  const prodId = parseInt(document.getElementById('stockin-link-prod')?.value);
-  if(!prodId){
-    toast('w', 'Ürün Seçilmedi', 'Lütfen alt barkodu bağlamak istediğiniz ürünü seçin.');
-    return;
-  }
-  const P = gp();
-  const prod = P.find(p => p.id === prodId);
-  if(!prod){
-    toast('e', 'Hata', 'Seçilen ürün bulunamadı.');
-    return;
-  }
-  
-  if(!Array.isArray(prod.altBarcodes)){
-    prod.altBarcodes = prod.altBarcodes ? String(prod.altBarcodes).split(',').map(s=>s.trim()).filter(Boolean) : [];
-  }
-  
-  if(!prod.altBarcodes.includes(code) && prod.barc !== code){
-    prod.altBarcodes.push(code);
-  }
-  
-  sp(P);
-  renderProds();
-  updBadge();
-  toast('s', 'Alt Barkod Bağlandı! 🚀', `"${code}" barkodu "${prod.name}" ürününe kaydedildi.`);
-  
-  // Immediately switch to this product in Stock-in form
-  onStockinScan(code);
-}
-
-// ── STOK GİRİŞİ MİKTAR ALANI: BUTON TABANLI GİRİŞ ──
-// Tabanca her koşulda yazamaz: hızlı gelen karakterler engellenir.
-// Kullanıcı +/- butonları VEYA klavyeyle elle girebilir.
-let qtyManualActive = false;
-let qtyLastKey = 0;
-
-function stepQty(delta){
-  const el = document.getElementById('stockin-qty');
-  if(!el) return;
-  const cur = parseInt(el.value) || 0;
-  const next = cur + delta;
-  el.value = next < 1 ? 1 : next;
-}
-
-function promptQty(){
-  // Native prompt — completely isolated from keyboard/scanner events on the page
-  const val = window.prompt('Eklenecek miktarı girin:', document.getElementById('stockin-qty').value || '1');
-  if(val === null) return; // iptal
-  const n = parseInt(val);
-  if(!isNaN(n) && n >= 1){
-    document.getElementById('stockin-qty').value = n;
-  } else if(val !== ''){
-    toast('w', 'Geçersiz Miktar', 'Lütfen 1 veya daha büyük bir sayı girin.');
-  }
-}
-
-function deactivateQtyManual(){
-  qtyManualActive = false;
-  const el = document.getElementById('stockin-qty');
-  if(el){ el.value = ''; el.blur(); }
-}
-
-function handleQtyKeydown(e){
-  const now = Date.now();
-  const diff = now - qtyLastKey;
-  qtyLastKey = now;
-
-  if(e.key === 'Enter'){
-    e.preventDefault();
-    confirmStockin();
-    return;
-  }
-
-  // Backspace, Delete, Tab, arrow keys: her zaman izin ver
-  if(['Backspace','Delete','Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
-
-  // Sayısal karakter geldi
-  if(e.key.length === 1 && /[0-9]/.test(e.key)){
-    // 80ms'den hızlı geliyorsa tabanca → engelle
-    if(diff < 80 && qtyLastKey - now < 10){
-      // qtyLastKey = 0 olursa ilk karakter — güvenli kabul et
-    }
-    // Genel hız kontrolü: 60ms altı kesinlikle tabanca
-    if(diff > 0 && diff < 60){
-      e.preventDefault();
-      // Tabanca karakterlerini global buffer'a yönlendir
-      globalBarcodeBuffer += e.key;
-      return;
-    }
-  }
-  // Diğer her şey normal
-}
-
-function confirmStockin(){
-  const id=parseInt(document.getElementById('stockin-prod-id').value);
-  const qty=parseInt(document.getElementById('stockin-qty').value)||0;
-  const note=document.getElementById('stockin-note').value.trim();
-  if(!id){toast('w','Ürün Seçilmedi','Lütfen önce bir barkod okutun');return;}
-  if(qty<1){toast('w','Miktar Hatalı','En az 1 giriniz');return;}
-  const P=gp(),pi=P.findIndex(p=>p.id===id);
-  if(pi<0){toast('e','Hata','Ürün bulunamadı');return;}
-
-  P[pi].stk = parseInt(P[pi].stk || 0) + qty;
-  localStorage.setItem('nl_prod', JSON.stringify(P));
-  const p=P[pi];
-
-  // Save to persistent Stock-in history
-  const buyP = parseFloat(p.price) || 0;
-  const sellP = (p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '') ? parseFloat(p.sellPrice) : buyP;
-  const stockinRecord = {
-    id: Date.now(),
-    prodId: p.id,
-    name: p.name,
-    barc: p.barc || '',
-    cat: p.cat || '',
-    qty: qty,
-    unit: p.unit || 'Adet',
-    buyPrice: buyP,
-    sellPrice: sellP,
-    totalValue: qty * buyP,
-    note: note || '',
-    date: getTodayStr(),
-    time: getTimeStr(),
-    user: currentUser ? currentUser.name : 'Kullanıcı'
-  };
-  const inHist = gih();
-  inHist.unshift(stockinRecord);
-  if(inHist.length > 500) inHist.length = 500;
-  localStorage.setItem('nl_stockin_hist', JSON.stringify(inHist));
-
-  triggerCloudPush('stockin_complete', true);
-
-  triggerScanFeedback(p.barc || '', p, 'stockin');
-  toast('s','Stok Eklendi! 🚀',`${p.name} +${qty} ${p.unit} (Toplam: ${p.stk} ${p.unit})`);
-  updBadge();
-
-  // Log entry
-  const log=document.getElementById('stockin-log');
-  if(log){
-    const empties=log.querySelectorAll('[data-empty]');
-    empties.forEach(e=>e.remove());
-    const item=document.createElement('div');
-    item.style.cssText='padding:9px 12px;border-radius:8px;font-size:12px;display:flex;align-items:center;gap:10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.18)';
-    item.innerHTML=`<span>✅</span><span style="flex:1;font-weight:600">${p.name}</span><span style="color:var(--green)">+${qty} ${p.unit}</span><span style="color:var(--txt3);font-size:11px">${note||''}</span>`;
-    log.prepend(item);
-  }
-
-  // ── İŞLEM BİTTİĞİNDE EKRANI TAMAMEN KAPAT VE STOK TAKİBİ SAYFASINA DÖN ──
-  resetStockin();
-  go('products');
-}
 function resetStockin(){
-  stopCam('stockin');
   stopCam('invoice');
-  stockinProdId=null;
-  document.getElementById('stockin-prod-card').style.display='none';
-  document.getElementById('stockin-notfound').style.display='none';
-  document.getElementById('stockin-prod-display').value='';
-  document.getElementById('stockin-qty').value='';
-  document.getElementById('stockin-note').value='';
-  document.getElementById('stockin-prod-id').value='';
-  document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
-  if(stockinMode === 'barcode') initStockin();
-  else initStockinInvoice();
+  clearInvoiceForm();
+  initStockinInvoice();
+  toast('i', 'Form Sıfırlandı', 'Fatura / irsaliye formu temizlendi.');
 }
 
 // ── REALTIME MULTI-DEVICE BROADCAST ENGINE (PHONE <-> PC SYNC) ──
@@ -5661,8 +5247,9 @@ function handleRemoteScan(code, senderId, senderName, eventId){
     toast('s', '📱 Telefondan Barkod Okundu', `Barkod: ${cleanCode}`);
     onSalesScan(cleanCode, true);
   } else if(isStockinVisible){
+    // Stok Girişi sayfasında barkod bölümü kaldırıldı → standart stok ekleme akışı
     toast('s', '📱 Telefondan Barkod Okundu', `Barkod: ${cleanCode}`);
-    onStockinScan(cleanCode, true);
+    onScan(cleanCode);
   } else {
     toast('i', '📱 Telefondan Barkod Okutuldu', `Barkod: ${cleanCode} (Sepete eklendi)`);
     onSalesScan(cleanCode, true);
