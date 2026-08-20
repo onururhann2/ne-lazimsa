@@ -3948,8 +3948,8 @@ document.addEventListener('keydown', (e) => {
 
   const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
 
-  // If focus is on a numeric input (qty, price fields) don't accumulate barcode there
-  const isNumericInput = isInput && target && (
+  // Miktar/sayı alanlarında focus varken tabanca mı okuyor?
+  const isQtyField = isInput && target && (
     target.id === 'stockin-qty' ||
     target.id === 'stockin-price' ||
     target.id === 'stockin-buyprice' ||
@@ -3957,11 +3957,15 @@ document.addEventListener('keydown', (e) => {
     target.classList.contains('qty-input')
   );
 
+  // Tabanca hızında (isHardwareScanGun) karakter geliyorsa ve focus miktar
+  // alanındaysa: karakteri alana YAZMA, buffer'a ekle, stok ekranda yeni ürün tara
+  const isScannerTypingInQty = isQtyField && (isHardwareScanGun || timeDiff < 50);
+
   if(e.key === 'Enter'){
-    if(globalBarcodeBuffer.length >= 3 && !isNumericInput){
+    if(globalBarcodeBuffer.length >= 3){
       const scannedCode = globalBarcodeBuffer.trim();
       globalBarcodeBuffer = '';
-      
+
       const activePage = document.querySelector('.page.active');
       const pageId = activePage ? activePage.id.replace('page-', '') : '';
       const qcOpen = document.getElementById('m-qc')?.classList.contains('open');
@@ -3970,38 +3974,39 @@ document.addEventListener('keydown', (e) => {
       playBeep();
 
       if(qcOpen){
-        // Hızlı Sayım Modu: directly increment stock
         handleQCGunScan(scannedCode);
       } else if(pageId === 'sales'){
         onSalesScan(scannedCode);
       } else if(pageId === 'stockin'){
+        // Her zaman yeni ürün taraması — miktar alanı boşsa confirmStockin yapma
         onStockinScan(scannedCode);
       } else if(pageId === 'products'){
-        // Stok Takip: fill search box and filter
         const searchEl = document.getElementById('p-search');
-        if(searchEl){
-          searchEl.value = scannedCode;
-          renderProds();
-          searchEl.focus();
-        }
+        if(searchEl){ searchEl.value = scannedCode; renderProds(); searchEl.focus(); }
       } else if(scanOpen){
         onScan(scannedCode);
       }
-      
-      if(isHardwareScanGun && isInput){
-        e.preventDefault();
-      }
+
+      if(isHardwareScanGun && isInput) e.preventDefault();
       isHardwareScanGun = false;
     } else {
+      // Buffer boş veya çok kısa: Enter'ı normal işle (miktar onayı için)
+      // Sadece tabanca modu varsa engelle
+      if(isScannerTypingInQty) e.preventDefault();
       globalBarcodeBuffer = '';
     }
   } else if(e.key.length === 1){
-    // Don't add to barcode buffer if user is typing in a numeric/qty field
-    if(!isNumericInput){
+    if(isScannerTypingInQty){
+      // Tabanca karakterini miktar alanına yazdırma, buffer'a ekle
+      e.preventDefault();
+      globalBarcodeBuffer += e.key;
+    } else if(!isQtyField){
       globalBarcodeBuffer += e.key;
     }
+    // Normal klavye + qty alanı: kullanıcı elle yazıyor, buffer'a ekleme
   }
 });
+
 
 // ══════════════ MODALS ══════════════
 function openM(id){document.getElementById(id).classList.add('open');}
