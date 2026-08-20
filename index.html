@@ -428,8 +428,45 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   th,td{padding:8px 10px;font-size:11px}
 }
 </style>
+<style>
+/* ── SCANNER FEEDBACK FLASH & FLOATING HUD ── */
+@keyframes screenScanPulse {
+  0% { box-shadow: inset 0 0 0 4px #10b981, 0 0 25px rgba(16,185,129,0.5); }
+  100% { box-shadow: inset 0 0 0 0 transparent, 0 0 0 transparent; }
+}
+body.scan-pulse-active {
+  animation: screenScanPulse 0.45s ease-out;
+}
+#scan-hud {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-30px);
+  background: rgba(15, 23, 42, 0.95);
+  border: 1.5px solid #10b981;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(16, 185, 129, 0.35);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 999999;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#scan-hud.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+</style>
 </head>
 <body>
+<div id="scan-hud"></div>
 
 <!-- ═══════════════ LOGIN ═══════════════ -->
 <div id="login-screen">
@@ -3434,10 +3471,10 @@ function onScan(code){
   if(!code) return;
   lastCode = code;
   
-  // Barkod okutulduğunda okuma ekranını her zaman kapat
   closeScanner();
   
   const p = findProductByBarcode(code);
+  triggerScanFeedback(code, p, 'general');
   if(p){
     // Kayıtlı barkod: sadece ürün bilgisi ve miktar giriş ekranı açılır
     openQuickStockModal(p);
@@ -3613,6 +3650,47 @@ let availableCamList = [];
 let preferredCameraId = localStorage.getItem('nl_preferred_cam_id') || '';
 let camZoomLevels = { stockin: 1.5, sales: 1.5, scan: 1.5, qc: 1.5 };
 let scanConsensusMap = {};
+
+
+// ── UNIFIED SCAN FEEDBACK (AUDIO + VISUAL FLASH + HUD + TOAST) ──
+let scanHudTimeout = null;
+
+function triggerScanFeedback(code, p, context = 'general'){
+  // 1. Ses Çal (POS Lazer Bip)
+  playBeep();
+
+  // 2. Ekran Kenarlarında Yeşil Lazer Işıması (Visual Pulse)
+  try {
+    document.body.classList.remove('scan-pulse-active');
+    void document.body.offsetWidth; // trigger reflow
+    document.body.classList.add('scan-pulse-active');
+    setTimeout(() => document.body.classList.remove('scan-pulse-active'), 500);
+  } catch(e){}
+
+  // 3. Üstte Kayan Canlı HUD Bildirimi (Floating HUD)
+  const hud = document.getElementById('scan-hud');
+  if(hud){
+    if(p){
+      hud.innerHTML = `<span style="color:#10b981;font-size:16px">🎯</span> <span>Barkod: <span class="mono" style="color:#38bdf8">${code}</span></span> <span style="color:var(--border2)">|</span> <span style="color:#fff">${p.name}</span> <span style="color:#10b981">(${p.stk} ${p.unit})</span>`;
+      hud.style.borderColor = '#10b981';
+    } else {
+      hud.innerHTML = `<span style="color:#f59e0b;font-size:16px">⚠️</span> <span>Yeni Barkod: <span class="mono" style="color:#f59e0b">${code}</span></span> <span style="color:var(--border2)">|</span> <span style="color:#fcd34d">Kayıt Açıldı</span>`;
+      hud.style.borderColor = '#f59e0b';
+    }
+    hud.classList.add('show');
+    if(scanHudTimeout) clearTimeout(scanHudTimeout);
+    scanHudTimeout = setTimeout(() => hud.classList.remove('show'), 2200);
+  }
+
+  // 4. Toast Bildirimi
+  if(context === 'general'){
+    if(p){
+      toast('s', 'Barkod Okundu ✅: ' + p.name, `Mevcut Stok: ${p.stk} ${p.unit} | Fiyat: ${tl(p.sellPrice || p.price)}`);
+    } else {
+      toast('w', 'Yeni Barkod Okundu ⚠️', `"${code}" barkodu için ürün formu açıldı.`);
+    }
+  }
+}
 
 function playBeep(){
   try{
@@ -4276,7 +4354,7 @@ function toast(type, title, msg){
   const key = `${type}__${title}__${msg || ''}`;
   const now = Date.now();
   const lastTime = recentToastCache.get(key) || 0;
-  if(now - lastTime < 2500){
+  if(now - lastTime < 400){
     return; // Block duplicate notification within 2.5s
   }
   recentToastCache.set(key, now);
