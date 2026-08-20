@@ -788,7 +788,7 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <div class="fg"><label>Ürün</label><input type="text" id="stockin-prod-display" readonly placeholder="Barkod okutun veya seçin..." style="opacity:.7"></div>
             <div class="fg">
               <label>Eklenecek Miktar *</label>
-              <input type="number" id="stockin-qty" min="1" value="1" placeholder="1"
+              <input type="number" id="stockin-qty" min="1" placeholder="Miktar girin..."
                 style="font-size:22px;font-weight:700;text-align:center;padding:14px"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();confirmStockin();}">
             </div>
@@ -4119,7 +4119,7 @@ function initStockin(){
   }
   stockinProdId=null;
   document.getElementById('stockin-prod-display').value='';
-  document.getElementById('stockin-qty').value=1;
+  document.getElementById('stockin-qty').value='';
   document.getElementById('stockin-note').value='';
   document.getElementById('stockin-prod-id').value='';
   document.getElementById('stockin-prod-card').style.display='none';
@@ -4763,18 +4763,18 @@ function onStockinScan(code){
     document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'Düşük Stok':'Kritik Stok'}</span>`;
     document.getElementById('stockin-prod-card').style.display='block';
     document.getElementById('stockin-notfound').style.display='none';
-    // ── Miktara odaklanıp seç, kullanıcı direkt yazıyor ──
+    // ── Miktara odaklan — kullanıcı ELLE girmek zorunda ──
     const qtyEl = document.getElementById('stockin-qty');
-    qtyEl.value = 1;
-    // Clear global barcode buffer so scanner tail chars don't land in qty field
+    qtyEl.value = '';
+    qtyEl.placeholder = 'Miktar girin...';
+    // Buffer temizle: barkodun kalan karakterleri miktar alanına girmesin
     globalBarcodeBuffer = '';
     isHardwareScanGun = false;
-    // Longer delay so hardware scanner finishes sending all its characters first
+    // 400ms bekle: tabanca Enter gönderdikten sonra tüm karakterler gelsin
     setTimeout(() => {
-      qtyEl.value = 1;
+      qtyEl.value = '';   // Gecikme içinde gelen karakterleri de sil
       qtyEl.focus();
-      qtyEl.select();
-    }, 350);
+    }, 400);
   }else{
     stockinProdId=null;
     document.getElementById('stockin-prod-card').style.display='none';
@@ -4979,7 +4979,7 @@ function confirmStockin(){
   item.innerHTML=`<span>\u2705</span><span style="flex:1;font-weight:600">${p.name}</span><span style="color:var(--green)">+${qty} ${p.unit}</span><span style="color:var(--txt3);font-size:11px">${note||''}</span>`;
   log.prepend(item);
   // reset qty
-  document.getElementById('stockin-qty').value=1;
+  document.getElementById('stockin-qty').value='';
   document.getElementById('stockin-note').value='';
 }
 function resetStockin(){
@@ -4989,7 +4989,7 @@ function resetStockin(){
   document.getElementById('stockin-prod-card').style.display='none';
   document.getElementById('stockin-notfound').style.display='none';
   document.getElementById('stockin-prod-display').value='';
-  document.getElementById('stockin-qty').value=1;
+  document.getElementById('stockin-qty').value='';
   document.getElementById('stockin-note').value='';
   document.getElementById('stockin-prod-id').value='';
   document.getElementById('stockin-scan-res').innerHTML='<span style="color:var(--txt3)">\u00DCr\u00FCn barkodunu okutun...</span>';
