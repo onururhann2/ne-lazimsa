@@ -788,9 +788,9 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <div class="fg"><label>Ürün</label><input type="text" id="stockin-prod-display" readonly placeholder="Barkod okutun veya seçin..." style="opacity:.7"></div>
             <div class="fg">
               <label>Eklenecek Miktar *</label>
-              <input type="number" id="stockin-qty" min="1" placeholder="Miktar girin..."
-                style="font-size:22px;font-weight:700;text-align:center;padding:14px"
-                onkeydown="handleQtyKeydown(event)">
+              <input type="number" id="stockin-qty" min="1" placeholder="Tıklayın ve miktar girin..."
+                style="font-size:22px;font-weight:700;text-align:center;padding:14px;cursor:pointer;border:2px dashed var(--accent)"
+                readonly onclick="activateQtyManual(this)" onkeydown="handleQtyKeydown(event)">
             </div>
             <div class="fg"><label>Not (İsteğe Bağlı)</label><input type="text" id="stockin-note" placeholder="Örn: Depodan gelen"></div>
             <input type="hidden" id="stockin-prod-id">
@@ -4777,8 +4777,8 @@ function onStockinScan(code){
     isHardwareScanGun = false;
     // 400ms bekle: tabanca Enter gönderdikten sonra tüm karakterler gelsin
     setTimeout(() => {
-      qtyEl.value = '';   // Gecikme içinde gelen karakterleri de sil
-      qtyEl.focus();
+      qtyEl.value = '';   // Boş bırak, focus YOK
+      deactivateQtyManual();
     }, 400);
   }else{
     stockinProdId=null;
@@ -4929,51 +4929,44 @@ function linkStockinBarcodeToProduct(code){
   onStockinScan(code);
 }
 
-// ── STOK GİRİŞİ MİKTAR ALANI: Tabanca koruması ──
-// Tabanca hızında (< 80ms/tuş) gelen karakterleri tamamen reddeder.
-// İlk karakter dahi sızmaz. Elle yazım her zaman çalışır.
-let qtyLastKeyTime = 0;
-let qtyRapidCount = 0;
-let qtyScannerBuffer = '';
+// ── STOK GİRİŞİ MİKTAR ALANI: TAM KORUMA ──
+// Miktar alanı varsayılan olarak readonly'dir.
+// Kullanıcı tıklayınca aktif olur → sadece klavye girişi kabul edilir.
+// Tabanca odaklanmış alana yazamaz çünkü alan tıklanmadan readonly kalır.
+let qtyManualActive = false;
+
+function activateQtyManual(el){
+  qtyManualActive = true;
+  el.removeAttribute('readonly');
+  el.style.border = '2px solid var(--accent)';
+  el.style.cursor = 'text';
+  el.placeholder = 'Miktar girin...';
+  el.focus();
+  el.select();
+}
+
+function deactivateQtyManual(){
+  qtyManualActive = false;
+  const el = document.getElementById('stockin-qty');
+  if(el){
+    el.setAttribute('readonly', '');
+    el.style.border = '2px dashed var(--accent)';
+    el.style.cursor = 'pointer';
+    el.placeholder = 'Tıklayın ve miktar girin...';
+  }
+}
 
 function handleQtyKeydown(e){
-  const now = Date.now();
-  const diff = now - qtyLastKeyTime;
-  qtyLastKeyTime = now;
-
-  if(e.key === 'Enter'){
-    // Eğer buffer doluysa → tabanca yeni ürün tarıyor, confirmStockin yapma
-    if(qtyScannerBuffer.length >= 3){
-      const code = qtyScannerBuffer.trim();
-      qtyScannerBuffer = '';
-      qtyRapidCount = 0;
-      e.preventDefault();
-      playBeep();
-      onStockinScan(code);
-      return;
-    }
-    // Buffer kısa/boş ve hız normal → elle Enter, stoğu onayla
-    qtyScannerBuffer = '';
-    qtyRapidCount = 0;
+  if(!qtyManualActive){
+    // readonly mod: hiçbir tuşa izin verme
     e.preventDefault();
-    confirmStockin();
     return;
   }
-
-  // Hızlı tuş = tabanca (< 80ms)
-  if(e.key.length === 1){
-    if(diff < 80){
-      // Tabanca karakteri: alana yazma, buffer'a ekle
-      e.preventDefault();
-      qtyScannerBuffer += e.key;
-      qtyRapidCount++;
-    } else {
-      // Yavaş tuş = elle yazım: bufferi sıfırla, normal davran
-      qtyScannerBuffer = '';
-      qtyRapidCount = 0;
-      // e.preventDefault() YAPMA → karakter alana yazılsın
-    }
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    confirmStockin();
   }
+  // Diğer tuşlar normal çalışır (sayı, backspace, delete vb.)
 }
 
 function confirmStockin(){
