@@ -2889,8 +2889,17 @@ function saveProd(e){
     sup:parseInt(document.getElementById('p-sup').value)||null,
     note:document.getElementById('p-note').value.trim()
   };
-  if(id){const i=P.findIndex(p=>p.id===parseInt(id));P[i]={...P[i],...d};toast('s','Güncellendi','Ürün kaydedildi');}
-  else{d.id=nid(P);P.push(d);toast('s','Eklendi','Yeni ürün oluşturuldu');}
+  if(id){
+    const i=P.findIndex(p=>p.id===parseInt(id));
+    P[i]={...P[i],...d};
+    triggerScanFeedback(d.barc || '', d, 'prod_save');
+    toast('s', 'Ürün Güncellendi! ✏️', `"${d.name}" bilgileri kaydedildi.`);
+  } else {
+    d.id=nid(P);
+    P.push(d);
+    triggerScanFeedback(d.barc || '', d, 'prod_save');
+    toast('s', 'Yeni Ürün Eklendi! 🚀', `"${d.name}" (${d.cat}) ${d.stk} ${d.unit} stok ile sisteme eklendi.`);
+  }
   sp(P);closeM('m-prod');renderProds();updBadge();
 }
 function delProd(id){if(!confirm('Bu ürünü silmek istediğinize emin misiniz?'))return;sp(gp().filter(p=>p.id!==id));renderProds();updBadge();toast('s','Silindi','Ürün silindi');}
@@ -3592,56 +3601,48 @@ function doScanAction(){
 
 // ══════════════ QUICK COUNT ══════════════
 async function openQC(){
-  document.getElementById('qc-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
+  document.getElementById('qc-res').innerHTML='<span style="color:var(--txt3)">Barkodu kamera önüne tutun veya okutun...</span>';
   document.getElementById('qc-log').innerHTML='';
   openM('m-qc');
-  let lastQC=null,lastQCt=0;
   await startCam('qc-video','qc',(code)=>{
-    const now=Date.now();
-    if(code===lastQC&&now-lastQCt<2000)return;
-    lastQC=code;lastQCt=now;
-    const p=findProductByBarcode(code);
-    if(p){
-      const P=gp(),pi=P.findIndex(x=>x.id===p.id);
-      if(pi>=0){
-        P[pi].stk+=1;sp(P);
-        document.getElementById('qc-res').innerHTML=`<span style="color:var(--green);font-weight:600">✅ ${P[pi].name} → Stok: ${P[pi].stk} ${P[pi].unit}</span>`;
-        addQCLog(P[pi].name,P[pi].stk,P[pi].unit,true);updBadge();
-      }
-    }else{
-      document.getElementById('qc-res').innerHTML=`<span style="color:var(--yellow)">⚠️ Bulunamadı: ${code}</span>`;
-      addQCLog(code,null,null,false);
-    }
+    handleQCGunScan(code);
   });
 }
 function closeQC(){stopCam('qc');closeM('m-qc');}
 
 let lastQCGunCode = null, lastQCGunTime = 0;
 function handleQCGunScan(code){
+  const cleanCode = (code || '').trim();
+  if(!cleanCode) return;
+  
   const now = Date.now();
-  if(code === lastQCGunCode && now - lastQCGunTime < 2000) return;
-  lastQCGunCode = code;
+  if(cleanCode === lastQCGunCode && now - lastQCGunTime < 1500) return;
+  lastQCGunCode = cleanCode;
   lastQCGunTime = now;
 
-  const p = findProductByBarcode(code);
+  const p = findProductByBarcode(cleanCode);
   if(p){
     const P = gp(), pi = P.findIndex(x => x.id === p.id);
     if(pi >= 0){
       P[pi].stk += 1;
       sp(P);
-      document.getElementById('qc-res').innerHTML = `<span style="color:var(--green);font-weight:600">✅ ${P[pi].name} → Stok: ${P[pi].stk} ${P[pi].unit}</span>`;
+      document.getElementById('qc-res').innerHTML = `<span style="color:var(--green);font-weight:700">✅ ${P[pi].name} → Stok: ${P[pi].stk} ${P[pi].unit}</span>`;
       addQCLog(P[pi].name, P[pi].stk, P[pi].unit, true);
       updBadge();
+      triggerScanFeedback(cleanCode, P[pi], 'qc');
+      toast('s', 'Hızlı Sayım +1 ✅: ' + P[pi].name, `Güncel Stok: ${P[pi].stk} ${P[pi].unit}`);
     }
   } else {
-    document.getElementById('qc-res').innerHTML = `<span style="color:var(--yellow)">⚠️ Bulunamadı: ${code}</span>`;
-    addQCLog(code, null, null, false);
+    document.getElementById('qc-res').innerHTML = `<span style="color:var(--yellow);font-weight:700">⚠️ Bulunamadı: ${cleanCode}</span>`;
+    addQCLog(cleanCode, null, null, false);
+    triggerScanFeedback(cleanCode, null, 'qc');
+    toast('w', 'Ürün Bulunamadı ⚠️', `"${cleanCode}" barkodlu ürün sistemde kayıtlı değil.`);
   }
 }
 function addQCLog(name,stk,unit,ok){
   const el=document.createElement('div');
-  el.style.cssText=`padding:7px 11px;border-radius:7px;font-size:12px;display:flex;align-items:center;gap:8px;background:${ok?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)'};border:1px solid ${ok?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'}`;
-  el.innerHTML=ok?`<span>✅</span><span style="flex:1;font-weight:600">${name}</span><span style="color:var(--green)">Stok: ${stk} ${unit}</span>`:`<span>❌</span><span style="color:var(--red)">Bulunamadı: ${name}</span>`;
+  el.style.cssText=`padding:9px 12px;border-radius:8px;font-size:12.5px;display:flex;align-items:center;gap:10px;background:${ok?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)'};border:1px solid ${ok?'rgba(16,185,129,.25)':'rgba(239,68,68,.25)'}`;
+  el.innerHTML=ok?`<span>✅</span><span style="flex:1;font-weight:700">${name}</span><span style="color:var(--green);font-weight:700">+1 (Stok: ${stk} ${unit})</span>`:`<span>❌</span><span style="color:var(--red);font-weight:600">Bulunamadı: ${name}</span>`;
   document.getElementById('qc-log').prepend(el);
 }
 
