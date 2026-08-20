@@ -3151,6 +3151,23 @@ function closeScanner(){stopCam('scan');closeM('m-scan');}
 function onScan(code){
   if(!code) return;
   lastCode = code;
+  
+  // "Barkod ile Ekle" modunda ise doğrudan ilgili pencereyi aç
+  if(scanMode === 'add'){
+    const p = findProductByBarcode(code);
+    closeScanner();
+    if(p){
+      openProdModal(p.id);
+      toast('w', 'Kayıtlı Ürün Bulundu', `"${p.name}" zaten kayıtlı. Bilgilerini düzenleyebilirsiniz.`);
+    } else {
+      openProdModal();
+      document.getElementById('p-barc').value = code;
+      toast('s', 'Barkod Okundu ✅', `"${code}" barkodu forma işlendi. Ürün adını girip kaydedebilirsiniz.`);
+    }
+    return;
+  }
+
+  // "Barkod Tara" (görüntüleme) modunda ise modal içinde kart göster
   openM('m-scan');
   
   const resEl = document.getElementById('scan-res');
@@ -3215,7 +3232,7 @@ function onScan(code){
             <div style="font-size:13px;font-weight:800;color:var(--green);display:flex;align-items:center;gap:6px">
               <span>➕</span> Bu Barkodla Yeni Ürün Ekle
             </div>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="openNewProdWithBarcode('${code}')" style="font-size:11px;padding:3px 8px">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="closeScanner();openProdModal();document.getElementById('p-barc').value='${code}';" style="font-size:11px;padding:3px 8px">
               📝 Detaylı Formda Aç ↗
             </button>
           </div>
@@ -3972,7 +3989,6 @@ async function stopCam(key){
 // ── GLOBAL USB BARCODE SCANNER / RAPID KEYBOARD LISTENER ──
 let globalBarcodeBuffer = '';
 let lastKeyTime = 0;
-let isHardwareScanGun = false;
 
 document.addEventListener('keydown', (e) => {
   const target = e.target;
@@ -3980,12 +3996,9 @@ document.addEventListener('keydown', (e) => {
   const timeDiff = now - lastKeyTime;
   lastKeyTime = now;
 
-  // Hardware scanners type each key in <45ms
-  if(timeDiff < 50 && globalBarcodeBuffer.length > 0){
-    isHardwareScanGun = true;
-  } else if(timeDiff > 120){
+  // 500ms'den uzun süre tuşa basılmadıysa ve basılan tuş Enter değilse buffer'ı temizle
+  if(timeDiff > 500 && e.key !== 'Enter'){
     globalBarcodeBuffer = '';
-    isHardwareScanGun = false;
   }
 
   const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
@@ -3999,15 +4012,21 @@ document.addEventListener('keydown', (e) => {
     target.classList.contains('qty-input')
   );
 
-  // Tabanca hızında (isHardwareScanGun) karakter geliyorsa ve focus miktar
-  // alanındaysa: karakteri alana YAZMA, buffer'a ekle, stok ekranda yeni ürün tara
-  const isScannerTypingInQty = isQtyField && (isHardwareScanGun || timeDiff < 50);
+  // Tabanca hızında gelen karakterleri miktar alanına yazdırma
+  const isScannerTypingInQty = isQtyField && timeDiff < 60;
 
-  if(e.key === 'Enter'){
+  if(e.key === 'Enter' || e.keyCode === 13){
+    let scannedCode = '';
     if(globalBarcodeBuffer.length >= 3){
-      const scannedCode = globalBarcodeBuffer.trim();
-      globalBarcodeBuffer = '';
+      scannedCode = globalBarcodeBuffer.trim();
+    } else if(target && (target.id === 'm-scan-manual' || target.id === 'sales-manual-barc' || target.id === 'stockin-manual-barc') && target.value.trim().length >= 3){
+      scannedCode = target.value.trim();
+      target.value = '';
+    }
 
+    globalBarcodeBuffer = '';
+
+    if(scannedCode.length >= 3){
       const activePage = document.querySelector('.page.active');
       const pageId = activePage ? activePage.id.replace('page-', '') : '';
       const qcOpen = document.getElementById('m-qc')?.classList.contains('open');
@@ -4017,7 +4036,7 @@ document.addEventListener('keydown', (e) => {
       playBeep();
 
       if(scanOpen){
-        // 1. Barkod Tara / Barkod ile Ekle modalı açıkken öncelikli çalış
+        // 1. Barkod Tara / Barkod ile Ekle modalı açık
         onScan(scannedCode);
         const mInput = document.getElementById('m-scan-manual');
         if(mInput) mInput.value = '';
@@ -4031,7 +4050,6 @@ document.addEventListener('keydown', (e) => {
       } else if(pageId === 'sales'){
         onSalesScan(scannedCode);
       } else if(pageId === 'stockin'){
-        // Her zaman yeni ürün taraması — miktar alanı boşsa confirmStockin yapma
         onStockinScan(scannedCode);
       } else if(pageId === 'products'){
         const p = findProductByBarcode(scannedCode);
@@ -4040,29 +4058,22 @@ document.addEventListener('keydown', (e) => {
           if(searchEl){ searchEl.value = scannedCode; renderProds(); }
           toast('s', 'Ürün Bulundu: ' + p.name, `Stok: ${p.stk} ${p.unit} | Fiyat: ${tl(p.sellPrice || p.price)}`);
         } else {
-          // Ürün kayıtlı değilse Barkod ile Ekle modalını doğrudan aç ve formu getir
-          openScanner('add');
-          setTimeout(() => { onScan(scannedCode); }, 100);
+          // Ürün kayıtlı değilse doğrudan Ürün Ekle penceresini aç ve barkodu yaz
+          openProdModal();
+          document.getElementById('p-barc').value = scannedCode;
+          toast('s', 'Barkod Okundu ✅', `"${scannedCode}" barkodu için ürün ekleme penceresi açıldı.`);
         }
       }
 
-      if(isHardwareScanGun && isInput) e.preventDefault();
-      isHardwareScanGun = false;
-    } else {
-      // Buffer boş veya çok kısa: Enter'ı normal işle (miktar onayı için)
-      // Sadece tabanca modu varsa engelle
-      if(isScannerTypingInQty) e.preventDefault();
-      globalBarcodeBuffer = '';
+      if(isInput) e.preventDefault();
     }
-  } else if(e.key.length === 1){
+  } else if(e.key && e.key.length === 1){
     if(isScannerTypingInQty){
-      // Tabanca karakterini miktar alanına yazdırma, buffer'a ekle
       e.preventDefault();
       globalBarcodeBuffer += e.key;
     } else if(!isQtyField){
       globalBarcodeBuffer += e.key;
     }
-    // Normal klavye + qty alanı: kullanıcı elle yazıyor, buffer'a ekleme
   }
 });
 
