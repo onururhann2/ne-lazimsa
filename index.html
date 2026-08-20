@@ -3263,160 +3263,21 @@ function onScan(code){
   if(!code) return;
   lastCode = code;
   
-  // "Barkod ile Ekle" modunda ise doğrudan ilgili pencereyi aç
-  if(scanMode === 'add'){
-    const p = findProductByBarcode(code);
-    closeScanner();
-    if(p){
-      openProdModal(p.id);
-      toast('w', 'Kayıtlı Ürün Bulundu', `"${p.name}" zaten kayıtlı. Bilgilerini düzenleyebilirsiniz.`);
-    } else {
-      openProdModal();
-      document.getElementById('p-barc').value = code;
-      toast('s', 'Barkod Okundu ✅', `"${code}" barkodu forma işlendi. Ürün adını girip kaydedebilirsiniz.`);
-    }
-    return;
-  }
-
-  // "Barkod Tara" (görüntüleme) modunda ise modal içinde kart göster
-  openM('m-scan');
-  
-  const resEl = document.getElementById('scan-res');
-  if(resEl) resEl.innerHTML = `<span style="color:var(--green);font-weight:700">✅ Okunan Barkod: <span class="mono">${code}</span></span>`;
+  // Barkod okutulduğunda okuma ekranını her zaman kapat
+  closeScanner();
   
   const p = findProductByBarcode(code);
-  const info = document.getElementById('scan-info');
-  const btn = document.getElementById('scan-act-btn');
-  if(!info) return;
-
   if(p){
-    const st = sst(p);
-    const altArr = Array.isArray(p.altBarcodes) ? p.altBarcodes : (typeof p.altBarcodes === 'string' ? p.altBarcodes.split(',') : []);
-    const altBadges = altArr.map(x => x.trim()).filter(Boolean).map(b => `<span style="background:rgba(59,130,246,.15);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:5px">${b}</span>`).join(' ');
-
-    info.innerHTML = `
-      <div class="card" style="padding:16px;border:1.5px solid var(--accent);background:var(--bg3);border-radius:10px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-          <div>
-            <span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}" style="margin-bottom:4px">${st==='ok'?'Normal Stok':st==='warn'?'Düşük Stok':'Kritik Stok'}</span>
-            <div style="font-weight:800;font-size:15px;color:var(--txt);margin-top:2px">${p.name}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:11px;color:var(--txt2)">Satış Fiyatı</div>
-            <div style="font-weight:800;font-size:16px;color:var(--accent)">${tl(p.sellPrice || p.price)}</div>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--border2);font-size:12px;margin-bottom:12px">
-          <div><span style="color:var(--txt2);display:block;font-size:10.5px">Kategori</span><strong>${p.cat || 'Genel'}</strong></div>
-          <div><span style="color:var(--txt2);display:block;font-size:10.5px">Mevcut Stok</span><strong style="color:var(--green)">${p.stk} ${p.unit}</strong></div>
-          <div><span style="color:var(--txt2);display:block;font-size:10.5px">Min. Kritik</span><strong>${p.min} ${p.unit}</strong></div>
-          <div><span style="color:var(--txt2);display:block;font-size:10.5px">Alış Fiyatı</span><strong>${tl(p.price)}</strong></div>
-        </div>
-
-        ${altBadges ? `<div style="margin-bottom:12px;font-size:11.5px;color:var(--txt2)">Alt Barkodlar: ${altBadges}</div>` : ''}
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button type="button" class="btn btn-primary" onclick="closeScanner();openProdModal(${p.id})" style="font-weight:700">
-            ✏️ Ürünü Düzenle
-          </button>
-          <button type="button" class="btn btn-success" onclick="closeScanner();go('stockin');setTimeout(()=>{onStockinScan('${code}');},200)" style="font-weight:700">
-            📥 Stoğa Ekle (+)
-          </button>
-        </div>
-      </div>`;
-    if(btn) btn.style.display = 'none';
+    // Mevcut ürün: Ürün Düzenleme ekranını aç
+    openProdModal(p.id);
+    toast('w', 'Kayıtlı Ürün', `"${p.name}" ürünü açıldı. Bilgilerini düzenleyebilirsiniz.`);
   } else {
-    const P = gp();
-    const cats = [...new Set(P.map(p => p.cat).filter(Boolean))].sort();
-
-    info.innerHTML = `
-      <div class="card" style="padding:16px;border:1.5px solid rgba(245,158,11,.4);background:var(--bg3);border-radius:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="color:var(--yellow);font-weight:700;font-size:13.5px">⚠️ Barkod Sistemde Kayıtlı Değil</div>
-          <span class="mono" style="font-size:12px;background:var(--bg);padding:3px 10px;border-radius:5px;border:1px solid var(--border);color:var(--accent);font-weight:700">${code}</span>
-        </div>
-
-        <!-- SEÇENEK 1: YENİ ÜRÜN EKLE -->
-        <div style="background:var(--bg);border:1px solid var(--border2);border-radius:9px;padding:14px;margin-bottom:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <div style="font-size:13px;font-weight:800;color:var(--green);display:flex;align-items:center;gap:6px">
-              <span>➕</span> Bu Barkodla Yeni Ürün Ekle
-            </div>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="closeScanner();openProdModal();document.getElementById('p-barc').value='${code}';" style="font-size:11px;padding:3px 8px">
-              📝 Detaylı Formda Aç ↗
-            </button>
-          </div>
-          
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-            <div>
-              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Ürün Adı *</label>
-              <input type="text" id="scan-quick-name" placeholder="Örn: A4 Kağıt" style="width:100%;padding:7px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12.5px;font-weight:600">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Kategori</label>
-              <input type="text" id="scan-quick-cat" list="catlist" placeholder="Örn: Kırtasiye" value="${cats[0] || 'Genel'}" style="width:100%;padding:7px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12px">
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
-            <div>
-              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Başlangıç Stoğu</label>
-              <input type="number" id="scan-quick-stk" value="10" min="0" style="width:100%;padding:7px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12px;font-weight:700">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Alış Fiyatı (₺)</label>
-              <input type="number" id="scan-quick-buyprice" placeholder="0.00" step="0.01" style="width:100%;padding:7px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12px">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Satış Fiyatı (₺)</label>
-              <input type="number" id="scan-quick-price" placeholder="0.00" step="0.01" style="width:100%;padding:7px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12px">
-            </div>
-          </div>
-          <button type="button" class="btn btn-success btn-full" onclick="saveQuickProductFromScan('${code}')" style="font-weight:800;padding:10px;font-size:13px">
-            💾 Ürün Olarak Kaydet
-          </button>
-        </div>
-
-        <!-- SEÇENEK 2: MEVCUT ÜRÜNE ALT BARKOD OLARAK BAĞLA -->
-        <details style="background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-size:12px">
-          <summary style="font-weight:700;color:var(--accent);cursor:pointer;user-select:none">
-            🔗 Veya Mevcut Bir Ürüne Alt Barkod Olarak Bağla
-          </summary>
-          <div style="margin-top:10px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-              <div>
-                <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">1. Kategori Filtresi</label>
-                <select id="scan-link-cat" onchange="onScanCatFilterChange('${code}')" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
-                  <option value="">Tüm Kategoriler (${P.length})</option>
-                  ${cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('')}
-                </select>
-              </div>
-              <div>
-                <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">2. Bağlanacak Ürün *</label>
-                <select id="scan-link-prod" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
-                  <option value="">Ürün Seçiniz...</option>
-                  ${P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('')}
-                </select>
-              </div>
-            </div>
-            <div style="margin-bottom:8px">
-              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:3px">Bu Ürünün Stoğuna Eklenecek Miktar (İsteğe Bağlı)</label>
-              <input type="number" id="scan-link-qty" value="1" min="0" placeholder="1" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
-            </div>
-            <button type="button" class="btn btn-warning btn-sm btn-full" onclick="linkScannedBarcodeToProduct('${code}')" style="font-weight:700;padding:8px">
-              🔗 Bu Ürüne Alt Barkod Yap & Stoğa Ekle
-            </button>
-          </div>
-        </details>
-      </div>`;
-    if(btn) btn.style.display = 'none';
+    // Yeni ürün: Ürün Ekleme ekranını barkod yazılmış olarak aç
+    openProdModal();
+    const bEl = document.getElementById('p-barc');
+    if(bEl) bEl.value = code;
+    toast('s', 'Barkod Okundu ✅', `"${code}" barkodu forma işlendi. Ürün bilgilerini girip kaydedebilirsiniz.`);
   }
-  
-  info.style.display = 'block';
-  setTimeout(() => {
-    info.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    document.getElementById('scan-quick-name')?.focus();
-  }, 120);
 }
 
 function saveQuickProductFromScan(code){
@@ -4165,13 +4026,14 @@ document.addEventListener('keydown', (e) => {
       } else if(pageId === 'products'){
         const p = findProductByBarcode(scannedCode);
         if(p){
-          const searchEl = document.getElementById('p-search');
-          if(searchEl){ searchEl.value = scannedCode; renderProds(); }
-          toast('s', 'Ürün Bulundu: ' + p.name, `Stok: ${p.stk} ${p.unit} | Fiyat: ${tl(p.sellPrice || p.price)}`);
+          // Mevcut ürün okutulduğunda doğrudan ürün düzenleme ekranını aç
+          openProdModal(p.id);
+          toast('w', 'Kayıtlı Ürün', `"${p.name}" ürünü açıldı. Bilgilerini düzenleyebilirsiniz.`);
         } else {
-          // Ürün kayıtlı değilse doğrudan Ürün Ekle penceresini aç ve barkodu yaz
+          // Yeni ürün: doğrudan Ürün Ekle penceresini aç ve barkodu yaz
           openProdModal();
-          document.getElementById('p-barc').value = scannedCode;
+          const bEl = document.getElementById('p-barc');
+          if(bEl) bEl.value = scannedCode;
           toast('s', 'Barkod Okundu ✅', `"${scannedCode}" barkodu için ürün ekleme penceresi açıldı.`);
         }
       }
