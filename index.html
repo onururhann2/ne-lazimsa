@@ -1363,6 +1363,62 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
   </div>
 </div>
 
+
+<!-- Quick Stock In (Mevcut Ürün Stok Miktar Girişi) -->
+<div class="overlay" id="m-quick-stock">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hdr">
+      <h2 class="modal-ttl">📦 Stoğa Miktar Ekle</h2>
+      <button class="modal-x" onclick="closeM('m-quick-stock')">×</button>
+    </div>
+    
+    <!-- Ürün Kartı -->
+    <div class="card" style="padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <span id="qs-badge" class="badge b-ok">Normal Stok</span>
+          <div id="qs-name" style="font-weight:800;font-size:15px;color:var(--txt);margin-top:4px">Ürün Adı</div>
+          <div style="font-size:11px;color:var(--txt2);margin-top:2px">
+            Kategori: <strong id="qs-cat" style="color:var(--txt)">Genel</strong> • Barkod: <span id="qs-barc" class="mono" style="color:var(--accent)">-</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:8px 10px;background:var(--bg);border-radius:7px;border:1px solid var(--border2);font-size:11.5px;text-align:center">
+        <div><span style="color:var(--txt2);font-size:10px;display:block">Mevcut Stok</span><strong id="qs-curstk" style="color:var(--green);font-size:13px">0 Adet</strong></div>
+        <div><span style="color:var(--txt2);font-size:10px;display:block">Alış Fiyatı</span><strong id="qs-price">0,00 ₺</strong></div>
+        <div><span style="color:var(--txt2);font-size:10px;display:block">Satış Fiyatı</span><strong id="qs-sellprice" style="color:var(--accent)">0,00 ₺</strong></div>
+      </div>
+    </div>
+
+    <!-- Miktar Girişi -->
+    <div class="fg" style="margin-bottom:12px">
+      <label style="font-weight:700;font-size:12.5px;display:block;margin-bottom:6px">Eklenecek Miktar *</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button type="button" onclick="stepQuickStockQty(-10)" style="width:44px;height:50px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:13px;font-weight:700;cursor:pointer">−10</button>
+        <button type="button" onclick="stepQuickStockQty(-1)" style="width:44px;height:50px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:20px;font-weight:700;cursor:pointer">−</button>
+        <input type="number" id="qs-qty" min="1" value="1" style="font-size:24px;font-weight:800;text-align:center;height:50px;flex:1;border:2px solid var(--accent);border-radius:8px;background:var(--bg);color:var(--txt)" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmQuickStockModal();}">
+        <button type="button" onclick="stepQuickStockQty(1)" style="width:44px;height:50px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:20px;font-weight:700;cursor:pointer">+</button>
+        <button type="button" onclick="stepQuickStockQty(10)" style="width:44px;height:50px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer">+10</button>
+      </div>
+    </div>
+
+    <!-- Not (İsteğe bağlı) -->
+    <div class="fg" style="margin-bottom:14px">
+      <label style="font-size:11px;color:var(--txt2)">Not (İsteğe Bağlı)</label>
+      <input type="text" id="qs-note" placeholder="Örn: Haftalık teslimat, depodan gelen..." style="padding:8px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12px">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <button type="button" class="btn btn-ghost" onclick="editProdFromQuickStock()" style="font-size:12px">
+        ✏️ Tüm Bilgileri Düzenle
+      </button>
+      <button type="button" class="btn btn-success" onclick="confirmQuickStockModal()" style="font-weight:800;font-size:13px">
+        📥 Stoğa Ekle
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Barcode Scanner -->
 <div class="overlay" id="m-scan">
   <div class="modal modal-lg">
@@ -3259,6 +3315,112 @@ async function openScanner(mode){
   await startCam('barcode-video','scan',(code)=>onScan(code));
 }
 function closeScanner(){stopCam('scan');closeM('m-scan');}
+
+// ── MEVCUT ÜRÜN İÇİN HIZLI MİKTAR GİRİŞİ MODALI ──
+let currentQuickStockProdId = null;
+
+function openQuickStockModal(p){
+  if(!p) return;
+  currentQuickStockProdId = p.id;
+  
+  const st = sst(p);
+  const nameEl = document.getElementById('qs-name');
+  const catEl = document.getElementById('qs-cat');
+  const barcEl = document.getElementById('qs-barc');
+  const curStkEl = document.getElementById('qs-curstk');
+  const priceEl = document.getElementById('qs-price');
+  const sellPriceEl = document.getElementById('qs-sellprice');
+  const qtyEl = document.getElementById('qs-qty');
+  const noteEl = document.getElementById('qs-note');
+  const badgeEl = document.getElementById('qs-badge');
+  
+  if(nameEl) nameEl.textContent = p.name;
+  if(catEl) catEl.textContent = p.cat || 'Genel';
+  if(barcEl) barcEl.textContent = p.barc || '-';
+  if(curStkEl) curStkEl.textContent = `${p.stk} ${p.unit}`;
+  if(priceEl) priceEl.textContent = tl(p.price);
+  if(sellPriceEl) sellPriceEl.textContent = tl(p.sellPrice || p.price);
+  if(qtyEl) qtyEl.value = 1;
+  if(noteEl) noteEl.value = '';
+  if(badgeEl) {
+    badgeEl.className = 'badge ' + (st === 'ok' ? 'b-ok' : st === 'warn' ? 'b-warn' : 'b-danger');
+    badgeEl.textContent = st === 'ok' ? 'Normal Stok' : st === 'warn' ? 'Düşük Stok' : 'Kritik Stok';
+  }
+  
+  openM('m-quick-stock');
+  setTimeout(() => {
+    qtyEl?.focus();
+    qtyEl?.select();
+  }, 120);
+}
+
+function stepQuickStockQty(delta){
+  const el = document.getElementById('qs-qty');
+  if(!el) return;
+  const cur = parseInt(el.value) || 0;
+  el.value = Math.max(1, cur + delta);
+}
+
+function confirmQuickStockModal(){
+  if(!currentQuickStockProdId) return;
+  const qtyEl = document.getElementById('qs-qty');
+  const noteEl = document.getElementById('qs-note');
+  const qty = parseInt(qtyEl?.value) || 0;
+  const note = noteEl?.value?.trim() || 'Hızlı Barkod Girişi';
+  
+  if(qty < 1){
+    toast('w', 'Geçersiz Miktar', 'Lütfen en az 1 adet miktar girin.');
+    qtyEl?.focus();
+    return;
+  }
+  
+  const P = gp();
+  const pi = P.findIndex(x => x.id === currentQuickStockProdId);
+  if(pi < 0){
+    toast('e', 'Hata', 'Ürün bulunamadı.');
+    return;
+  }
+  
+  const oldStk = parseInt(P[pi].stk || 0);
+  P[pi].stk = oldStk + qty;
+  sp(P);
+  
+  // Add to stockin history
+  const p = P[pi];
+  const buyP = parseFloat(p.price) || 0;
+  const sellP = (p.sellPrice !== undefined && p.sellPrice !== null && p.sellPrice !== '') ? parseFloat(p.sellPrice) : buyP;
+  const stockinRecord = {
+    id: Date.now(),
+    prodId: p.id,
+    name: p.name,
+    cat: p.cat || 'Genel',
+    qty: qty,
+    unit: p.unit || 'Adet',
+    buyPrice: buyP,
+    sellPrice: sellP,
+    totalValue: qty * buyP,
+    note: note,
+    date: getTodayStr(),
+    time: getCurrentTimeStr(),
+    user: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.name : 'Admin'
+  };
+  
+  let stockinHist = getStockinHist();
+  stockinHist.push(stockinRecord);
+  saveStockinHist(stockinHist);
+  
+  closeM('m-quick-stock');
+  renderProds();
+  updBadge();
+  toast('s', 'Stok Eklendi! 🚀', `"${p.name}" stoğuna +${qty} ${p.unit} eklendi. Güncel Stok: ${P[pi].stk} ${p.unit}`);
+}
+
+function editProdFromQuickStock(){
+  const id = currentQuickStockProdId;
+  closeM('m-quick-stock');
+  if(id) openProdModal(id);
+}
+
 function onScan(code){
   if(!code) return;
   lastCode = code;
@@ -3268,15 +3430,14 @@ function onScan(code){
   
   const p = findProductByBarcode(code);
   if(p){
-    // Mevcut ürün: Ürün Düzenleme ekranını aç
-    openProdModal(p.id);
-    toast('w', 'Kayıtlı Ürün', `"${p.name}" ürünü açıldı. Bilgilerini düzenleyebilirsiniz.`);
+    // Kayıtlı barkod: sadece ürün bilgisi ve miktar giriş ekranı açılır
+    openQuickStockModal(p);
   } else {
-    // Yeni ürün: Ürün Ekleme ekranını barkod yazılmış olarak aç
+    // Yeni barkod: ürün ekleme / düzenleme ekranı açılır
     openProdModal();
     const bEl = document.getElementById('p-barc');
     if(bEl) bEl.value = code;
-    toast('s', 'Barkod Okundu ✅', `"${code}" barkodu forma işlendi. Ürün bilgilerini girip kaydedebilirsiniz.`);
+    toast('s', 'Yeni Barkod Okundu ✅', `"${code}" barkodu forma işlendi. Ürün bilgilerini girip kaydedebilirsiniz.`);
   }
 }
 
@@ -4026,15 +4187,14 @@ document.addEventListener('keydown', (e) => {
       } else if(pageId === 'products'){
         const p = findProductByBarcode(scannedCode);
         if(p){
-          // Mevcut ürün okutulduğunda doğrudan ürün düzenleme ekranını aç
-          openProdModal(p.id);
-          toast('w', 'Kayıtlı Ürün', `"${p.name}" ürünü açıldı. Bilgilerini düzenleyebilirsiniz.`);
+          // Kayıtlı barkod: sadece ürün bilgisi ve miktar giriş ekranını aç
+          openQuickStockModal(p);
         } else {
-          // Yeni ürün: doğrudan Ürün Ekle penceresini aç ve barkodu yaz
+          // Yeni barkod: doğrudan Ürün Ekle penceresini aç ve barkodu yaz
           openProdModal();
           const bEl = document.getElementById('p-barc');
           if(bEl) bEl.value = scannedCode;
-          toast('s', 'Barkod Okundu ✅', `"${scannedCode}" barkodu için ürün ekleme penceresi açıldı.`);
+          toast('s', 'Yeni Barkod Okundu ✅', `"${scannedCode}" barkodu için ürün ekleme penceresi açıldı.`);
         }
       }
 
