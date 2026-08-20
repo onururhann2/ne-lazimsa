@@ -3656,13 +3656,16 @@ let scanConsensusMap = {};
 let scanHudTimeout = null;
 
 function triggerScanFeedback(code, p, context = 'general'){
+  if(!code) return;
+  code = String(code).trim();
+
   // 1. Ses Çal (POS Lazer Bip)
   playBeep();
 
   // 2. Ekran Kenarlarında Yeşil Lazer Işıması (Visual Pulse)
   try {
     document.body.classList.remove('scan-pulse-active');
-    void document.body.offsetWidth; // trigger reflow
+    void document.body.offsetWidth; // reflow
     document.body.classList.add('scan-pulse-active');
     setTimeout(() => document.body.classList.remove('scan-pulse-active'), 500);
   } catch(e){}
@@ -3674,21 +3677,19 @@ function triggerScanFeedback(code, p, context = 'general'){
       hud.innerHTML = `<span style="color:#10b981;font-size:16px">🎯</span> <span>Barkod: <span class="mono" style="color:#38bdf8">${code}</span></span> <span style="color:var(--border2)">|</span> <span style="color:#fff">${p.name}</span> <span style="color:#10b981">(${p.stk} ${p.unit})</span>`;
       hud.style.borderColor = '#10b981';
     } else {
-      hud.innerHTML = `<span style="color:#f59e0b;font-size:16px">⚠️</span> <span>Yeni Barkod: <span class="mono" style="color:#f59e0b">${code}</span></span> <span style="color:var(--border2)">|</span> <span style="color:#fcd34d">Kayıt Açıldı</span>`;
+      hud.innerHTML = `<span style="color:#f59e0b;font-size:16px">⚠️</span> <span>Yeni Barkod: <span class="mono" style="color:#f59e0b">${code}</span></span> <span style="color:var(--border2)">|</span> <span style="color:#fcd34d">Ürün Ekleme Ekranı Açıldı</span>`;
       hud.style.borderColor = '#f59e0b';
     }
     hud.classList.add('show');
     if(scanHudTimeout) clearTimeout(scanHudTimeout);
-    scanHudTimeout = setTimeout(() => hud.classList.remove('show'), 2200);
+    scanHudTimeout = setTimeout(() => hud.classList.remove('show'), 2400);
   }
 
   // 4. Toast Bildirimi
-  if(context === 'general'){
-    if(p){
-      toast('s', 'Barkod Okundu ✅: ' + p.name, `Mevcut Stok: ${p.stk} ${p.unit} | Fiyat: ${tl(p.sellPrice || p.price)}`);
-    } else {
-      toast('w', 'Yeni Barkod Okundu ⚠️', `"${code}" barkodu için ürün formu açıldı.`);
-    }
+  if(p){
+    toast('s', 'Barkod Okundu ✅: ' + p.name, `Mevcut Stok: ${p.stk} ${p.unit} | Fiyat: ${tl(p.sellPrice || p.price)}`);
+  } else {
+    toast('w', 'Yeni Barkod Okundu ⚠️', `"${code}" barkodu için ürün ekleme formu açıldı.`);
   }
 }
 
@@ -4271,6 +4272,7 @@ document.addEventListener('keydown', (e) => {
         // Ürün Ekle/Düzenle modalı açık
         const bEl = document.getElementById('p-barc');
         if(bEl){ bEl.value = scannedCode; bEl.focus(); }
+        triggerScanFeedback(scannedCode, findProductByBarcode(scannedCode), 'prod_field');
       } else if(quickStockOpen){
         // Quick stock modal açıkken başka barkod okutulursa o barkodu işle
         onScan(scannedCode);
