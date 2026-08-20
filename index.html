@@ -789,15 +789,13 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <div class="fg">
               <label>Eklenecek Miktar * <span style="font-size:10px;color:var(--txt3);font-weight:400">(Butonlarla veya klavyeyle girin)</span></label>
               <div style="display:flex;align-items:center;gap:8px">
-                <button type="button" onclick="stepQty(-10)" style="width:40px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0">−10</button>
+                <button type="button" onclick="stepQty(-10)" style="width:42px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">−10</button>
                 <button type="button" onclick="stepQty(-1)" style="width:48px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:22px;font-weight:700;cursor:pointer;flex-shrink:0">−</button>
-                <input type="number" id="stockin-qty" min="1" placeholder="0"
-                  style="font-size:26px;font-weight:800;text-align:center;padding:10px;flex:1;border:2px solid var(--accent);border-radius:8px;background:var(--bg3);color:var(--txt)"
-                  onkeydown="handleQtyKeydown(event)"
-                  onfocus="qtyManualActive=true"
-                  onblur="qtyManualActive=false">
+                <input type="number" id="stockin-qty" readonly tabindex="-1"
+                  style="font-size:26px;font-weight:800;text-align:center;padding:10px;flex:1;border:2px solid var(--accent);border-radius:8px;background:var(--bg3);color:var(--txt);cursor:default;pointer-events:none" value="">
                 <button type="button" onclick="stepQty(1)" style="width:48px;height:56px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:22px;font-weight:700;cursor:pointer;flex-shrink:0">+</button>
-                <button type="button" onclick="stepQty(10)" style="width:40px;height:56px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0">+10</button>
+                <button type="button" onclick="stepQty(10)" style="width:42px;height:56px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">+10</button>
+                <button type="button" onclick="promptQty()" title="Sayı gir" style="width:42px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--accent);font-size:18px;cursor:pointer;flex-shrink:0">✏️</button>
               </div>
             </div>
             <div class="fg"><label>Not (İsteğe Bağlı)</label><input type="text" id="stockin-note" placeholder="Örn: Depodan gelen"></div>
@@ -4947,7 +4945,20 @@ function stepQty(delta){
   const el = document.getElementById('stockin-qty');
   if(!el) return;
   const cur = parseInt(el.value) || 0;
-  el.value = Math.max(1, cur + delta);
+  const next = cur + delta;
+  el.value = next < 1 ? 1 : next;
+}
+
+function promptQty(){
+  // Native prompt — completely isolated from keyboard/scanner events on the page
+  const val = window.prompt('Eklenecek miktarı girin:', document.getElementById('stockin-qty').value || '1');
+  if(val === null) return; // iptal
+  const n = parseInt(val);
+  if(!isNaN(n) && n >= 1){
+    document.getElementById('stockin-qty').value = n;
+  } else if(val !== ''){
+    toast('w', 'Geçersiz Miktar', 'Lütfen 1 veya daha büyük bir sayı girin.');
+  }
 }
 
 function deactivateQtyManual(){
