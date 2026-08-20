@@ -3468,9 +3468,8 @@ function confirmQuickStockModal(){
   if(qtyEl) qtyEl.value = '1';
   if(noteEl) noteEl.value = '';
   
-  // Pencereleri anında kapat
-  closeScanner();
-  closeM('m-quick-stock');
+  // ── PERSONEL ELLE STOK GİRDİKTEN SONRA PENCEREYİ ANINDA VE KESİN OLARAK KAPAT ──
+  closeAllModals();
   renderProds();
   updBadge();
   triggerScanFeedback(p.barc || '', P[pi], 'stockin');
@@ -4282,20 +4281,45 @@ document.addEventListener('keydown', (e) => {
 
 // ══════════════ MODALS ══════════════
 function openM(id){
-  document.querySelectorAll('.overlay.open').forEach(el => {
-    if(el.id !== id) el.classList.remove('open');
+  document.querySelectorAll('.overlay').forEach(el => {
+    if(el.id !== id){
+      el.classList.remove('open');
+      el.style.display = 'none';
+    }
   });
   if(id !== 'm-scan') stopCam('scan');
   if(id !== 'm-qc') stopCam('qc');
   const target = document.getElementById(id);
-  if(target) target.classList.add('open');
+  if(target){
+    target.style.display = 'flex';
+    target.classList.add('open');
+  }
 }
-function closeM(id){document.getElementById(id).classList.remove('open');}
-document.addEventListener('click',e=>{
-  if(!e.target.classList.contains('overlay'))return;
-  const id=e.target.id;
-  if(id==='m-scan')closeScanner();
-  else if(id==='m-qc')closeQC();
+
+function closeM(id){
+  const el = document.getElementById(id);
+  if(el){
+    el.classList.remove('open');
+    el.style.display = 'none';
+  }
+  if(id === 'm-scan') stopCam('scan');
+  if(id === 'm-qc') stopCam('qc');
+}
+
+function closeAllModals(){
+  document.querySelectorAll('.overlay').forEach(el => {
+    el.classList.remove('open');
+    el.style.display = 'none';
+  });
+  stopCam('scan');
+  stopCam('qc');
+}
+
+document.addEventListener('click', e => {
+  if(!e.target.classList.contains('overlay')) return;
+  const id = e.target.id;
+  if(id === 'm-scan') closeScanner();
+  else if(id === 'm-qc') closeQC();
   else closeM(id);
 });
 document.addEventListener('keydown',e=>{
