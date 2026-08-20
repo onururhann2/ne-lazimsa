@@ -1433,7 +1433,7 @@ body.scan-pulse-active {
       <div style="display:flex;align-items:center;gap:6px">
         <button type="button" onclick="stepQuickStockQty(-10)" style="width:44px;height:50px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:13px;font-weight:700;cursor:pointer">−10</button>
         <button type="button" onclick="stepQuickStockQty(-1)" style="width:44px;height:50px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);font-size:20px;font-weight:700;cursor:pointer">−</button>
-        <input type="number" id="qs-qty" min="1" value="1" style="font-size:24px;font-weight:800;text-align:center;height:50px;flex:1;border:2px solid var(--accent);border-radius:8px;background:var(--bg);color:var(--txt)" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmQuickStockModal();}">
+        <input type="number" id="qs-qty" min="1" value="1" style="font-size:24px;font-weight:800;text-align:center;height:50px;flex:1;border:2px solid var(--accent);border-radius:8px;background:var(--bg);color:var(--txt)" onkeydown="if(event.key==='Enter'&&!isGunBurstPending()){event.preventDefault();confirmQuickStockModal();}">
         <button type="button" onclick="stepQuickStockQty(1)" style="width:44px;height:50px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:20px;font-weight:700;cursor:pointer">+</button>
         <button type="button" onclick="stepQuickStockQty(10)" style="width:44px;height:50px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer">+10</button>
       </div>
@@ -1442,7 +1442,7 @@ body.scan-pulse-active {
     <!-- Not (İsteğe bağlı) -->
     <div class="fg" style="margin-bottom:14px">
       <label style="font-size:11px;color:var(--txt2)">Not (İsteğe Bağlı)</label>
-      <input type="text" id="qs-note" placeholder="Örn: Haftalık teslimat, depodan gelen..." style="padding:8px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12px">
+      <input type="text" id="qs-note" placeholder="Örn: Haftalık teslimat, depodan gelen..." style="padding:8px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:12px" onkeydown="if(event.key==='Enter'&&!isGunBurstPending()){event.preventDefault();confirmQuickStockModal();}">
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
@@ -3416,26 +3416,33 @@ function stepQuickStockQty(delta){
   el.value = Math.max(1, cur + delta);
 }
 
+let quickStockBusy = false;
+
 function confirmQuickStockModal(){
+  // Çift tetiklenmeye karşı kilit (buton + Enter aynı anda gelebiliyor)
+  if(quickStockBusy) return;
   if(!currentQuickStockProdId) return;
   const qtyEl = document.getElementById('qs-qty');
   const noteEl = document.getElementById('qs-note');
   const qty = parseInt(qtyEl?.value) || 0;
   const note = noteEl?.value?.trim() || 'Hızlı Barkod Girişi';
-  
+
   if(qty < 1){
     toast('w', 'Geçersiz Miktar', 'Lütfen en az 1 adet miktar girin.');
     qtyEl?.focus();
     return;
   }
-  
+
   const P = gp();
   const pi = P.findIndex(x => x.id === currentQuickStockProdId);
   if(pi < 0){
     toast('e', 'Hata', 'Ürün bulunamadı.');
     return;
   }
-  
+
+  quickStockBusy = true;
+  setTimeout(() => { quickStockBusy = false; }, 400);
+
   const oldStk = parseInt(P[pi].stk || 0);
   P[pi].stk = oldStk + qty;
   sp(P);
@@ -3467,9 +3474,14 @@ function confirmQuickStockModal(){
   currentQuickStockProdId = null;
   if(qtyEl) qtyEl.value = '1';
   if(noteEl) noteEl.value = '';
-  
+
   // ── PERSONEL ELLE STOK GİRDİKTEN SONRA PENCEREYİ ANINDA VE KESİN OLARAK KAPAT ──
+  // Tabancadan arta kalan karakterler / geciken Enter yeni bir pencere açmasın:
+  // kapatmanın hemen ardından kısa süreli tarama baskısı uygulanır.
+  globalBarcodeBuffer = '';
+  suppressScansFor(600);
   closeAllModals();
+  document.activeElement?.blur?.();
   renderProds();
   updBadge();
   triggerScanFeedback(p.barc || '', P[pi], 'stockin');
@@ -3479,6 +3491,8 @@ function confirmQuickStockModal(){
 // ── BARKOD OKUTULDUĞUNDA ÇALIŞAN MERKEZİ FONKSİYON ──
 function onScan(code){
   if(!code) return;
+  // Stok eklendikten hemen sonraki artık karakterler yeni pencere açmasın
+  if(scansSuppressed()) return;
   code = String(code).trim();
   if(!code) return;
   lastCode = code;
@@ -4219,20 +4233,44 @@ async function stopCam(key){
 let globalBarcodeBuffer = '';
 let lastKeyTime = 0;
 
+// Tabanca karakterleri ~5-15ms aralıklarla gönderir; en hızlı insan yazısı bile
+// 80ms'nin altına inmez. 50ms eşiği ikisini güvenle ayırır.
+// Bu eşik olmadan elle yazılan miktar/not metinleri barkod sanılıp
+// araya yeni pencere açıyordu.
+const SCAN_GUN_MAX_GAP_MS = 50;
+
+// Kendi Enter işleyicisi olan barkod alanları. Global dinleyici bunlara
+// karışmaz; aksi halde aynı barkod iki kez işlenir.
+const MANUAL_BARCODE_INPUTS = ['m-scan-manual', 'stockin-manual-barc', 'sales-manual-barc'];
+
+// Stok eklendikten hemen sonra tabancadan arta kalan karakterlerin
+// yeni bir pencere açmasını engelleyen kısa süreli baskı
+let suppressScanUntil = 0;
+function suppressScansFor(ms){ suppressScanUntil = Date.now() + ms; }
+function scansSuppressed(){ return Date.now() < suppressScanUntil; }
+
+// Bu Enter, tabanca patlamasının sonu mu? Alan içi Enter işleyicileri
+// (miktar onayla vb.) bu durumda devreye girmemeli — Enter barkodun parçası.
+function isGunBurstPending(){
+  return globalBarcodeBuffer.trim().length >= 3 &&
+         (Date.now() - lastKeyTime) <= SCAN_GUN_MAX_GAP_MS;
+}
+
 document.addEventListener('keydown', (e) => {
   const target = e.target;
   const now = Date.now();
   const timeDiff = now - lastKeyTime;
   lastKeyTime = now;
 
-  // 500ms'den uzun süre tuşa basılmadıysa ve basılan tuş Enter değilse buffer'ı temizle
-  if(timeDiff > 500 && e.key !== 'Enter' && e.keyCode !== 13){
-    globalBarcodeBuffer = '';
-  }
-
   const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
 
-  // Stok girişindeki miktar alanında tabanca koruması
+  // Barkod alanları kendi Enter işleyicileriyle çalışır — burada dokunma
+  if(isInput && MANUAL_BARCODE_INPUTS.includes(target.id)){
+    globalBarcodeBuffer = '';
+    return;
+  }
+
+  // Tabanca koruması uygulanan sayısal alanlar
   const isQtyField = isInput && target && (
     target.id === 'stockin-qty' ||
     target.id === 'stockin-price' ||
@@ -4241,66 +4279,62 @@ document.addEventListener('keydown', (e) => {
     target.classList.contains('qty-input')
   );
 
-  const isScannerTypingInQty = isQtyField && timeDiff < 60;
-
   if(e.key === 'Enter' || e.keyCode === 13){
-    let scannedCode = '';
-    
-    // 1. Buffer'dan oku
-    if(globalBarcodeBuffer.length >= 3){
-      scannedCode = globalBarcodeBuffer.trim();
-    } 
-    // 2. Veya odaklı inputtan oku
-    else if(target && typeof target.value === 'string' && target.value.trim().length >= 3){
-      scannedCode = target.value.trim();
-      target.value = '';
-    }
-
+    // SADECE tabanca hızında birikmiş bir dizi barkod sayılır.
+    // Elle yazılan hiçbir metin (miktar, not, ürün adı) barkod olarak yorumlanmaz.
+    const scannedCode = globalBarcodeBuffer.trim();
     globalBarcodeBuffer = '';
 
-    if(scannedCode.length >= 3){
-      const activePage = document.querySelector('.page.active');
-      const pageId = activePage ? activePage.id.replace('page-', '') : '';
-      const qcOpen = document.getElementById('m-qc')?.classList.contains('open');
-      const scanOpen = document.getElementById('m-scan')?.classList.contains('open');
-      const prodOpen = document.getElementById('m-prod')?.classList.contains('open');
-      const quickStockOpen = document.getElementById('m-quick-stock')?.classList.contains('open');
+    if(scannedCode.length < 3) return;      // elle giriş → alanın kendi işleyicisine bırak
+    if(scansSuppressed()) return;           // az önce stok eklendi → yoksay
 
-      playBeep();
+    const activePage = document.querySelector('.page.active');
+    const pageId = activePage ? activePage.id.replace('page-', '') : '';
+    const qcOpen = document.getElementById('m-qc')?.classList.contains('open');
+    const scanOpen = document.getElementById('m-scan')?.classList.contains('open');
+    const prodOpen = document.getElementById('m-prod')?.classList.contains('open');
+    const quickStockOpen = document.getElementById('m-quick-stock')?.classList.contains('open');
 
-      if(scanOpen){
-        // Barkod Tara / Barkod ile Ekle modalı açıkken
-        onScan(scannedCode);
-        const mInput = document.getElementById('m-scan-manual');
-        if(mInput) mInput.value = '';
-      } else if(qcOpen){
-        // Hızlı Sayım Modu açık
-        handleQCGunScan(scannedCode);
-      } else if(prodOpen){
-        // Ürün Ekle/Düzenle modalı açık
-        const bEl = document.getElementById('p-barc');
-        if(bEl){ bEl.value = scannedCode; bEl.focus(); }
-        triggerScanFeedback(scannedCode, findProductByBarcode(scannedCode), 'prod_field');
-      } else if(quickStockOpen){
-        // Quick stock modal açıkken başka barkod okutulursa o barkodu işle
-        onScan(scannedCode);
-      } else if(pageId === 'sales'){
-        onSalesScan(scannedCode);
-      } else if(pageId === 'stockin'){
-        onStockinScan(scannedCode);
-      } else {
-        // Stok Takibi, Dashboard veya herhangi bir sayfada barkod okutulduğunda onScan çağır
-        onScan(scannedCode);
-      }
+    // Tabancanın sayısal alana sızdırdığı ilk karakterleri temizle
+    if(isQtyField) target.value = '';
 
-      if(isInput) e.preventDefault();
+    playBeep();
+
+    if(scanOpen){
+      // Barkod Tara / Barkod ile Ekle modalı açıkken
+      onScan(scannedCode);
+      const mInput = document.getElementById('m-scan-manual');
+      if(mInput) mInput.value = '';
+    } else if(qcOpen){
+      // Hızlı Sayım Modu açık
+      handleQCGunScan(scannedCode);
+    } else if(prodOpen){
+      // Ürün Ekle/Düzenle modalı açık
+      const bEl = document.getElementById('p-barc');
+      if(bEl){ bEl.value = scannedCode; bEl.focus(); }
+      triggerScanFeedback(scannedCode, findProductByBarcode(scannedCode), 'prod_field');
+    } else if(quickStockOpen){
+      // Quick stock modal açıkken başka barkod okutulursa o barkodu işle
+      onScan(scannedCode);
+    } else if(pageId === 'sales'){
+      onSalesScan(scannedCode);
+    } else if(pageId === 'stockin'){
+      onStockinScan(scannedCode);
+    } else {
+      // Stok Takibi, Dashboard veya herhangi bir sayfada barkod okutulduğunda onScan çağır
+      onScan(scannedCode);
     }
+
+    if(isInput) e.preventDefault();
+
   } else if(e.key && e.key.length === 1){
-    if(isScannerTypingInQty){
-      e.preventDefault();
+    // Karakterler yalnızca tabanca hızında birikir.
+    // Yavaş gelen her karakter yeni bir dizi başlatır → elle yazı asla 3 harfi geçmez.
+    if(timeDiff <= SCAN_GUN_MAX_GAP_MS && globalBarcodeBuffer.length > 0){
       globalBarcodeBuffer += e.key;
-    } else if(!isQtyField){
-      globalBarcodeBuffer += e.key;
+      if(isQtyField) e.preventDefault();   // tabanca miktar alanına yazmasın
+    } else {
+      globalBarcodeBuffer = e.key;
     }
   }
 });
