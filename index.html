@@ -3409,6 +3409,14 @@ function openQuickStockModal(p){
   }, 120);
 }
 
+// "✏️ Tüm Bilgileri Düzenle" butonu bu fonksiyonu çağırıyordu ama tanımlı değildi.
+function editProdFromQuickStock(){
+  const id = currentQuickStockProdId;
+  currentQuickStockProdId = null;
+  closeM('m-quick-stock');
+  if(id) openProdModal(id);
+}
+
 function stepQuickStockQty(delta){
   const el = document.getElementById('qs-qty');
   if(!el) return;
@@ -3463,14 +3471,21 @@ function confirmQuickStockModal(){
     totalValue: qty * buyP,
     note: note,
     date: getTodayStr(),
-    time: getCurrentTimeStr(),
+    // getCurrentTimeStr() bu dosyada TANIMLI DEĞİLDİ. Buradaki ReferenceError
+    // fonksiyonu tam bu satırda kesiyor, aşağıdaki closeAllModals() hiç
+    // çalışmıyordu: stok ekleniyor ama pencere açık kalıyordu.
+    time: getTimeStr(),
     user: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.name : 'Admin'
   };
   
-  let stockinHist = getStockinHist();
+  // gih()/sih() bu dosyadaki stok geçmişi yardımcıları.
+  // Burada tanımsız getStockinHist()/saveStockinHist() çağrılıyordu: ReferenceError
+  // fırlatıp fonksiyonu bu satırda kesiyor, aşağıdaki closeAllModals() hiç
+  // çalışmadığı için stok ekleniyor ama pencere açık kalıyordu.
+  const stockinHist = gih();
   stockinHist.push(stockinRecord);
-  saveStockinHist(stockinHist);
-  
+  sih(stockinHist);
+
   currentQuickStockProdId = null;
   if(qtyEl) qtyEl.value = '1';
   if(noteEl) noteEl.value = '';
@@ -3601,17 +3616,14 @@ function linkScannedBarcodeToProduct(code){
 
 function openNewProdWithBarcode(code){
   const selCat = document.getElementById('scan-quick-cat')?.value || document.getElementById('scan-link-cat')?.value || '';
-  const selSubCat = document.getElementById('scan-quick-subcat')?.value || '';
   closeScanner();
   openProdModal();
-  document.getElementById('p-barc').value = code;
-  if(selCat){
-    document.getElementById('p-cat2').value = selCat;
-    updateSubCatDatalist(selCat);
-  }
-  if(selSubCat){
-    document.getElementById('p-subcat2').value = selSubCat;
-  }
+  const barcEl = document.getElementById('p-barc');
+  if(barcEl) barcEl.value = code;
+  // Not: burada tanımsız updateSubCatDatalist() çağrılıyor ve var olmayan
+  // p-subcat2 alanına yazılıyordu. Bu uygulamada alt kategori alanı yok.
+  const catEl = document.getElementById('p-cat2');
+  if(selCat && catEl) catEl.value = selCat;
 }
 
 function doScanAction(){
