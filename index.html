@@ -165,7 +165,8 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
 .filter-bar select{padding:6px 10px;background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--txt);font-family:'Inter',sans-serif;font-size:12px;outline:none;cursor:pointer}
 
 /* ── MODAL ── */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(5px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(5px);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none}
+.overlay.open{display:flex !important;opacity:1 !important;pointer-events:all !important}
 .overlay.open{opacity:1;pointer-events:all}
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:22px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;transform:scale(.96) translateY(6px);transition:transform .2s;box-shadow:0 24px 48px rgba(0,0,0,.5)}
 .overlay.open .modal{transform:scale(1) translateY(0)}
@@ -1184,6 +1185,37 @@ tr.crit-row td{background:rgba(239,68,68,.04)!important}
             <span style="font-size:10.5px;color:var(--txt3)">Virgülle ayırın</span>
           </label>
           <input type="text" id="p-alt-barc" placeholder="Örn: 8690002, 8690003">
+        </div>
+      </div>
+
+      <!-- ALT BARKOD BAĞLAMA SEÇENEĞİ -->
+      <div id="p-alt-link-section" style="margin:-4px 0 14px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:10px 12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAltLinkBox()">
+          <span style="font-size:12px;font-weight:700;color:var(--accent);display:flex;align-items:center;gap:6px">
+            <span>🔗</span> Bu Barkodu Mevcut Bir Ürüne Alt Barkod Olarak Bağla
+          </span>
+          <span id="alt-link-chevron" style="font-size:11px;color:var(--txt3)">▼</span>
+        </div>
+        <div id="alt-link-box" style="display:none;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border2)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">1. Kategori Filtresi</label>
+              <select id="prod-link-cat" onchange="onProdLinkCatChange()" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px"></select>
+            </div>
+            <div>
+              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">2. Bağlanacak Ürün *</label>
+              <select id="prod-link-target" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px"></select>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1">
+              <label style="font-size:10.5px;color:var(--txt2);font-weight:600;display:block;margin-bottom:2px">Stoğa Eklenecek Miktar (İsteğe Bağlı)</label>
+              <input type="number" id="prod-link-qty" value="0" min="0" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);color:var(--txt);font-size:11.5px">
+            </div>
+            <button type="button" class="btn btn-warning btn-sm" onclick="saveAltBarcodeToExistingProduct()" style="margin-top:14px;font-weight:700;padding:7px 12px;white-space:nowrap">
+              🔗 Alt Barkod Yap & Stoğa Ekle
+            </button>
+          </div>
         </div>
       </div>
       <div class="form-row">
@@ -2612,6 +2644,83 @@ function calcProdProfit(){
   }
 }
 
+
+// ── ÜRÜN MODALINDA ALT BARKOD BAĞLAMA FONKSİYONLARI ──
+function toggleAltLinkBox(){
+  const box = document.getElementById('alt-link-box');
+  const chev = document.getElementById('alt-link-chevron');
+  if(!box) return;
+  const isHidden = box.style.display === 'none';
+  box.style.display = isHidden ? 'block' : 'none';
+  if(chev) chev.textContent = isHidden ? '▲' : '▼';
+  if(isHidden){
+    initProdLinkOptions();
+  }
+}
+
+function initProdLinkOptions(){
+  const P = gp();
+  const cats = [...new Set(P.map(p => p.cat).filter(Boolean))].sort();
+  const catSel = document.getElementById('prod-link-cat');
+  const targetSel = document.getElementById('prod-link-target');
+  if(!catSel || !targetSel) return;
+  
+  catSel.innerHTML = '<option value="">Tüm Kategoriler (' + P.length + ')</option>' +
+    cats.map(c => `<option value="${c}">${c} (${P.filter(p=>p.cat===c).length})</option>`).join('');
+  
+  onProdLinkCatChange();
+}
+
+function onProdLinkCatChange(){
+  const selCat = document.getElementById('prod-link-cat')?.value;
+  const targetSel = document.getElementById('prod-link-target');
+  if(!targetSel) return;
+  let P = gp();
+  if(selCat) P = P.filter(p => p.cat === selCat);
+  targetSel.innerHTML = '<option value="">Ürün Seçiniz...</option>' +
+    P.map(p => `<option value="${p.id}">${p.name} (${p.stk} ${p.unit})</option>`).join('');
+}
+
+function saveAltBarcodeToExistingProduct(){
+  const barcCode = document.getElementById('p-barc')?.value?.trim();
+  const targetId = parseInt(document.getElementById('prod-link-target')?.value);
+  const addQty = parseInt(document.getElementById('prod-link-qty')?.value) || 0;
+  
+  if(!barcCode){
+    toast('w', 'Barkod Boş', 'Lütfen bağlanacak barkodu girin.');
+    return;
+  }
+  if(!targetId){
+    toast('w', 'Ürün Seçilmedi', 'Lütfen alt barkodu bağlamak istediğiniz ürünü seçin.');
+    return;
+  }
+  
+  const P = gp();
+  const prod = P.find(p => p.id === targetId);
+  if(!prod){
+    toast('e', 'Hata', 'Seçilen ürün bulunamadı.');
+    return;
+  }
+  
+  if(!Array.isArray(prod.altBarcodes)){
+    prod.altBarcodes = prod.altBarcodes ? String(prod.altBarcodes).split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean) : [];
+  }
+  
+  if(!prod.altBarcodes.includes(barcCode) && prod.barc !== barcCode){
+    prod.altBarcodes.push(barcCode);
+  }
+  
+  if(addQty > 0){
+    prod.stk = parseInt(prod.stk || 0) + addQty;
+  }
+  
+  sp(P);
+  closeM('m-prod');
+  renderProds();
+  updBadge();
+  toast('s', 'Alt Barkod Başarıyla Bağlandı! 🚀', `"${barcCode}" barkodu "${prod.name}" ürününe bağlandı.${addQty > 0 ? ' (Stok: ' + prod.stk + ' ' + prod.unit + ')' : ''}`);
+}
+
 function openProdModal(id){
   const S=gs();
   document.getElementById('p-sup').innerHTML='<option value="">Seçiniz</option>'+S.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
@@ -2619,6 +2728,7 @@ function openProdModal(id){
     const p=gp().find(x=>x.id===id);
     if(!p)return;
     document.getElementById('prod-ttl').textContent='Ürünü Düzenle';
+    const altLinkSec = document.getElementById('p-alt-link-section'); if(altLinkSec) altLinkSec.style.display = 'none';
     document.getElementById('p-id').value=p.id;
     document.getElementById('p-name').value=p.name;
     document.getElementById('p-barc').value=p.barc||'';
@@ -2636,6 +2746,7 @@ function openProdModal(id){
     setTimeout(() => { document.getElementById('p-name')?.focus(); }, 150);
   } else {
     document.getElementById('prod-ttl').textContent='Ürün Ekle';
+    const altLinkSec = document.getElementById('p-alt-link-section'); if(altLinkSec) { altLinkSec.style.display = 'block'; document.getElementById('alt-link-box').style.display = 'none'; document.getElementById('alt-link-chevron').textContent = '▼'; }
     document.querySelector('#m-prod form').reset();
     document.getElementById('p-id').value='';
     document.getElementById('p-alt-barc').value='';
@@ -4079,7 +4190,15 @@ document.addEventListener('keydown', (e) => {
 
 
 // ══════════════ MODALS ══════════════
-function openM(id){document.getElementById(id).classList.add('open');}
+function openM(id){
+  document.querySelectorAll('.overlay.open').forEach(el => {
+    if(el.id !== id) el.classList.remove('open');
+  });
+  if(id !== 'm-scan') stopCam('scan');
+  if(id !== 'm-qc') stopCam('qc');
+  const target = document.getElementById(id);
+  if(target) target.classList.add('open');
+}
 function closeM(id){document.getElementById(id).classList.remove('open');}
 document.addEventListener('click',e=>{
   if(!e.target.classList.contains('overlay'))return;
