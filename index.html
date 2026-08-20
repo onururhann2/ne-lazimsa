@@ -3464,36 +3464,17 @@ function confirmQuickStockModal(){
   stockinHist.push(stockinRecord);
   saveStockinHist(stockinHist);
   
+  currentQuickStockProdId = null;
+  if(qtyEl) qtyEl.value = '1';
+  if(noteEl) noteEl.value = '';
+  
+  // Pencereleri anında kapat
+  closeScanner();
   closeM('m-quick-stock');
   renderProds();
   updBadge();
+  triggerScanFeedback(p.barc || '', P[pi], 'stockin');
   toast('s', 'Stok Eklendi! 🚀', `"${p.name}" stoğuna +${qty} ${p.unit} eklendi. Güncel Stok: ${P[pi].stk} ${p.unit}`);
-}
-
-function editProdFromQuickStock(){
-  const id = currentQuickStockProdId;
-  closeM('m-quick-stock');
-  if(id) openProdModal(id);
-}
-
-function onScan(code){
-  if(!code) return;
-  lastCode = code;
-  
-  closeScanner();
-  
-  const p = findProductByBarcode(code);
-  triggerScanFeedback(code, p, 'general');
-  if(p){
-    // Kayıtlı barkod: sadece ürün bilgisi ve miktar giriş ekranı açılır
-    openQuickStockModal(p);
-  } else {
-    // Yeni barkod: ürün ekleme / düzenleme ekranı açılır
-    openProdModal();
-    const bEl = document.getElementById('p-barc');
-    if(bEl) bEl.value = code;
-    toast('s', 'Yeni Barkod Okundu ✅', `"${code}" barkodu forma işlendi. Ürün bilgilerini girip kaydedebilirsiniz.`);
-  }
 }
 
 function saveQuickProductFromScan(code){
@@ -5328,26 +5309,26 @@ function confirmStockin(){
   if(inHist.length > 500) inHist.length = 500;
   localStorage.setItem('nl_stockin_hist', JSON.stringify(inHist));
 
-  // Single unified atomic cloud push
   triggerCloudPush('stockin_complete', true);
 
-  toast('s','Stok Eklendi',`${p.name} +${qty} ${p.unit}`);
+  triggerScanFeedback(p.barc || '', p, 'stockin');
+  toast('s','Stok Eklendi! 🚀',`${p.name} +${qty} ${p.unit} (Toplam: ${p.stk} ${p.unit})`);
   updBadge();
-  // update displayed stock
-  document.getElementById('stockin-prod-stk').textContent=p.stk+' '+p.unit;
-  const st=sst(p);
-  document.getElementById('stockin-prod-badge').innerHTML=`<span class="badge ${st==='ok'?'b-ok':st==='warn'?'b-warn':'b-danger'}">${st==='ok'?'Normal Stok':st==='warn'?'D\u00fc\u015f\u00fck Stok':'Kritik Stok'}</span>`;
-  // log entry
+
+  // Log entry
   const log=document.getElementById('stockin-log');
-  const empties=log.querySelectorAll('[data-empty]');
-  empties.forEach(e=>e.remove());
-  const item=document.createElement('div');
-  item.style.cssText='padding:9px 12px;border-radius:8px;font-size:12px;display:flex;align-items:center;gap:10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.18)';
-  item.innerHTML=`<span>\u2705</span><span style="flex:1;font-weight:600">${p.name}</span><span style="color:var(--green)">+${qty} ${p.unit}</span><span style="color:var(--txt3);font-size:11px">${note||''}</span>`;
-  log.prepend(item);
-  // reset qty
-  document.getElementById('stockin-qty').value='';
-  document.getElementById('stockin-note').value='';
+  if(log){
+    const empties=log.querySelectorAll('[data-empty]');
+    empties.forEach(e=>e.remove());
+    const item=document.createElement('div');
+    item.style.cssText='padding:9px 12px;border-radius:8px;font-size:12px;display:flex;align-items:center;gap:10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.18)';
+    item.innerHTML=`<span>✅</span><span style="flex:1;font-weight:600">${p.name}</span><span style="color:var(--green)">+${qty} ${p.unit}</span><span style="color:var(--txt3);font-size:11px">${note||''}</span>`;
+    log.prepend(item);
+  }
+
+  // ── İŞLEM BİTTİĞİNDE EKRANI TAMAMEN KAPAT VE STOK TAKİBİ SAYFASINA DÖN ──
+  resetStockin();
+  go('products');
 }
 function resetStockin(){
   stopCam('stockin');
