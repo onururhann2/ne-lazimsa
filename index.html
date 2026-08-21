@@ -2607,9 +2607,11 @@ function renderDash(){
   const totalSalesRevenue = sHist.reduce((s, x) => s + (x.totalAmount || 0), 0);
   const totalSalesProfit = sHist.reduce((s, x) => s + (x.totalProfit || 0), 0);
   const val=P.reduce((s,p)=>s+(p.stk*(p.price||0)),0);
+  // Cesit = ana barkod + alt barkodlar (tekil). Barkodsuz urun 1 cesit sayilir.
+  const cesitAdedi=totalVariantCount(P);
 
   document.getElementById('dash-stats').innerHTML=`
-    <div class="stat-card s-blue"><div class="stat-ico">📦</div><div class="stat-val">${P.length}</div><div class="stat-lbl">Toplam Ürün</div><div class="stat-meta">${tl(val)} stok değeri</div></div>
+    <div class="stat-card s-blue"><div class="stat-ico">📦</div><div class="stat-val">${cesitAdedi}</div><div class="stat-lbl">Toplam Çeşit</div><div class="stat-meta">${P.length} ürün kaydı &bull; ${tl(val)} stok değeri</div></div>
     <div class="stat-card s-red"><div class="stat-ico">⚠️</div><div class="stat-val">${crits.length}</div><div class="stat-lbl">Kritik Stok</div><div class="stat-meta">${crits.length>0?'Dikkat gerektiriyor!':'Tüm stoklar normal'}</div></div>
     <div class="stat-card s-green"><div class="stat-ico">🛍️</div><div class="stat-val">${sHist.length}</div><div class="stat-lbl">Tamamlanan Satış</div><div class="stat-meta">Ciro: ${tl(totalSalesRevenue)}</div></div>
     <div class="stat-card s-yellow"><div class="stat-ico">💰</div><div class="stat-val">${tl(totalSalesProfit)}</div><div class="stat-lbl">Toplam Kâr</div><div class="stat-meta">${S.length} tedarikçi</div></div>
@@ -2641,6 +2643,31 @@ function renderDash(){
 }
 
 // ══════════════ PRODUCTS ══════════════
+// Alt barkod alani gecmiste hem dizi hem virgullu metin olarak kaydedilmis;
+// tek yerden normalize edilir.
+function altBarcodesOf(p){
+  if(!p) return [];
+  const raw = p.altBarcodes;
+  const arr = Array.isArray(raw)
+    ? raw
+    : (typeof raw === 'string' && raw.trim() ? raw.split(/[,;\n]+/) : []);
+  return arr.map(b => String(b || '').trim()).filter(Boolean);
+}
+
+// Bir urun kaydinin kac "cesit"e karsilik geldigi.
+// Ana barkod + alt barkodlarin tekilleri; barkodsuz urun 1 cesit sayilir.
+function productVariantCount(p){
+  if(!p) return 0;
+  const codes = new Set(
+    [p.barc, ...altBarcodesOf(p)].map(c => String(c || '').trim().toLowerCase()).filter(Boolean)
+  );
+  return Math.max(1, codes.size);
+}
+
+function totalVariantCount(list){
+  return (list || []).reduce((sum, p) => sum + productVariantCount(p), 0);
+}
+
 function findProductByBarcode(code){
   if(!code) return null;
   const clean = String(code).trim().toLowerCase();
