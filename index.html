@@ -38,6 +38,10 @@ a{color:var(--accent);text-decoration:none}
 .login-logo p{color:var(--txt2);font-size:12px;margin-top:3px}
 .login-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:10px 14px;border-radius:9px;font-size:12px;margin-bottom:14px;display:none}
 .login-hint{text-align:center;color:var(--txt3);font-size:11px;margin-top:12px}
+.login-dl{margin-top:18px;padding-top:18px;border-top:1px solid var(--border2);display:none}
+.login-dl.on{display:block}
+.login-dl .btn{gap:8px;text-decoration:none}
+.login-dl-note{text-align:center;color:var(--txt3);font-size:11px;margin-top:8px;line-height:1.5}
 
 /* ── FORM ── */
 .fg{margin-bottom:14px}
@@ -495,6 +499,13 @@ body.scan-pulse-active {
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
     </button>
     <p class="login-hint">Yönetici: admin@nelazimsa.com / 123456 &bull; Kasiyer: kasiyer / 123456</p>
+    <div class="login-dl" id="login-dl">
+      <a class="btn btn-ghost btn-full" id="login-dl-btn" href="https://github.com/onururhann2/ne-lazimsa/releases/latest" target="_blank" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        <span>Windows Uygulamasını İndir</span>
+      </a>
+      <p class="login-dl-note" id="login-dl-note">Masaüstü sürümü kendini otomatik günceller</p>
+    </div>
   </div>
 </div>
 
@@ -5825,8 +5836,54 @@ async function testAndPullCloud(){
 }
 
 // ══════════════ INIT ══════════════
+
+// ══════════════ MASAÜSTÜ UYGULAMASI İNDİRME ══════════════
+const DESKTOP_REPO = 'onururhann2/ne-lazimsa';
+
+// Electron kabuğunun içindeysek indirme butonunu göstermenin anlamı yok.
+function isDesktopApp(){
+  try{ return String(navigator.userAgent || '').toLowerCase().indexOf('electron') >= 0; }
+  catch(e){ return false; }
+}
+
+function fmtMB(bytes){
+  const mb = Number(bytes) / 1048576;
+  return (isFinite(mb) && mb > 0) ? mb.toFixed(0) + ' MB' : '';
+}
+
+// Kurulum dosyasinin adi surumle degistigi icin link sabit yazilamaz;
+// en son surumu GitHub API uzerinden cozup dogrudan indirme linkine baglariz.
+// API erisilemezse buton yine de surum sayfasina gider.
+async function initDesktopDownload(){
+  const box = document.getElementById('login-dl');
+  if(!box || isDesktopApp()) return;
+  box.classList.add('on');
+
+  try{
+    const res = await fetch('https://api.github.com/repos/' + DESKTOP_REPO + '/releases/latest',
+                            { headers: { Accept: 'application/vnd.github+json' } });
+    if(!res.ok) return;
+    const rel = await res.json();
+    const exe = (rel.assets || []).find(a =>
+      a && typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe'));
+    if(!exe || !exe.browser_download_url) return;
+
+    const btn = document.getElementById('login-dl-btn');
+    if(btn) btn.href = exe.browser_download_url;
+
+    const note = document.getElementById('login-dl-note');
+    if(note){
+      const size = fmtMB(exe.size);
+      const ver = String(rel.tag_name || '').replace(/^v/, '');
+      note.textContent = (ver ? 'Sürüm ' + ver + ' • ' : '')
+        + (size ? size + ' • ' : '') + 'Kendini otomatik günceller';
+    }
+  }catch(e){ /* çevrimdışı: sürüm sayfası linki geçerli kalır */ }
+}
+
 initData();
 checkSess();
+initDesktopDownload();
 </script>
 </body>
 </html>
