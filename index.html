@@ -1016,7 +1016,7 @@ body.scan-pulse-active {
         </div>
       </div>
       <div class="form-row">
-        <div class="fg"><label>Mevcut Stok *</label><input type="number" id="p-stk" required min="0" value="1" placeholder="1"></div>
+        <div class="fg"><label>Mevcut Stok *</label><input type="number" id="p-stk" required min="0" placeholder="Adet girin"></div>
         <div class="fg"><label>Kritik Seviye *</label><input type="number" id="p-min" required min="0" value="5" placeholder="5"></div>
         <div class="fg"><label>Birim</label><select id="p-unit"><option>Adet</option><option>Kg</option><option>Litre</option><option>Metre</option><option>Kutu</option><option>Paket</option><option>Koli</option><option>Bidon</option><option>Çift</option></select></div>
       </div>
@@ -2856,14 +2856,12 @@ function openProdModal(id){
     document.getElementById('p-id').value='';
     document.getElementById('p-alt-barc').value='';
     
-    // Auto-fill smart defaults
-    const activeCatF = document.getElementById('p-cat')?.value || '';
-    const P = gp();
-    const defaultCat = activeCatF || (P.length ? P[P.length-1].cat : 'Kırtasiye');
-    
-    document.getElementById('p-cat2').value = defaultCat || '';
-    document.getElementById('p-stk').value = 1;
-    document.getElementById('p-min').value = 5;
+    // Yeni urun formu BOS acilir. Eskiden kategori, son eklenen urunden
+    // (ya da acik kategori filtresinden) otomatik doluyordu; yanlis kategoriyle
+    // kaydetmeye yol aciyordu. Kategori ve stok artik elle girilir.
+    document.getElementById('p-cat2').value = '';
+    document.getElementById('p-stk').value = '';
+    document.getElementById('p-min').value = 5;      // yalnizca yapilandirma varsayilani
     document.getElementById('p-unit').value = 'Adet';
     document.getElementById('p-price').value = '';
     document.getElementById('p-sell-price').value = '';
