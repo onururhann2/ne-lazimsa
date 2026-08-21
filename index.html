@@ -1273,6 +1273,30 @@ body.scan-pulse-active {
 </div>
 
 <!-- Cloud Sync Modal (Supabase & Firebase) -->
+<!-- WhatsApp bildirim numarası -->
+<div class="overlay" id="m-wa-phone">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr">
+      <h2 class="modal-ttl">📲 WhatsApp Bildirim Numarası</h2>
+      <button class="modal-x" onclick="closeM('m-wa-phone')">×</button>
+    </div>
+    <form onsubmit="saveWaPhone(event)">
+      <div class="fg">
+        <label>Numara</label>
+        <input type="tel" id="wa-phone-input" placeholder="0532 123 45 67" autocomplete="off">
+        <div style="font-size:11px;color:var(--txt3);margin-top:5px">
+          Kritik stok uyarıları bu numaraya hazırlanır. Ülke kodu yazmazsanız Türkiye (+90) varsayılır.
+        </div>
+      </div>
+      <div id="wa-phone-err" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px"></div>
+      <div class="modal-ftr">
+        <button type="button" class="btn btn-ghost" onclick="closeM('m-wa-phone')">Vazgeç</button>
+        <button type="submit" class="btn btn-primary">💾 Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="overlay" id="m-sync">
   <div class="modal modal-lg">
     <div class="modal-hdr"><h2 class="modal-ttl">☁️ Canlı Bulut Senkronizasyon</h2><button class="modal-x" onclick="closeM('m-sync')">×</button></div>
@@ -2948,19 +2972,30 @@ const DEFAULT_WA_PHONE = '905386140376';   // 0538 614 03 76
 
 function getWaPhone(){ return localStorage.getItem('nl_wa_phone') || DEFAULT_WA_PHONE; }
 
+// Electron'da window.prompt() DESTEKLENMEZ (hata firlatir), bu yuzden
+// numara kendi modalimizla alinir.
 function askWaPhone(){
-  const cur = getWaPhone();
-  const input = prompt('Kritik stok bildirimlerinin gönderileceği WhatsApp numarası:\n(örn. 0532 123 45 67)', cur);
-  if(input === null) return null;
-  const norm = normalizePhone(input);
+  const el = document.getElementById('wa-phone-input');
+  const err = document.getElementById('wa-phone-err');
+  if(el) el.value = getWaPhone() ? '+' + getWaPhone() : '';
+  if(err) err.style.display = 'none';
+  openM('m-wa-phone');
+  setTimeout(() => el?.focus(), 120);
+}
+
+function saveWaPhone(e){
+  if(e) e.preventDefault();
+  const el = document.getElementById('wa-phone-input');
+  const err = document.getElementById('wa-phone-err');
+  const norm = normalizePhone(el ? el.value : '');
   if(!norm){
-    toast('w', 'Geçersiz Numara', 'Numarayı 0532 123 45 67 gibi girin.');
-    return null;
+    if(err){ err.textContent = '⚠️ Geçersiz numara. Örnek: 0532 123 45 67'; err.style.display = 'block'; }
+    return;
   }
   localStorage.setItem('nl_wa_phone', norm);
+  closeM('m-wa-phone');
   toast('s', 'Numara Kaydedildi', '+' + norm);
   renderCrit();
-  return norm;
 }
 
 // Kritik ürünleri tedarikçiye göre gruplayan mesaj metni

@@ -1,0 +1,40 @@
+{
+  "name": "ne-lazimsa",
+  "productName": "NE LAZIMSA",
+  "version": "1.0.0",
+  "description": "Stok & Satın Alma Yönetimi",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.nelazimsa.stok",
+    "productName": "NE LAZIMSA",
+    "files": [
+      "index.html",
+      "electron/**/*",
+      "build/icon.png"
+    ],
+    "directories": { "output": "dist" },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NE LAZIMSA",
+      "installerLanguages": ["tr_TR"],
+      "language": "1055"
+    }
+  }
+}
