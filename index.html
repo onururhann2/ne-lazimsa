@@ -652,6 +652,13 @@ body.scan-pulse-active {
     <div class="page" id="page-critical">
       <div class="page-header">
         <div><h1 class="page-title">Kritik Ürünler</h1><p class="page-sub">Minimum seviyenin altındaki ürünler</p></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="askWaPhone()" id="crit-wa-num" title="Bildirim numarasını değiştir">⚙️ Numara</button>
+          <button class="btn btn-primary" onclick="sendCriticalToWhatsApp()" style="background:#25D366;border-color:#25D366">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.39-1.47-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.06 2.87 1.21 3.07.15.2 2.09 3.2 5.07 4.49.71.31 1.26.49 1.69.62.71.23 1.36.19 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35z"/><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 18.15h-.01c-1.52 0-3.01-.41-4.31-1.18l-.31-.18-3.2.84.85-3.12-.2-.32a8.22 8.22 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.24-8.23 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.69 8.23-8.23 8.23z"/></svg>
+            WhatsApp'a Gönder
+          </button>
+        </div>
       </div>
       <div class="tbl-wrap"><table><thead><tr><th>Ürün</th><th>Kategori</th><th>Mevcut</th><th>Min. Seviye</th><th>Eksik</th><th>Tedarikçi</th><th>İşlem</th></tr></thead><tbody id="crit-tbody"></tbody></table></div>
     </div>
@@ -2915,11 +2922,132 @@ function saveProd(e){
 function delProd(id){if(!confirm('Bu ürünü silmek istediğinize emin misiniz?'))return;sp(gp().filter(p=>p.id!==id));renderProds();updBadge();toast('s','Silindi','Ürün silindi');}
 
 // ══════════════ CRITICAL ══════════════
+// ══════════════ KRİTİK STOK → WHATSAPP ══════════════
+// Uygulama sunucusuz çalıştığı için mesaj otomatik GÖNDERİLEMEZ (bunun için
+// bir sunucu ve WhatsApp Cloud API anahtarı gerekir; anahtar tarayıcıya
+// konulamaz). Bunun yerine WhatsApp "tıkla-konuş" bağlantısı kullanılır:
+// mesaj hazır olarak açılır, gönder tuşuna kullanıcı basar.
+
+// Telefonu WhatsApp'ın beklediği uluslararası biçime çevirir (TR varsayılan).
+// Gecersiz ise null doner.
+function normalizePhone(raw){
+  let d = String(raw || '').replace(/[^0-9]/g, '');
+  if(!d) return null;
+  if(d.startsWith('00')) d = d.slice(2);
+  if(d.startsWith('0')) d = d.slice(1);          // 0532... -> 532..., 0212... -> 212...
+  // TR numaralari 10 hanedir: cep 5xx, sabit hat 2xx/3xx/4xx
+  if(d.length === 10 && /^[2-5]/.test(d)) d = '90' + d;
+  if(d.length === 12 && d.startsWith('90')) return d;
+  if(d.length >= 11 && d.length <= 15) return d; // yurt disi numaralar
+  return null;
+}
+
+function getWaPhone(){ return localStorage.getItem('nl_wa_phone') || ''; }
+
+function askWaPhone(){
+  const cur = getWaPhone();
+  const input = prompt('Kritik stok bildirimlerinin gönderileceği WhatsApp numarası:\n(örn. 0532 123 45 67)', cur);
+  if(input === null) return null;
+  const norm = normalizePhone(input);
+  if(!norm){
+    toast('w', 'Geçersiz Numara', 'Numarayı 0532 123 45 67 gibi girin.');
+    return null;
+  }
+  localStorage.setItem('nl_wa_phone', norm);
+  toast('s', 'Numara Kaydedildi', '+' + norm);
+  renderCrit();
+  return norm;
+}
+
+// Kritik ürünleri tedarikçiye göre gruplayan mesaj metni
+function buildCriticalMessage(items, S){
+  const bugun = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const lines = ['🔴 KRİTİK STOK UYARISI', bugun, ''];
+
+  const gruplar = new Map();
+  items.forEach(p => {
+    const sup = S.find(x => x.id === p.sup);
+    const ad = sup ? sup.name : 'Tedarikçi atanmamış';
+    if(!gruplar.has(ad)) gruplar.set(ad, []);
+    gruplar.get(ad).push(p);
+  });
+
+  // wa.me baglantisi bir URL'dir; cok uzarsa WhatsApp mesaji kirpar veya
+  // baglantiyi acmaz. Turkce karakterler URL kodlamasinda 3 kata cikabildigi
+  // icin satir sayisi degil, KODLANMIS uzunluk butcesi kullanilir.
+  const BUDGET = 1500;
+  let yazilan = 0, dolu = false;
+
+  for(const [ad, list] of gruplar){
+    if(dolu) break;
+    lines.push('🏭 ' + ad);
+    for(const p of list){
+      const eksik = Math.max(0, (p.min || 0) - (p.stk || 0));
+      const satir = '• ' + p.name + ' — mevcut ' + p.stk + ' ' + p.unit +
+                    ' (min ' + p.min + ') → ' + eksik + ' ' + p.unit + ' eksik';
+      if(encodeURIComponent(lines.join('\n') + '\n' + satir).length > BUDGET){ dolu = true; break; }
+      lines.push(satir);
+      yazilan++;
+    }
+    lines.push('');
+  }
+  if(items.length > yazilan) lines.push('…ve ' + (items.length - yazilan) + ' ürün daha');
+  lines.push('Toplam ' + items.length + ' ürün kritik seviyede.');
+  return lines.join('\n');
+}
+
+function openWhatsApp(phone, message){
+  const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+  window.open(url, '_blank', 'noopener');
+}
+
+// Kritik listenin tamamını kayıtlı numaraya gönder
+function sendCriticalToWhatsApp(){
+  const items = gp().filter(p => sst(p) === 'crit');
+  if(!items.length){
+    toast('i', 'Kritik Ürün Yok', 'Gönderilecek bir uyarı bulunmuyor.');
+    return;
+  }
+  let phone = getWaPhone();
+  if(!phone){ phone = askWaPhone(); if(!phone) return; }
+  openWhatsApp(phone, buildCriticalMessage(items, gs()));
+}
+
+// Tek tedarikçiye, yalnızca ona ait kritik ürünlerin siparişi
+function sendSupplierOrderToWhatsApp(supId){
+  const S = gs();
+  const sup = S.find(s => s.id === supId);
+  if(!sup) return;
+  const phone = normalizePhone(sup.tel);
+  if(!phone){
+    toast('w', 'Telefon Yok', sup.name + ' için geçerli bir telefon kayıtlı değil. Tedarikçiler ekranından ekleyin.');
+    return;
+  }
+  const items = gp().filter(p => sst(p) === 'crit' && p.sup === supId);
+  if(!items.length) return;
+  openWhatsApp(phone, buildCriticalMessage(items, S));
+}
+
 function renderCrit(){
   const P=gp().filter(p=>sst(p)==='crit'),S=gs();
   const tb=document.getElementById('crit-tbody');
+
+  // Kayitli bildirim numarasini butonda goster
+  const numBtn=document.getElementById('crit-wa-num');
+  if(numBtn){
+    const ph=getWaPhone();
+    numBtn.textContent = ph ? ('⚙️ +'+ph) : '⚙️ Numara Ekle';
+  }
+
   if(!P.length){tb.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-icon">✅</div><h3>Harika! Kritik ürün yok</h3><p>Tüm stok seviyeleri normal.</p></div></td></tr>';return;}
-  tb.innerHTML=P.map(p=>{const sup=S.find(s=>s.id===p.sup),miss=Math.max(0,p.min-p.stk);return`<tr class="crit-row"><td style="font-weight:600">${p.name}</td><td><span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px">${p.cat}</span></td><td><span class="badge b-danger">${p.stk} ${p.unit}</span></td><td style="color:var(--txt2)">${p.min} ${p.unit}</td><td style="color:var(--yellow);font-weight:700">+${miss} ${p.unit}</td><td>${sup?sup.name:'—'}</td><td><button class="btn btn-warning btn-sm" onclick="openQuickStockModal(gp().find(x=>x.id===${p.id}))">➕ Stok Ekle</button></td></tr>`;}).join('');
+  tb.innerHTML=P.map(p=>{
+    const sup=S.find(s=>s.id===p.sup), miss=Math.max(0,p.min-p.stk);
+    // Tedarikcinin telefonu varsa dogrudan ona siparis mesaji atma butonu
+    const waBtn = (sup && normalizePhone(sup.tel))
+      ? `<button class="btn btn-sm" onclick="sendSupplierOrderToWhatsApp(${sup.id})" title="${sup.name} firmasına WhatsApp'tan sipariş gönder" style="background:#25D366;color:#04231a;font-weight:700">📲</button>`
+      : '';
+    return `<tr class="crit-row"><td style="font-weight:600">${p.name}</td><td><span style="background:var(--bg3);padding:2px 9px;border-radius:20px;font-size:11px">${p.cat}</span></td><td><span class="badge b-danger">${p.stk} ${p.unit}</span></td><td style="color:var(--txt2)">${p.min} ${p.unit}</td><td style="color:var(--yellow);font-weight:700">+${miss} ${p.unit}</td><td>${sup?sup.name:'—'}</td><td><div class="flex gap-2"><button class="btn btn-warning btn-sm" onclick="openQuickStockModal(gp().find(x=>x.id===${p.id}))">➕ Stok Ekle</button>${waBtn}</div></td></tr>`;
+  }).join('');
 }
 
 // ══════════════ SUPPLIERS ══════════════
