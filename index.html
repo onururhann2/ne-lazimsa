@@ -819,8 +819,8 @@ body.scan-pulse-active {
           <!-- Sales history -->
           <div class="card" style="padding:18px;margin-top:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-              <div style="font-size:13px;font-weight:700">Tamamlanan Satışlar</div>
-              <span id="sales-hist-count" class="badge b-blue" style="font-size:11px">Son 100 Satış</span>
+              <div style="font-size:13px;font-weight:700">Bugünkü Satışlar</div>
+              <span id="sales-hist-count" class="badge b-blue" style="font-size:11px">0 Satış</span>
             </div>
             <div id="sales-history" style="display:flex;flex-direction:column;gap:6px;max-height:460px;overflow-y:auto">
               <div style="color:var(--txt3);font-size:13px;text-align:center;padding:16px">Henüz tamamlanan satış yok</div>
@@ -1582,9 +1582,11 @@ function scheduleMidnightReset(){
   if(midnightTimer) clearTimeout(midnightTimer);
   midnightTimer = setTimeout(() => {
     try{
+      // Gunluk kapsamli her iki gorunum de tazelenir
+      renderSalesHistory();
       const active = document.querySelector('.page.active');
       if(active && active.id === 'page-dashboard') renderDash();
-      if(typeof toast === 'function') toast('i', 'Yeni Gun Basladi', 'Gunluk satis sayaclari sifirlandi. Onceki gunler Raporlar ekraninda.');
+      toast('i', 'Yeni Gün Başladı', 'Günlük satış sayaçları sıfırlandı. Önceki günler Raporlar ekranında.');
     }catch(e){}
     scheduleMidnightReset();
   }, msUntilTrMidnight() + 1500);
@@ -1641,6 +1643,8 @@ function initData(){
   if(!ls('nl_theme')) ls('nl_theme','dark');
   
   setupRealtimeSync();
+  // TR gece yarisinda gunluk sayaclari sifirla (Dashboard'a hic girilmese bile)
+  scheduleMidnightReset();
 }
 
 function ls(k,v){if(v!==undefined)localStorage.setItem(k,v);else return localStorage.getItem(k)}
@@ -2475,7 +2479,6 @@ function renderDash(){
   const gunlukCiro = sBugun.reduce((s, x) => s + (x.totalAmount || 0), 0);
   const gunlukKar  = sBugun.reduce((s, x) => s + (x.totalProfit || 0), 0);
   const gunlukAdet = sBugun.reduce((s, x) => s + (x.items || []).reduce((a,b)=>a+(b.qty||0),0), 0);
-  scheduleMidnightReset();
   const val=P.reduce((s,p)=>s+(p.stk*(p.price||0)),0);
   // Cesit = ana barkod + alt barkodlar (tekil). Barkodsuz urun 1 cesit sayilir.
   const cesitAdedi=totalVariantCount(P);
@@ -4759,13 +4762,17 @@ function renderSalesHistory(){
   const hist = document.getElementById('sales-history');
   const countEl = document.getElementById('sales-hist-count');
   if(!hist) return;
-  const sHist = gsh();
-  if(!sHist || sHist.length === 0){
-    hist.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:16px">Henüz tamamlanan satış yok</div>';
+  // Bu liste de Dashboard gibi YALNIZCA bugunu (TR saati) gosterir.
+  // Gecmis gunler Raporlar ekranindaki tarih araligi ile goruntulenir.
+  const bugunTR = trDateStr();
+  const sHist = gsh().filter(x => isTodayTR(x, bugunTR));
+  if(!sHist.length){
+    hist.innerHTML = '<div style="color:var(--txt3);font-size:13px;text-align:center;padding:16px">Bugün henüz satış yok<br><span style="font-size:11px">Geçmiş satışlar Raporlar ekranında</span></div>';
     if(countEl) countEl.textContent = '0 Satış';
     return;
   }
-  if(countEl) countEl.textContent = `${sHist.length} Satış`;
+  const gunlukCiro = sHist.reduce((a, x) => a + (x.totalAmount || 0), 0);
+  if(countEl) countEl.textContent = `${sHist.length} Satış • ${tl(gunlukCiro)}`;
   hist.innerHTML = sHist.map(s => {
     const summary = (s.items || []).map(c => `${c.name} x${c.qty}`).join(', ');
     const userLabel = s.user ? ` <span style="color:var(--txt3);font-size:11px">(${s.user})</span>` : '';
