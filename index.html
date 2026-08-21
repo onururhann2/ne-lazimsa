@@ -567,6 +567,12 @@ body.scan-pulse-active {
       <div class="nav-item" id="nav-sync" onclick="openSyncModal()">
         <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg></span>Bulut Senkronizasyon
       </div>
+      <a class="nav-item" id="nav-desktop-dl" style="display:none;text-decoration:none"
+         href="https://github.com/onururhann2/ne-lazimsa/releases/latest"
+         target="_blank" rel="noopener" onclick="closeSidebar()"
+         title="Windows masaüstü uygulamasını indir">
+        <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></span>Masaüstü Uygulaması
+      </a>
       <div class="nav-sec">Analiz</div>
       <div class="nav-item" id="nav-reports" onclick="go('reports')">
         <span class="nav-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Raporlar
@@ -5853,11 +5859,14 @@ function fmtMB(bytes){
 
 // Kurulum dosyasinin adi surumle degistigi icin link sabit yazilamaz;
 // en son surumu GitHub API uzerinden cozup dogrudan indirme linkine baglariz.
-// API erisilemezse buton yine de surum sayfasina gider.
+// API erisilemezse butonlar yine de surum sayfasina gider.
 async function initDesktopDownload(){
-  const box = document.getElementById('login-dl');
-  if(!box || isDesktopApp()) return;
-  box.classList.add('on');
+  if(isDesktopApp()) return;   // zaten masaüstü uygulamasının içindeyiz
+
+  const box  = document.getElementById('login-dl');        // giriş ekranı bölümü
+  const nav  = document.getElementById('nav-desktop-dl');  // kenar menü öğesi
+  if(box) box.classList.add('on');
+  if(nav) nav.style.display = 'flex';
 
   try{
     const res = await fetch('https://api.github.com/repos/' + DESKTOP_REPO + '/releases/latest',
@@ -5868,13 +5877,19 @@ async function initDesktopDownload(){
       a && typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe'));
     if(!exe || !exe.browser_download_url) return;
 
+    const ver  = String(rel.tag_name || '').replace(/^v/, '');
+    const size = fmtMB(exe.size);
+
     const btn = document.getElementById('login-dl-btn');
     if(btn) btn.href = exe.browser_download_url;
+    if(nav){
+      nav.href  = exe.browser_download_url;
+      nav.title = 'Windows masaüstü uygulamasını indir'
+        + (ver ? ' (sürüm ' + ver : '') + (ver && size ? ', ' + size : '') + (ver ? ')' : '');
+    }
 
     const note = document.getElementById('login-dl-note');
     if(note){
-      const size = fmtMB(exe.size);
-      const ver = String(rel.tag_name || '').replace(/^v/, '');
       note.textContent = (ver ? 'Sürüm ' + ver + ' • ' : '')
         + (size ? size + ' • ' : '') + 'Kendini otomatik günceller';
     }
@@ -5882,8 +5897,8 @@ async function initDesktopDownload(){
 }
 
 initData();
-checkSess();
 initDesktopDownload();
+checkSess();
 </script>
 </body>
 </html>
