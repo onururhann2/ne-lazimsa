@@ -592,7 +592,7 @@ body.scan-pulse-active {
       <div class="stats-grid" id="dash-stats"></div>
       <div class="grid-2">
         <div class="tbl-wrap">
-          <div class="tbl-head"><span class="tbl-title">Son Satışlar</span><button class="btn btn-ghost btn-sm" onclick="go('sales')">Satış Ekranı →</button></div>
+          <div class="tbl-head"><span class="tbl-title">Bugünkü Satışlar</span><button class="btn btn-ghost btn-sm" onclick="go('reports')">Geçmiş Raporlar →</button></div>
           <table><thead><tr><th>Fiş No</th><th>Tutar</th><th>Zaman</th></tr></thead><tbody id="dash-sales"></tbody></table>
         </div>
         <div class="tbl-wrap">
@@ -1547,6 +1547,49 @@ function getTimeStr(d = new Date()){
   return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+// ── TURKIYE GUNU (Europe/Istanbul) ──
+// Cihazin saat dilimi ne olursa olsun gun siniri TR'ye gore hesaplanir.
+function trDateStr(d = new Date()){
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(d);
+}
+
+// Kayit bugune (TR) ait mi? id epoch ms oldugu icin saat diliminden bagimsizdir;
+// eski kayitlarda id yoksa date alanina dusulur.
+function isTodayTR(rec, today = trDateStr()){
+  if(!rec) return false;
+  if(typeof rec.id === 'number' && rec.id > 1000000000000){
+    return trDateStr(new Date(rec.id)) === today;
+  }
+  return rec.date === today;
+}
+
+// TR gece yarisina kalan sure (ms)
+function msUntilTrMidnight(){
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).formatToParts(now).reduce((a, x) => (a[x.type] = x.value, a), {});
+  const h = Number(parts.hour) % 24, m = Number(parts.minute), sec = Number(parts.second);
+  const elapsed = ((h * 60 + m) * 60 + sec) * 1000 + now.getMilliseconds();
+  return Math.max(1000, 86400000 - elapsed);
+}
+
+// Gece yarisi gelince Dashboard sayaclarini sifirla (sayfa acik kalsa bile)
+let midnightTimer = null;
+function scheduleMidnightReset(){
+  if(midnightTimer) clearTimeout(midnightTimer);
+  midnightTimer = setTimeout(() => {
+    try{
+      const active = document.querySelector('.page.active');
+      if(active && active.id === 'page-dashboard') renderDash();
+      if(typeof toast === 'function') toast('i', 'Yeni Gun Basladi', 'Gunluk satis sayaclari sifirlandi. Onceki gunler Raporlar ekraninda.');
+    }catch(e){}
+    scheduleMidnightReset();
+  }, msUntilTrMidnight() + 1500);
+}
+
 function initData(){
   // Run mock data cleanup ONLY ONCE on initial launch so subsequent sales are never wiped
   if(!localStorage.getItem('nl_mock_sanitized_v4')){
@@ -2426,8 +2469,13 @@ function closeSidebar(){
 function renderDash(){
   const P=gp(), S=gs(), sHist=gsh();
   const crits=P.filter(p=>sst(p)==='crit');
-  const totalSalesRevenue = sHist.reduce((s, x) => s + (x.totalAmount || 0), 0);
-  const totalSalesProfit = sHist.reduce((s, x) => s + (x.totalProfit || 0), 0);
+  // Dashboard YALNIZCA bugunu (TR saati) gosterir; gecmis Raporlar ekraninda.
+  const bugunTR = trDateStr();
+  const sBugun = sHist.filter(x => isTodayTR(x, bugunTR));
+  const gunlukCiro = sBugun.reduce((s, x) => s + (x.totalAmount || 0), 0);
+  const gunlukKar  = sBugun.reduce((s, x) => s + (x.totalProfit || 0), 0);
+  const gunlukAdet = sBugun.reduce((s, x) => s + (x.items || []).reduce((a,b)=>a+(b.qty||0),0), 0);
+  scheduleMidnightReset();
   const val=P.reduce((s,p)=>s+(p.stk*(p.price||0)),0);
   // Cesit = ana barkod + alt barkodlar (tekil). Barkodsuz urun 1 cesit sayilir.
   const cesitAdedi=totalVariantCount(P);
@@ -2435,20 +2483,20 @@ function renderDash(){
   document.getElementById('dash-stats').innerHTML=`
     <div class="stat-card s-blue"><div class="stat-ico">📦</div><div class="stat-val">${cesitAdedi}</div><div class="stat-lbl">Toplam Çeşit</div><div class="stat-meta">${P.length} ürün kaydı &bull; ${tl(val)} stok değeri</div></div>
     <div class="stat-card s-red"><div class="stat-ico">⚠️</div><div class="stat-val">${crits.length}</div><div class="stat-lbl">Kritik Stok</div><div class="stat-meta">${crits.length>0?'Dikkat gerektiriyor!':'Tüm stoklar normal'}</div></div>
-    <div class="stat-card s-green"><div class="stat-ico">🛍️</div><div class="stat-val">${sHist.length}</div><div class="stat-lbl">Tamamlanan Satış</div><div class="stat-meta">Ciro: ${tl(totalSalesRevenue)}</div></div>
-    <div class="stat-card s-yellow"><div class="stat-ico">💰</div><div class="stat-val">${tl(totalSalesProfit)}</div><div class="stat-lbl">Toplam Kâr</div><div class="stat-meta">${S.length} tedarikçi</div></div>
+    <div class="stat-card s-green"><div class="stat-ico">🛍️</div><div class="stat-val">${sBugun.length}</div><div class="stat-lbl">Bugünkü Satış</div><div class="stat-meta">Ciro: ${tl(gunlukCiro)} &bull; ${gunlukAdet} adet</div></div>
+    <div class="stat-card s-yellow"><div class="stat-ico">💰</div><div class="stat-val">${tl(gunlukKar)}</div><div class="stat-lbl">Bugünkü Kâr</div><div class="stat-meta">Geçmiş dönemler için Raporlar</div></div>
   `;
 
   const banner=document.getElementById('dash-banner');
   banner.innerHTML=crits.length?`<div class="alert-banner"><span style="font-size:20px">🔴</span><div style="flex:1"><div class="alert-banner-title">Kritik Stok Uyarısı — ${crits.length} ürün minimum seviyenin altında!</div><div class="alert-banner-sub">${crits.slice(0,3).map(p=>p.name).join(', ')}${crits.length>3?' ve daha fazlası...':''}</div></div><button class="btn btn-danger btn-sm" onclick="go('critical')">Görüntüle</button></div>`:'';
 
   // Recent Sales Table
-  const sales5=[...sHist].slice(0, 5);
+  const sales5=[...sBugun].slice(0, 5);
   const salesTbody = document.getElementById('dash-sales');
   if(salesTbody){
     salesTbody.innerHTML = sales5.length ? sales5.map(s => {
       return `<tr><td class="mono" style="font-weight:600">${s.receiptNo || '#'}</td><td style="font-weight:700;color:var(--accent)">${tl(s.totalAmount || 0)}</td><td style="color:var(--txt2);font-size:12px">${s.time || ''}</td></tr>`;
-    }).join('') : '<tr><td colspan="3"><div class="empty" style="padding:20px">Henüz tamamlanan satış yok</div></td></tr>';
+    }).join('') : '<tr><td colspan="3"><div class="empty" style="padding:20px">Bugün henüz satış yok</div></td></tr>';
   }
 
   // Critical items table
@@ -4535,6 +4583,14 @@ function handleRemoteScan(code, senderId, senderName, eventId){
 }
 
 // ══════════════ SALES ══════════════
+// ── SATIS EKRANI OKUTMA BEKLEME SURELERI (ms) ──
+// Tabanca/elle giris ayrik olaylardir; 150 ms arka arkaya okutma icin yeterli.
+// Kamera ise ayni barkodu saniyede defalarca gorur; tek okutmanin sepete
+// 10 kez eklenmemesi icin kamerada ayni barkoda daha uzun bir kilit uygulanir.
+const SALES_SCAN_GAP_MS = 150;       // arka arkaya FARKLI urun
+const SALES_SAME_GAP_MS = 150;       // ayni urunu tekrar okutma (tabanca/elle)
+const SALES_CAM_SAME_GAP_MS = 1500;  // kamerada ayni barkod
+
 function initSales(){
   salesScannedProdId=null;
   document.getElementById('sales-prod-card').style.display='none';
@@ -4542,12 +4598,13 @@ function initSales(){
   document.getElementById('sales-scan-res').innerHTML='<span style="color:var(--txt3)">Ürün barkodunu okutun...</span>';
   renderCart();
   renderSalesHistory();
-  // start camera with 5.0s cooldown for identical item, 2.5s for different item
+  // Kamera surekli goruntu akisi oldugu icin ayni barkoda daha uzun kilit;
+  // farkli urunler arasinda tabanca ile ayni hizda (150 ms) calisir.
   let lastSC=null,lastSCt=0;
   startCam('sales-video','sales',(code)=>{
     const now=Date.now();
-    if(code===lastSC && now-lastSCt < 5000) return;
-    if(now-lastSCt < 2500) return;
+    if(code===lastSC && now-lastSCt < SALES_CAM_SAME_GAP_MS) return;
+    if(now-lastSCt < SALES_SCAN_GAP_MS) return;
     lastSC=code;lastSCt=now;
     onSalesScan(code);
   });
@@ -4559,11 +4616,11 @@ function onSalesScan(code, fromRemote = false){
   if(!cleanCode) return;
 
   const now = Date.now();
-  // Strictly prevent duplicate scan triggers (regardless of local or remote)
-  if(cleanCode === lastSalesScanCode && (now - lastSalesScanTime < 4000)){
+  // Cift tetiklemeyi engelle (yerel veya uzak fark etmez)
+  if(cleanCode === lastSalesScanCode && (now - lastSalesScanTime < SALES_SAME_GAP_MS)){
     return;
   }
-  if(now - lastSalesScanTime < 1000){
+  if(now - lastSalesScanTime < SALES_SCAN_GAP_MS){
     return;
   }
 
