@@ -2280,6 +2280,22 @@ function makeSbClient(){
 }
 function ensureSbClient(){ return sbClient || makeSbClient(); }
 
+// Barindirilan sitenin adresi. Dogrulama ve sifre sifirlama e-postalarindaki
+// baglantilar buraya doner.
+const APP_WEB_URL = 'https://ne-lazimsa.vercel.app/';
+
+// Masaustu uygulamasi sayfayi file:// uzerinden yukler; boyle bir adres bir
+// e-posta baglantisinin hedefi olamaz (kullanicinin makinesindeki dosyaya
+// gidemez). Bu yuzden web disindaki her durumda siteye yonlendiriyoruz:
+// kullanici linke tiklayip hesabini sitede dogrular, sonra masaustunden girer.
+// http/https ile aciliyorsa bulundugu adres kullanilir; boylece localhost'ta
+// gelistirme ve Vercel onizleme dagitimlari da calisir.
+function authRedirectUrl(){
+  const p = location.protocol;
+  if(p === 'http:' || p === 'https:') return location.origin + location.pathname;
+  return APP_WEB_URL;
+}
+
 // ── giriş ekranı yardımcıları ──
 function loginClear(){
   ['login-err','login-ok'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
@@ -2361,7 +2377,7 @@ async function doRegister(){
   try{
     const { data, error } = await sb.auth.signUp({
       email, password: pass,
-      options: { data: { store_name: store, full_name: name }, emailRedirectTo: location.href.split('#')[0] }
+      options: { data: { store_name: store, full_name: name }, emailRedirectTo: authRedirectUrl() }
     });
     if(error){ loginErr('❌ ' + authErrText(error)); return; }
 
@@ -2508,7 +2524,7 @@ async function doResetPassword(){
   const sb = ensureSbClient();
   if(!sb) return loginErr('⚠️ Sunucuya bağlanılamadı.');
   try{
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.href.split('#')[0] });
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: authRedirectUrl() });
     if(error) return loginErr('❌ ' + authErrText(error));
     loginOk('✅ ' + email + ' adresine şifre sıfırlama bağlantısı gönderildi.');
   }catch(e){ loginErr('⚠️ ' + authErrText(e)); }
