@@ -1,8 +1,8 @@
 {
-  "name": "ne-lazimsa",
-  "productName": "NE LAZIMSA",
+  "name": "stakip",
+  "productName": "Stakip",
   "version": "1.0.0",
-  "description": "Stok & Satın Alma Yönetimi",
+  "description": "Stakip — mağazanız için stok ve satış yönetimi",
   "main": "electron/main.js",
   "private": true,
   "scripts": {
@@ -15,8 +15,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.nelazimsa.stok",
-    "productName": "NE LAZIMSA",
+    "appId": "com.stakip.app",
+    "productName": "Stakip",
     "files": [
       "index.html",
       "electron/**/*",
@@ -42,7 +42,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "NE LAZIMSA",
+      "shortcutName": "Stakip",
       "installerLanguages": [
         "tr_TR"
       ],

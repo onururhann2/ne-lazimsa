@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KILIÇSAYMAZ TEKNOLOJİ MARKET - Stok Yönetimi</title>
-<meta name="description" content="KILIÇSAYMAZ TEKNOLOJİ MARKET - Stok ve Satış Yönetim Sistemi">
+<title>Stakip — Mağaza Stok Yönetimi</title>
+<meta name="description" content="Stakip — mağazanız için stok ve satış yönetimi">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js"></script>
@@ -38,6 +38,10 @@ a{color:var(--accent);text-decoration:none}
 .login-logo p{color:var(--txt2);font-size:12px;margin-top:3px}
 .login-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:10px 14px;border-radius:9px;font-size:12px;margin-bottom:14px;display:none}
 .login-hint{text-align:center;color:var(--txt3);font-size:11px;margin-top:12px}
+.login-ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#6ee7b7;padding:10px 14px;border-radius:9px;font-size:12px;margin-bottom:14px;display:none;line-height:1.5}
+.login-swap{text-align:center;font-size:12px;color:var(--txt2);margin-top:14px}
+.login-swap button{background:none;border:none;color:var(--accent);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;padding:0 2px;text-decoration:underline}
+.login-swap button:hover{opacity:.8}
 .login-dl{margin-top:18px;padding-top:18px;border-top:1px solid var(--border2);display:none}
 .login-dl.on{display:block}
 .login-dl .btn{gap:8px;text-decoration:none}
@@ -488,17 +492,58 @@ body.scan-pulse-active {
   <div class="login-card">
     <div class="login-logo">
       <div class="login-icon">📦</div>
-      <h1>KILIÇSAYMAZ TEKNOLOJİ MARKET</h1>
-      <p>Stok &amp; Satın Alma Yönetimi</p>
+      <h1>Stakip</h1>
+      <p>Mağazanızın stok &amp; satış yönetimi</p>
     </div>
-    <div class="login-err" id="login-err">❌ Kullanıcı adı / e-posta veya şifre hatalı!</div>
-    <div class="fg"><label>Kullanıcı Adı veya E-posta</label><input type="text" id="l-email" value="admin@nelazimsa.com" placeholder="admin veya kasiyer1"></div>
-    <div class="fg"><label>Şifre / PIN</label><input type="password" id="l-pass" value="123456" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button class="btn btn-primary btn-full" onclick="doLogin()">
-      <span>Giriş Yap</span>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-    </button>
-    <p class="login-hint">Yönetici: admin@nelazimsa.com / 123456 &bull; Kasiyer: kasiyer / 123456</p>
+    <div class="login-err" id="login-err"></div>
+    <div class="login-ok" id="login-ok"></div>
+
+    <!-- ── GİRİŞ ── -->
+    <div id="pane-login">
+      <div class="fg"><label>E-posta veya Kullanıcı Adı</label>
+        <input type="text" id="l-email" placeholder="ornek@magazam.com veya kasiyer1" autocomplete="username"></div>
+      <div class="fg"><label>Şifre</label>
+        <input type="password" id="l-pass" placeholder="••••••" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()">
+        <span>Giriş Yap</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+      <p class="login-hint" style="margin-top:10px"><button type="button" onclick="doResetPassword()" style="background:none;border:none;color:var(--txt2);font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">Şifremi unuttum</button></p>
+      <div class="login-swap">Mağazanız yok mu? <button type="button" onclick="showRegister()">Ücretsiz mağaza açın</button></div>
+    </div>
+
+    <!-- ── YENİ ŞİFRE (e-postadaki sıfırlama bağlantısından gelinince) ── -->
+    <div id="pane-newpass" style="display:none">
+      <p class="login-hint" style="margin:0 0 12px;text-align:left;line-height:1.5">Yeni şifrenizi belirleyin.</p>
+      <div class="fg"><label>Yeni Şifre</label>
+        <input type="password" id="n-pass" placeholder="En az 8 karakter" autocomplete="new-password"></div>
+      <div class="fg"><label>Yeni Şifre (tekrar)</label>
+        <input type="password" id="n-pass2" placeholder="Şifreyi tekrar yazın" autocomplete="new-password"
+               onkeydown="if(event.key==='Enter')doSetNewPassword()"></div>
+      <button class="btn btn-primary btn-full" onclick="doSetNewPassword()"><span>Şifremi Güncelle</span></button>
+      <div class="login-swap"><button type="button" onclick="showLogin()">Vazgeç</button></div>
+    </div>
+
+    <!-- ── KAYIT ── -->
+    <div id="pane-register" style="display:none">
+      <div class="fg"><label>Mağaza Adı</label>
+        <input type="text" id="r-store" placeholder="Örn. Onur Teknoloji Market" maxlength="60"></div>
+      <div class="fg"><label>Adınız Soyadınız</label>
+        <input type="text" id="r-name" placeholder="Ad Soyad" maxlength="60" autocomplete="name"></div>
+      <div class="fg"><label>E-posta</label>
+        <input type="email" id="r-email" placeholder="ornek@magazam.com" autocomplete="email"></div>
+      <div class="fg"><label>Şifre</label>
+        <input type="password" id="r-pass" placeholder="En az 8 karakter" autocomplete="new-password"></div>
+      <div class="fg"><label>Şifre (tekrar)</label>
+        <input type="password" id="r-pass2" placeholder="Şifreyi tekrar yazın" autocomplete="new-password"
+               onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <button class="btn btn-primary btn-full" onclick="doRegister()">
+        <span>Mağazamı Aç</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+      <div class="login-swap">Zaten hesabınız var mı? <button type="button" onclick="showLogin()">Giriş yapın</button></div>
+    </div>
     <div class="login-dl" id="login-dl">
       <a class="btn btn-ghost btn-full" id="login-dl-btn" href="https://github.com/onururhann2/ne-lazimsa/releases/latest" target="_blank" rel="noopener">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -512,7 +557,7 @@ body.scan-pulse-active {
 <!-- ═══════════════ APP ═══════════════ -->
 <!-- MOBILE HEADER -->
 <div class="mobile-header" id="mobile-header">
-  <div class="mob-logo" onclick="go('dashboard')" style="cursor:pointer">KILIÇSAYMAZ TEKNOLOJİ MARKET</div>
+  <div class="mob-logo" id="mob-store-name" onclick="go('dashboard')" style="cursor:pointer">Stakip</div>
   <div style="display:flex;align-items:center;gap:6px">
     <div id="mob-sync-pill" class="sync-pill" onclick="openSyncModal()" title="Bulut Senkronizasyon Durumu">
       <span class="sync-dot"></span><span id="mob-sync-txt">Canlı</span>
@@ -533,8 +578,8 @@ body.scan-pulse-active {
     <div class="sidebar-logo">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div>
-          <div class="logo-text">KILIÇSAYMAZ TEKNOLOJİ MARKET</div>
-          <div class="logo-sub">Stok Yönetimi</div>
+          <div class="logo-text" id="side-store-name">Stakip</div>
+          <div class="logo-sub" id="side-store-sub">Stok Yönetimi</div>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
           <div id="desk-sync-pill" class="sync-pill" onclick="openSyncModal()" title="Bulut Senkronizasyon">
@@ -592,7 +637,7 @@ body.scan-pulse-active {
         <div class="u-avatar" id="u-av">A</div>
         <div style="flex:1;min-width:0">
           <div class="u-name" id="u-name">Admin</div>
-          <div class="u-email" id="u-email">admin@nelazimsa.com</div>
+          <div class="u-email" id="u-email"></div>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:.6"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
@@ -1368,33 +1413,41 @@ body.scan-pulse-active {
         </div>
       </div>
       <div class="fg">
-        <label>Şirket / Depo Kanal Kodu</label>
-        <input type="text" id="sb-channel-input" value="ana_depo" placeholder="ana_depo" style="font-weight:700">
+        <label>Bağlı Mağaza</label>
+        <input type="text" id="sb-channel-input" readonly
+               style="font-weight:700;opacity:.75;cursor:not-allowed"
+               title="Mağaza kimliği hesabınıza bağlıdır ve elle değiştirilemez">
+        <p style="font-size:11px;color:var(--txt3);margin-top:5px;line-height:1.5">
+          Verileriniz bu mağaza kimliğine bağlı. Başka bir mağazanın verisi bu cihaza gelemez.
+        </p>
       </div>
 
       <!-- Supabase Quick SQL Guide -->
       <details style="margin-top:10px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:12px">
-        <summary style="font-size:12px;font-weight:700;color:var(--green);cursor:pointer">📖 Supabase 1 Dakikada Kurulum (SQL Tablosu)</summary>
-        <p style="font-size:12px;color:var(--txt2);margin:8px 0 4px">Supabase panelinizde <strong>SQL Editor</strong> sayfasına girip şu kodu yapıştırıp <strong>RUN</strong>'a basın:</p>
-        <pre style="background:var(--bg);padding:10px;border-radius:8px;font-size:11px;color:#a7f3d0;overflow-x:auto;user-select:all"><code>create table if not exists public.company_inventory (
-  channel text primary key,
-  products jsonb default '[]'::jsonb,
-  suppliers jsonb default '[]'::jsonb,
-  orders jsonb default '[]'::jsonb,
-  sales_history jsonb default '[]'::jsonb,
-  stockin_history jsonb default '[]'::jsonb,
-  users jsonb default '[]'::jsonb,
-  updated_at bigint,
-  updated_by text
-);
-alter publication supabase_realtime add table public.company_inventory;
-alter table public.company_inventory enable row level security;
-create policy "Allow all" on public.company_inventory for all using (true) with check (true);
--- Mevcut tabloya users, sales_history, stockin_history eklemek icin:
-alter table public.company_inventory add column if not exists sales_history jsonb default '[]'::jsonb;
-alter table public.company_inventory add column if not exists stockin_history jsonb default '[]'::jsonb;
-alter table public.company_inventory add column if not exists users jsonb default '[]'::jsonb;</code></pre>
+        <summary style="font-size:12px;font-weight:700;color:var(--green);cursor:pointer">📖 Veritabanı Kurulumu</summary>
+        <p style="font-size:12px;color:var(--txt2);margin:8px 0 4px;line-height:1.6">
+          Stakip çok mağazalı çalışır: her hesabın verisi kendi mağazasına bağlıdır ve
+          Row Level Security ile diğer mağazalardan yalıtılır.
+        </p>
+        <p style="font-size:12px;color:var(--txt2);margin:0 0 6px;line-height:1.6">
+          Kurulum SQL'i depodaki <strong>supabase/stakip-saas.sql</strong> dosyasındadır.
+          Supabase panelinde <strong>SQL Editor</strong> sayfasına yapıştırıp <strong>RUN</strong>'a basın.
+          Tekrar tekrar çalıştırılabilir.
+        </p>
+        <p style="font-size:11px;color:var(--txt3);margin:0;line-height:1.5">
+          Kurulum yapılmadan kayıt ve giriş çalışmaz.
+        </p>
       </details>
+
+      <!-- Cihazı mağazadan ayır -->
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)">
+        <button type="button" class="btn btn-danger btn-sm" onclick="doSignOutDevice()">
+          Cihazın Mağaza Bağlantısını Kes
+        </button>
+        <p style="font-size:11px;color:var(--txt3);margin-top:6px;line-height:1.5">
+          Oturumu kapatır ve bu cihazdaki yerel kopyayı siler. Ortak ya da devredilen cihazlarda kullanın.
+        </p>
+      </div>
     </div>
 
     <!-- 2. FIREBASE PANEL -->
@@ -1404,8 +1457,8 @@ alter table public.company_inventory add column if not exists users jsonb defaul
         <textarea id="firebase-config-input" rows="3" placeholder='https://proje-id-default-rtdb.firebaseio.com' style="font-family:monospace;font-size:12px"></textarea>
       </div>
       <div class="fg">
-        <label>Şirket / Depo Kanal Kodu</label>
-        <input type="text" id="fb-channel-input" value="ana_depo" placeholder="ana_depo" style="font-weight:700">
+        <label>Bağlı Mağaza</label>
+        <input type="text" id="fb-channel-input" readonly style="font-weight:700;opacity:.75;cursor:not-allowed">
       </div>
       <details style="margin-top:10px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px">
         <summary style="font-size:12px;font-weight:700;color:var(--accent);cursor:pointer">📖 Firebase Kurulum Adımları</summary>
@@ -1435,7 +1488,6 @@ alter table public.company_inventory add column if not exists users jsonb defaul
 
 <script>
 // ══════════════ DATA & CLOUD SYNC ══════════════
-const DEMO_USERS=[{id:1,name:'Admin Kullanıcı',email:'admin@nelazimsa.com',password:'123456'}];
 let currentUser=null;
 let currentTab=null; // go() ile atanır; giriş ekranındayken okunabilmesi için burada tanımlı
 const charts={};
@@ -1446,7 +1498,9 @@ let salesCart=[];
 let salesScannedProdId=null;
 
 // Cloud Sync Configuration
-let syncChannel = localStorage.getItem('nl_channel') || 'nelazimsa_ana_depo';
+// Senkronizasyon anahtari = magaza kimligi. Elle duzenlenemez;
+// oturum acilinca afterSignIn()/checkSess() tarafindan atanir.
+let syncChannel = localStorage.getItem('nl_store_id') || '';
 let isCloudSyncing = false;
 let lastCloudSyncTime = Date.now();
 let cloudPollInterval = null;
@@ -1477,7 +1531,7 @@ function noteMissingColumn(error){
 function schemaFixSql(){
   const cols = missingColumns.size ? Array.from(missingColumns) : ['users', 'sales_history', 'stockin_history'];
   return cols.map(c =>
-    `alter table public.company_inventory add column if not exists ${c} jsonb default '[]'::jsonb;`).join('\n');
+    `alter table public.store_data add column if not exists ${c} jsonb default '[]'::jsonb;`).join('\n');
 }
 
 // Supabase proje panelindeki SQL Editor adresini yapılandırılmış URL'den türetir
@@ -1533,7 +1587,7 @@ async function probeSchema(){
 
   const cols = ['users', 'sales_history', 'stockin_history'];
   const hdr = { apikey: key, Authorization: 'Bearer ' + key };
-  const ask = (sel) => fetch(`${url}/rest/v1/company_inventory?select=${sel}&limit=1`, { headers: hdr });
+  const ask = (sel) => fetch(`${url}/rest/v1/store_data?select=${sel}&limit=1`, { headers: hdr });
 
   try{
     const res = await ask(cols.join(','));
@@ -1838,12 +1892,9 @@ function getUsersRaw(){
   // Aksi halde sıfırdan açılan bir cihaz (yeni tablet, temizlenmiş tarayıcı)
   // taze zaman damgalı varsayılanlarla buluttaki gerçek hesapları ezer ve
   // admin şifresini tüm cihazlarda 123456'ya döndürür.
-  const defaultUsers = [
-    { id: 1, name: 'Admin Yönetici', email: 'admin@nelazimsa.com', username: 'admin', password: '123456', role: 'admin', uts: 0, seed: true },
-    { id: 2, name: 'Kasiyer 1', email: 'kasiyer@nelazimsa.com', username: 'kasiyer', password: '123456', role: 'cashier', uts: 0, seed: true }
-  ];
-  localStorage.setItem('nl_users', JSON.stringify(defaultUsers));
-  return defaultUsers;
+  // SaaS'ta fabrika hesabi YOK. Magaza sahibi Supabase Auth ile kaydolur ve
+  // ensureOwnerUser() onu bu listeye admin olarak ekler; kasiyerleri sahip acar.
+  return [];
 }
 
 // Uygulamanın her yerinde kullanılan liste: silinenler hariç.
@@ -2185,94 +2236,300 @@ function delUser(id){
 }
 
 // ══════════════ AUTH & ROLES ══════════════
+// Mağaza içi (kasiyer) girişi. Mağaza sahibi buradan giremez — o yalnızca
+// e-posta + Supabase Auth ile girer; şifresi hiçbir zaman bizde durmaz.
 function findLoginUser(input, pass){
   const norm = v => String(v || '').trim().toLowerCase();
   return getUsers().find(x => {
+    if(x.owner) return false;
+    if(!x.password) return false;
     const matchEmail = x.email && norm(x.email) === input;
-    const matchUser = x.username && norm(x.username) === input;
+    const matchUser  = x.username && norm(x.username) === input;
     return (matchEmail || matchUser) && String(x.password) === String(pass);
   });
 }
 
-let loginBusy = false;
-async function doLogin(){
-  if(loginBusy) return;
-  const input = (document.getElementById('l-email').value || '').trim().toLowerCase();
-  const pass = String(document.getElementById('l-pass').value || '');
-  const err = document.getElementById('login-err');
+// ══════════════ STAKİP — HESAP & MAĞAZA (SaaS) ══════════════
+// Cihaz kimliği  = mağaza sahibinin Supabase oturumu (kalıcı, RLS bunu görür).
+// Uygulama kullanıcısı = o cihazdaki yerel profil (sahip ya da kasiyer).
+let authBusy = false;
+let sbAuthUrl = null, sbAuthKey = null;
+let currentStoreId   = localStorage.getItem('nl_store_id')   || null;
+let currentStoreName = localStorage.getItem('nl_store_name') || '';
 
-  const fail = (msg) => {
-    err.textContent = msg;
-    err.style.display = 'block';
-  };
-
-  let u = findLoginUser(input, pass);
-
-  // Kullanıcı yerelde yoksa buluttan taze listeyi çekip bir kez daha dene.
-  // Yeni bir cihazda (tablet, temizlenmiş tarayıcı) localStorage boştur; ilk
-  // poll turunu beklemeden buluttaki gerçek hesaplarla giriş yapılabilmeli.
-  if(!u){
-    loginBusy = true;
-    err.textContent = '⏳ Hesap bulutta kontrol ediliyor...';
-    err.style.display = 'block';
-    let pull;
-    try{
-      pull = await pullRemoteUsers();
-    } finally {
-      loginBusy = false;
-    }
-    u = findLoginUser(input, pass);
-
-    if(!u && !pull.reached){
-      fail('⚠️ Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
-      return;
-    }
-  }
-
-  if(u){
-    // Ensure permissions array exists for non-admin users
-    if(u.role !== 'admin' && !u.permissions){
-      u.permissions = ['sales'];
-    }
-    currentUser = {...u}; // Fresh copy
-    localStorage.setItem('nl_sess', JSON.stringify(currentUser));
-    err.style.display = 'none';
-    err.textContent = '❌ Kullanıcı adı / e-posta veya şifre hatalı!';
-    console.log('[KTM] Login:', currentUser.name, 'Role:', currentUser.role, 'Permissions:', currentUser.permissions);
-    showApp();
-  } else {
-    fail('❌ Kullanıcı adı / e-posta veya şifre hatalı!');
-  }
-}
-
-// Supabase REST üzerinden doğrudan kullanıcı listesi çeker.
-// SDK yüklenmemiş ya da sbClient henüz hazır değilken de çalışır
-// (yeni bir cihazda giriş denemesi initSupabase'den önce olabilir).
-async function fetchRemoteUsersDirect(){
+function sbCreds(){
   let url = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
   let key = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
-  url = url.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+  url = String(url).replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
   if(key && key.startsWith('sb_secret_')) key = DEFAULT_SB_KEY;
-  if(!url || !key) return null;
+  return { url, key };
+}
 
-  // select=* kullanılır: users sütunu tabloda yoksa select=users 400 döner
-  const endpoint = url + '/rest/v1/company_inventory?select=*&channel=eq.' + encodeURIComponent(syncChannel);
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000);
+// TEK istemci. İkinci bir createClient çağrısı ayrı bir oturum deposu açar;
+// giriş yapılmış olsa bile sorgular anonim gider ve RLS her şeyi keser.
+function makeSbClient(){
+  if(typeof supabase === 'undefined') return null;
+  const { url, key } = sbCreds();
+  if(!url || !key) return null;
+  if(sbClient && sbAuthUrl === url && sbAuthKey === key) return sbClient;
+  sbAuthUrl = url; sbAuthKey = key;
+  sbClient = supabase.createClient(url, key, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'stakip_auth' }
+  });
+  return sbClient;
+}
+function ensureSbClient(){ return sbClient || makeSbClient(); }
+
+// ── giriş ekranı yardımcıları ──
+function loginClear(){
+  ['login-err','login-ok'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+}
+function loginErr(msg){
+  const ok = document.getElementById('login-ok'); if(ok) ok.style.display = 'none';
+  const el = document.getElementById('login-err'); if(!el) return;
+  el.textContent = msg; el.style.display = 'block';
+}
+function loginOk(msg){
+  const er = document.getElementById('login-err'); if(er) er.style.display = 'none';
+  const el = document.getElementById('login-ok'); if(!el) return;
+  el.textContent = msg; el.style.display = 'block';
+}
+function showPane(which){
+  loginClear();
+  ['pane-login','pane-register','pane-newpass'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = (id === which) ? 'block' : 'none';
+  });
+}
+function showLogin(){ showPane('pane-login'); }
+function showRegister(){ showPane('pane-register'); }
+
+// Marka: büyük satır mağaza adı, küçük satır ürün adı.
+function setBrand(storeName){
+  if(typeof storeName === 'string') currentStoreName = storeName;
+  try{ localStorage.setItem('nl_store_name', currentStoreName || ''); }catch(e){}
+  const nm   = currentStoreName || 'Stakip';
+  const side = document.getElementById('side-store-name');
+  const sub  = document.getElementById('side-store-sub');
+  const mob  = document.getElementById('mob-store-name');
+  if(side) side.textContent = nm;
+  if(mob)  mob.textContent  = nm;
+  if(sub)  sub.textContent  = currentStoreName ? 'Stakip' : 'Stok Yönetimi';
+  document.title = currentStoreName ? currentStoreName + ' — Stakip' : 'Stakip — Mağaza Stok Yönetimi';
+}
+
+// Supabase Auth hata mesajlarını Türkçeleştir.
+function authErrText(err){
+  const m = String((err && err.message) || err || '');
+  if(/Invalid login credentials/i.test(m))    return 'E-posta veya şifre hatalı.';
+  if(/Email not confirmed/i.test(m))          return 'E-posta adresiniz henüz doğrulanmamış. Gelen kutunuzdaki bağlantıya tıklayın.';
+  if(/already registered/i.test(m))           return 'Bu e-posta ile zaten bir hesap var. Giriş yapmayı deneyin.';
+  if(/Password should be at least/i.test(m))  return 'Şifre çok kısa.';
+  if(/rate limit|too many requests/i.test(m)) return 'Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin.';
+  if(/Unable to validate email|invalid format/i.test(m)) return 'E-posta adresi geçersiz.';
+  if(/[Ss]ignups not allowed/.test(m))        return 'Yeni kayıtlar şu anda kapalı.';
+  if(/Failed to fetch|NetworkError/i.test(m)) return 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.';
+  return m || 'Bilinmeyen hata.';
+}
+
+// SaaS tabloları yoksa (kurulum SQL'i çalıştırılmamış) net söyle.
+function saasSchemaMissing(){
+  loginErr('⚠️ Veritabanı kurulumu eksik. supabase/stakip-saas.sql dosyasını Supabase SQL Editor içinde çalıştırın.');
+}
+
+// ── kayıt ──
+async function doRegister(){
+  if(authBusy) return;
+  const val   = id => String((document.getElementById(id) || {}).value || '').trim();
+  const store = val('r-store');
+  const name  = val('r-name');
+  const email = val('r-email').toLowerCase();
+  const pass  = String((document.getElementById('r-pass')  || {}).value || '');
+  const pass2 = String((document.getElementById('r-pass2') || {}).value || '');
+
+  if(store.length < 2) return loginErr('❌ Mağaza adını yazın.');
+  if(name.length  < 2) return loginErr('❌ Adınızı ve soyadınızı yazın.');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return loginErr('❌ Geçerli bir e-posta adresi yazın.');
+  if(pass.length < 8)  return loginErr('❌ Şifre en az 8 karakter olmalı.');
+  if(pass !== pass2)   return loginErr('❌ Şifreler birbirini tutmuyor.');
+
+  const sb = ensureSbClient();
+  if(!sb) return loginErr('⚠️ Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+
+  authBusy = true;
+  loginOk('⏳ Hesabınız oluşturuluyor...');
   try{
-    const res = await fetch(endpoint, {
-      headers: { apikey: key, Authorization: 'Bearer ' + key },
-      signal: ctrl.signal
+    const { data, error } = await sb.auth.signUp({
+      email, password: pass,
+      options: { data: { store_name: store, full_name: name }, emailRedirectTo: location.href.split('#')[0] }
     });
-    if(!res.ok) return { reached: false, users: null };
-    const rows = await res.json();
-    const row = Array.isArray(rows) ? rows[0] : null;
-    if(row) checkUsersColumn(row);
-    return { reached: true, users: row ? row.users : null };
-  } finally {
-    clearTimeout(timer);
+    if(error){ loginErr('❌ ' + authErrText(error)); return; }
+
+    // E-posta doğrulaması açıkken signUp oturum döndürmez.
+    if(!data || !data.session){
+      showLogin();
+      loginOk('✅ Kaydınız alındı. ' + email + ' adresine doğrulama bağlantısı gönderdik. '
+        + 'Linke tıkladıktan sonra buradan giriş yapabilirsiniz.');
+      return;
+    }
+    await afterSignIn(store);
+  }catch(e){
+    loginErr('⚠️ ' + authErrText(e));
+  }finally{ authBusy = false; }
+}
+
+// ── giriş ──
+async function doLogin(){
+  if(authBusy) return;
+  const input = String((document.getElementById('l-email') || {}).value || '').trim();
+  const pass  = String((document.getElementById('l-pass')  || {}).value || '');
+  if(!input || !pass) return loginErr('❌ E-posta/kullanıcı adı ve şifrenizi girin.');
+  return input.includes('@')
+    ? doOwnerLogin(input.toLowerCase(), pass)   // mağaza sahibi — Supabase Auth
+    : doStaffLogin(input.toLowerCase(), pass);  // mağaza içi kasiyer — yerel liste
+}
+
+async function doOwnerLogin(email, pass){
+  const sb = ensureSbClient();
+  if(!sb) return loginErr('⚠️ Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+  authBusy = true;
+  loginOk('⏳ Giriş yapılıyor...');
+  try{
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if(error){ loginErr('❌ ' + authErrText(error)); return; }
+    const meta = (data && data.user && data.user.user_metadata) || {};
+    await afterSignIn(meta.store_name);
+  }catch(e){
+    loginErr('⚠️ ' + authErrText(e));
+  }finally{ authBusy = false; }
+}
+
+// Kasiyer girişi yerel listeye bakar; bu yüzden cihazın daha önce mağaza
+// sahibi tarafından bağlanmış olması gerekir (RLS için canlı oturum şart).
+async function doStaffLogin(input, pass){
+  if(!currentStoreId){
+    return loginErr('⚠️ Bu cihaz henüz bir mağazaya bağlanmadı. Önce mağaza sahibi e-posta ile giriş yapmalı.');
+  }
+  const u = findLoginUser(input, pass);
+  if(!u) return loginErr('❌ Kullanıcı adı veya şifre hatalı.');
+  if(u.role !== 'admin' && !u.permissions) u.permissions = ['sales'];
+  currentUser = { ...u };
+  localStorage.setItem('nl_sess', JSON.stringify(currentUser));
+  loginClear();
+  showApp();
+}
+
+// Kullanıcının mağazasını getirir; yoksa create_store() ile açar.
+async function resolveStore(fallbackName){
+  const sb = ensureSbClient();
+  if(!sb) return null;
+  try{
+    const { data: rows, error } = await sb.from('stores').select('id,name').limit(1);
+    if(error){
+      if(error.code === '42P01'){ saasSchemaMissing(); return null; }
+      console.warn('stores okunamadı:', error);
+    } else if(rows && rows.length){
+      return rows[0];
+    }
+
+    let nm = fallbackName;
+    if(!nm){
+      const { data: u } = await sb.auth.getUser();
+      nm = (u && u.user && u.user.user_metadata && u.user.user_metadata.store_name) || 'Mağazam';
+    }
+    const { data: sid, error: e2 } = await sb.rpc('create_store', { store_name: nm });
+    if(e2){
+      if(e2.code === '42883' || /create_store/i.test(String(e2.message || ''))) saasSchemaMissing();
+      else console.warn('create_store hatası:', e2);
+      return null;
+    }
+    return sid ? { id: sid, name: nm } : null;
+  }catch(e){
+    console.warn('mağaza çözülemedi:', e);
+    return null;
   }
 }
+
+// Mağaza sahibi, mağaza içi kullanıcı listesinde de admin olarak durmalı:
+// Kullanıcı Yönetimi ekranı ve yetki kontrolleri bu listeye bakıyor.
+// password boş — sahip yalnızca Supabase Auth ile girer, findLoginUser onu eler.
+function ensureOwnerUser(profile){
+  const list  = getUsersRaw();
+  const email = String(profile.email || '').toLowerCase();
+  const found = list.find(x => x && !x.deleted && String(x.email || '').toLowerCase() === email);
+  if(found){
+    if(found.role !== 'admin' || !found.owner){
+      found.role = 'admin'; found.owner = true; found.uts = nextUts();
+      saveUsers(list);
+    }
+    return found;
+  }
+  const rec = {
+    id: newUserId(), name: profile.name, email: profile.email,
+    username: '', password: '', role: 'admin', owner: true, uts: nextUts()
+  };
+  list.push(rec);
+  saveUsers(list);
+  return rec;
+}
+
+// Oturum açıldıktan sonra: mağazayı çöz, markayı kur, uygulamayı aç.
+async function afterSignIn(fallbackStoreName){
+  const store = await resolveStore(fallbackStoreName);
+  if(!store){
+    const errEl = document.getElementById('login-err');
+    if(!errEl || errEl.style.display !== 'block') loginErr('⚠️ Mağazanız açılamadı. Birazdan tekrar deneyin.');
+    return false;
+  }
+  currentStoreId = store.id;
+  syncChannel = currentStoreId;          // MQTT/Firebase konulari da magazaya bagli
+  try{ localStorage.setItem('nl_store_id', currentStoreId); }catch(e){}
+  setBrand(store.name);
+
+  const sb = ensureSbClient();
+  const { data: u } = await sb.auth.getUser();
+  const user = (u && u.user) || {};
+  const meta = user.user_metadata || {};
+  const rec  = ensureOwnerUser({
+    name:  meta.full_name || String(user.email || '').split('@')[0],
+    email: user.email || ''
+  });
+  currentUser = { ...rec, authId: user.id || null, role: 'admin', owner: true };
+  localStorage.setItem('nl_sess', JSON.stringify(currentUser));
+  loginClear();
+  showApp();
+  return true;
+}
+
+// ── şifre sıfırlama ──
+async function doResetPassword(){
+  const email = String((document.getElementById('l-email') || {}).value || '').trim().toLowerCase();
+  if(!email.includes('@')) return loginErr('❌ Önce e-posta adresinizi yazın, sonra "Şifremi unuttum"a basın.');
+  const sb = ensureSbClient();
+  if(!sb) return loginErr('⚠️ Sunucuya bağlanılamadı.');
+  try{
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.href.split('#')[0] });
+    if(error) return loginErr('❌ ' + authErrText(error));
+    loginOk('✅ ' + email + ' adresine şifre sıfırlama bağlantısı gönderildi.');
+  }catch(e){ loginErr('⚠️ ' + authErrText(e)); }
+}
+
+// E-postadaki sıfırlama bağlantısı bu sayfaya kurtarma oturumuyla döner.
+async function doSetNewPassword(){
+  const p1 = String((document.getElementById('n-pass')  || {}).value || '');
+  const p2 = String((document.getElementById('n-pass2') || {}).value || '');
+  if(p1.length < 8) return loginErr('❌ Şifre en az 8 karakter olmalı.');
+  if(p1 !== p2)     return loginErr('❌ Şifreler birbirini tutmuyor.');
+  const sb = ensureSbClient();
+  if(!sb) return loginErr('⚠️ Sunucuya bağlanılamadı.');
+  try{
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if(error) return loginErr('❌ ' + authErrText(error));
+    showLogin();
+    loginOk('✅ Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz.');
+  }catch(e){ loginErr('⚠️ ' + authErrText(e)); }
+}
+
 
 // select('*') ile okunan satırda beklenen sütunlar var mı?
 // Sonradan eklenen sütunları da temizler, böylece SQL çalıştırıldığında uyarı kalkar.
@@ -2290,84 +2547,93 @@ function checkUsersColumn(row){
   return true;
 }
 
-// Buluttan yalnızca kullanıcı listesini çeker ve yereldekiyle birleştirir.
-// reached: sunucuya ulaşılabildi mi (ağ hatasını yanlış şifreden ayırmak için)
-// changed: yerel liste değişti mi
-async function pullRemoteUsers(){
-  try{
-    if(syncProvider === 'firebase'){
-      if(!fbSyncRef) return { reached: false, changed: false };
-      const snap = await fbSyncRef.child('users').get();
-      return { reached: true, changed: applyRemoteUsers(snap && snap.val()).changed };
-    }
 
-    let remoteUsers = null;
-    let reached = false;
-    if(sbClient){
-      try{
-        const { data, error } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
-        if(!error){
-          reached = true;
-          if(data){ checkUsersColumn(data); remoteUsers = data.users; }
-        }
-      }catch(e){ /* REST yedeğine düş */ }
-    }
-    if(!reached){
-      const direct = await fetchRemoteUsersDirect();
-      reached = direct.reached;
-      remoteUsers = remoteUsers || direct.users;
-    }
-
-    return { reached, changed: applyRemoteUsers(remoteUsers).changed };
-  }catch(e){
-    console.warn('Kullanıcı listesi çekilemedi:', e);
-    return { reached: false, changed: false };
-  }
-}
-
+// Normal çıkış: yalnızca yerel profili bırakır, Supabase oturumu kalır.
+// Böylece kasiyer kendi kullanıcı adıyla tekrar girebilir (RLS için canlı
+// oturum şart). Cihazı mağazadan tamamen ayırmak için doSignOutDevice().
 function doLogout(){
   currentUser = null;
   localStorage.removeItem('nl_sess');
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
+  showLogin();
 }
 
-function checkSess(){
-  const s = ls('nl_sess');
-  if(s){
+// Cihazın mağaza bağlantısını tamamen keser: Supabase oturumu kapanır ve
+// yereldeki mağaza kopyası silinir. Ortak/satılan cihazda kullanılmalı.
+async function doSignOutDevice(){
+  if(!confirm('Bu cihazın mağaza bağlantısı kesilecek ve yerel kopya silinecek.\n\nDevam edilsin mi?')) return;
+  try{ const sb = ensureSbClient(); if(sb) await sb.auth.signOut(); }catch(e){}
+  ['nl_sess','nl_store_id','nl_store_name','nl_prod','nl_sup','nl_ord',
+   'nl_sales_hist','nl_stockin_hist','nl_users','nl_hlc','nl_channel']
+    .forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
+  location.reload();
+}
+
+// Açılışta: önce Supabase oturumu var mı, sonra yerel profil.
+async function checkSess(){
+  const sb = ensureSbClient();
+
+  // Şifre sıfırlama bağlantısıyla gelindiyse yeni şifre panelini aç.
+  if(sb){
+    sb.auth.onAuthStateChange((event) => {
+      if(event === 'PASSWORD_RECOVERY'){
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+        showPane('pane-newpass');
+      }
+    });
+  }
+
+  let session = null;
+  if(sb){
     try{
-      let sessUser = JSON.parse(s);
-      // Always refresh from nl_users to get latest permissions & role
-      const freshUser = findUserRecord(sessUser);
-      // Hesap başka bir cihazdan silinmişse oturumu kapat
-      if(freshUser && freshUser.deleted){
-        doLogout();
-        return;
-      }
-      if(freshUser){
-        currentUser = {...freshUser};
-      } else {
-        currentUser = sessUser;
-      }
-      if(!currentUser.role){
-        currentUser.role = (currentUser.email === 'kasiyer@nelazimsa.com' || currentUser.username === 'kasiyer') ? 'cashier' : 'admin';
-      }
-      if(currentUser.role !== 'admin' && !currentUser.permissions){
-        currentUser.permissions = ['sales'];
-      }
-      localStorage.setItem('nl_sess', JSON.stringify(currentUser));
-      console.log('[KTM] Session restored:', currentUser.name, 'Role:', currentUser.role, 'Permissions:', currentUser.permissions);
-      showApp();
-    }catch(e){
-      doLogout();
+      const { data } = await sb.auth.getSession();
+      session = (data && data.session) || null;
+    }catch(e){ console.warn('oturum okunamadı:', e); }
+  }
+
+  // Oturum yoksa cihaz hiçbir mağazaya bağlı değil: yerel profil de geçersiz.
+  if(!session){
+    currentUser = null;
+    localStorage.removeItem('nl_sess');
+    setBrand('');
+    return;
+  }
+
+  if(!currentStoreId){
+    const store = await resolveStore();
+    if(store){
+      currentStoreId = store.id;
+      syncChannel = currentStoreId;
+      try{ localStorage.setItem('nl_store_id', currentStoreId); }catch(e){}
+      setBrand(store.name);
     }
+  } else {
+    setBrand(currentStoreName);
+  }
+  if(!currentStoreId) return;   // mağaza çözülemedi, giriş ekranında kal
+
+  const s = ls('nl_sess');
+  if(!s) return;                // cihaz bağlı ama kimse giriş yapmamış
+  try{
+    const sessUser  = JSON.parse(s);
+    const freshUser = findUserRecord(sessUser);
+    if(freshUser && freshUser.deleted){ doLogout(); return; }
+    currentUser = freshUser ? { ...freshUser } : sessUser;
+    if(!currentUser.role) currentUser.role = currentUser.owner ? 'admin' : 'cashier';
+    if(currentUser.role !== 'admin' && !currentUser.permissions) currentUser.permissions = ['sales'];
+    localStorage.setItem('nl_sess', JSON.stringify(currentUser));
+    showApp();
+  }catch(e){
+    doLogout();
   }
 }
 
 function applyRolePermissions(){
   if(!currentUser) return;
   if(!currentUser.role){
-    currentUser.role = (currentUser.email === 'kasiyer@nelazimsa.com' || currentUser.username === 'kasiyer') ? 'cashier' : 'admin';
+    currentUser.role = currentUser.owner ? 'admin' : 'cashier';
   }
   const isAdmin = (currentUser.role === 'admin');
   const perms = isAdmin ? ['sales','dashboard','products','critical','suppliers','reports','users','sync'] : (currentUser.permissions || ['sales']);
@@ -4659,7 +4925,17 @@ localStorage.setItem('nl_device_id', myDeviceId);
 
 let mqttClient = null;
 
+// Halka acik broker kullanildigi icin varsayilan olarak kapali.
+// Acmadan once kimlik dogrulamali, magaza basina yetkilendirilmis bir
+// broker'a gecilmeli — aksi halde magazalar arasi veri sizar.
+const MQTT_MESH_ENABLED = false;
+
 function initMqttMesh(){
+  // SaaS'ta devre disi: broker.emqx.io kimlik dogrulamasiz, herkese acik bir
+  // brokerdir ve 'stakip/sync/#' abonesi olan biri TUM magazalarin barkod,
+  // sepet ve satis trafigini okuyabilirdi. Ayni olaylar Supabase Realtime
+  // broadcast uzerinden kimlik dogrulamali sekilde tasiniyor.
+  if(MQTT_MESH_ENABLED !== true) return;
   if(typeof mqtt === 'undefined') return;
   try{
     if(mqttClient){
@@ -4667,14 +4943,14 @@ function initMqttMesh(){
     }
     const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
     mqttClient = mqtt.connect(brokerUrl, {
-      clientId: 'nl_' + myDeviceId,
+      clientId: 'stakip_' + myDeviceId,
       clean: true,
       connectTimeout: 5000,
       reconnectPeriod: 2500
     });
 
     mqttClient.on('connect', () => {
-      const topic = 'nelazimsa/sync/' + syncChannel + '/#';
+      const topic = 'stakip/sync/' + syncChannel + '/#';
       mqttClient.subscribe(topic, { qos: 0 });
     });
 
@@ -4730,7 +5006,7 @@ function broadcastRemoteScan(code){
   // 1. Instant MQTT WebSockets Mesh (Zero config, works on any Wi-Fi/IP/Cellular)
   try{
     if(mqttClient && mqttClient.connected){
-      mqttClient.publish('nelazimsa/sync/' + syncChannel + '/scan', JSON.stringify(payload), { qos: 0 });
+      mqttClient.publish('stakip/sync/' + syncChannel + '/scan', JSON.stringify(payload), { qos: 0 });
     }
   }catch(e){}
 
@@ -4769,7 +5045,7 @@ function broadcastCartUpdate(cart){
   // 1. Instant MQTT WebSockets Mesh
   try{
     if(mqttClient && mqttClient.connected){
-      mqttClient.publish('nelazimsa/sync/' + syncChannel + '/cart', JSON.stringify(payload), { qos: 0 });
+      mqttClient.publish('stakip/sync/' + syncChannel + '/cart', JSON.stringify(payload), { qos: 0 });
     }
   }catch(e){}
 
@@ -4811,7 +5087,7 @@ function broadcastSaleComplete(saleRecord){
   // 1. Instant MQTT WebSockets Mesh
   try{
     if(mqttClient && mqttClient.connected){
-      mqttClient.publish('nelazimsa/sync/' + syncChannel + '/sale', JSON.stringify(payload), { qos: 0 });
+      mqttClient.publish('stakip/sync/' + syncChannel + '/sale', JSON.stringify(payload), { qos: 0 });
     }
   }catch(e){}
 
@@ -5206,7 +5482,7 @@ function setSyncStatusUI(status, text){
   const lastTimeEl = document.getElementById('sync-last-time');
   const activeChanEl = document.getElementById('sync-active-chan');
 
-  if(activeChanEl) activeChanEl.textContent = syncChannel + ' (' + (syncProvider === 'supabase' ? 'Supabase' : 'Firebase') + ')';
+  if(activeChanEl) activeChanEl.textContent = (currentStoreName || currentStoreId || 'bağlı değil') + ' (' + (syncProvider === 'supabase' ? 'Supabase' : 'Firebase') + ')';
 
   [mobPill, deskPill].forEach(p => {
     if(!p) return;
@@ -5264,9 +5540,10 @@ function openSyncModal(){
 
   if(sbUrl) sbUrl.value = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
   if(sbKey) sbKey.value = curKey;
-  if(sbChan) sbChan.value = syncChannel;
+  const storeLabel = currentStoreName ? currentStoreName + '  ·  ' + (currentStoreId || '-') : (currentStoreId || 'bağlı değil');
+  if(sbChan) sbChan.value = storeLabel;
   if(fbConf) fbConf.value = localStorage.getItem('nl_firebase_config') || '';
-  if(fbChan) fbChan.value = syncChannel;
+  if(fbChan) fbChan.value = storeLabel;
 
   const isConn = (syncProvider === 'supabase' && isSupabaseConnected) || (syncProvider === 'firebase' && isFirebaseConnected);
   setSyncStatusUI(missingColumns.size ? 'offline' : (isConn ? 'ok' : 'offline'), missingColumns.size ? 'Tablo Eksik' : undefined);
@@ -5286,27 +5563,20 @@ function saveCloudConfig(){
   if(syncProvider === 'supabase'){
     const url = (document.getElementById('sb-url-input')?.value || '').trim();
     const key = (document.getElementById('sb-key-input')?.value || '').trim();
-    const chan = (document.getElementById('sb-channel-input')?.value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'ana_depo';
-
     if(!url || !key){
       toast('w', 'Bilgi Eksik', 'Lütfen Supabase Project URL ve Anon Key giriniz.');
       return;
     }
-    syncChannel = chan;
-    localStorage.setItem('nl_channel', chan);
+    // Kanal artik elle girilmiyor: veri magaza kimligine bagli (bkz. RLS).
     localStorage.setItem('nl_sb_url', url);
     localStorage.setItem('nl_sb_key', key);
     toast('s', 'Supabase Kaydedildi', 'Supabase veritabanına bağlanılıyor...');
   } else {
     const conf = (document.getElementById('firebase-config-input')?.value || '').trim();
-    const chan = (document.getElementById('fb-channel-input')?.value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'ana_depo';
-
     if(!conf){
       toast('w', 'Bilgi Eksik', 'Lütfen Firebase Database URL giriniz.');
       return;
     }
-    syncChannel = chan;
-    localStorage.setItem('nl_channel', chan);
     localStorage.setItem('nl_firebase_config', conf);
     toast('s', 'Firebase Kaydedildi', 'Firebase veritabanına bağlanılıyor...');
   }
@@ -5319,7 +5589,7 @@ function setupRealtimeSync(){
   // 1. Same-device cross-tab Broadcast Channel
   if(window.BroadcastChannel){
     try{
-      broadcastChan = new BroadcastChannel('ne_lazimsa_realtime');
+      broadcastChan = new BroadcastChannel('stakip_realtime');
       broadcastChan.onmessage = (e) => {
         const { type, payload } = e.data || {};
         if(type === 'SYNC_UPDATE' && payload){
@@ -5359,6 +5629,10 @@ const DEFAULT_SB_URL = "https://jvnuziiboysvisrifzii.supabase.co";
 const DEFAULT_SB_KEY = "sb_publishable_0PfH5bsIvZWBT0gOBDOHnQ_tMFjEh9N";
 
 async function initSupabase(){
+  // Magaza cozulmeden abone olma: aksi halde 'store_null' gibi bir kanala
+  // baglanip hicbir zaman veri gelmeyen bir "Canli" durumu gosterirdik.
+  if(!currentStoreId){ setSyncStatusUI('offline', 'Magaza Yok'); return; }
+
   let url = localStorage.getItem('nl_sb_url') || DEFAULT_SB_URL;
   let key = localStorage.getItem('nl_sb_key') || DEFAULT_SB_KEY;
 
@@ -5387,12 +5661,13 @@ async function initSupabase(){
       try{ sbClient?.removeChannel(sbChannelSub); }catch(e){}
     }
 
-    sbClient = supabase.createClient(url, key);
+    // Kimlik katmaniyla ayni istemci; ikinci bir GoTrue ornegi oturumu bolerdi.
+    if(!makeSbClient()) { setSyncStatusUI('offline'); return; }
     setSyncStatusUI('syncing', 'Bağlanıyor');
 
     // 1. Realtime WebSockets Listener & Mobile Remote Broadcast
     sbChannelSub = sbClient
-      .channel('inventory_sync_' + syncChannel, {
+      .channel('store_' + currentStoreId, {
         config: { broadcast: { self: false } }
       })
       .on('broadcast', { event: 'remote_scan' }, ({ payload }) => {
@@ -5416,9 +5691,9 @@ async function initSupabase(){
           applyRemotePayload(payload.payload, 'Supabase Realtime Broadcast');
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_inventory' }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_data', filter: 'store_id=eq.' + currentStoreId }, payload => {
         isSupabaseConnected = true;
-        if(payload.new && payload.new.channel === syncChannel){
+        if(payload.new && payload.new.store_id === currentStoreId){
           applyRemotePayload({
             products: payload.new.products,
             suppliers: payload.new.suppliers,
@@ -5444,7 +5719,7 @@ async function initSupabase(){
     cloudPollInterval = setInterval(async () => {
       if(syncProvider === 'supabase' && sbClient && !isRemoteApplying){
         try{
-          const { data } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
+          const { data } = await sbClient.from('store_data').select('*').eq('store_id', currentStoreId).maybeSingle();
           if(data){
             checkUsersColumn(data);
             applyRemotePayload({
@@ -5464,7 +5739,7 @@ async function initSupabase(){
     }, 1500);
 
     // 3. Initial Pull
-    const { data, error } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
+    const { data, error } = await sbClient.from('store_data').select('*').eq('store_id', currentStoreId).maybeSingle();
     if(error){
       console.warn('Supabase initial fetch:', error);
       if(error.code === '42P01'){
@@ -5525,12 +5800,12 @@ function initFirebase(){
       try{ fbApp.delete(); }catch(e){}
     }
 
-    const appName = 'nelazimsa_fb_' + Date.now();
+    const appName = 'stakip_fb_' + Date.now();
     fbApp = firebase.initializeApp(config, appName);
     fbDb = firebase.database(fbApp);
     
     if(fbSyncRef) fbSyncRef.off();
-    fbSyncRef = fbDb.ref('company_inventory/' + syncChannel);
+    fbSyncRef = fbDb.ref('store_data/' + syncChannel);
 
     setSyncStatusUI('syncing', 'Bağlanıyor');
 
@@ -5581,7 +5856,7 @@ function triggerCloudPush(reason, immediate = false){
   // 2. Broadcast via MQTT Mesh to all phones and computers instantly (Cross-IP/Wi-Fi)
   try{
     if(mqttClient && mqttClient.connected){
-      mqttClient.publish('nelazimsa/sync/' + syncChannel + '/stock', JSON.stringify({
+      mqttClient.publish('stakip/sync/' + syncChannel + '/stock', JSON.stringify({
         type: 'STOCK_SYNC',
         payload: payload,
         senderId: myDeviceId,
@@ -5609,9 +5884,9 @@ function triggerCloudPush(reason, immediate = false){
 
   const doPush = async () => {
     // 1. Supabase Push
-    if(syncProvider === 'supabase' && sbClient){
+    if(syncProvider === 'supabase' && sbClient && currentStoreId){
       const row = {
-        channel: syncChannel,
+        store_id: currentStoreId,
         products: payload.products,
         suppliers: payload.suppliers,
         orders: payload.orders,
@@ -5627,13 +5902,13 @@ function triggerCloudPush(reason, immediate = false){
       try{
         // DİKKAT: supabase-js hata fırlatmaz, { error } döner.
         // Bu kontrol olmadan başarısız yazmalar "Canlı" gibi görünür.
-        let { error } = await sbClient.from('company_inventory').upsert(row, { onConflict: 'channel' });
+        let { error } = await sbClient.from('store_data').upsert(row, { onConflict: 'store_id' });
 
         // Tabloda olmayan sütun varsa (PGRST204) onu çıkarıp yeniden dene:
         // users sütunu yoksa bile ürün/stok senkronizasyonu çalışmaya devam etsin.
         if(error && noteMissingColumn(error)){
           missingColumns.forEach(c => { delete row[c]; });
-          ({ error } = await sbClient.from('company_inventory').upsert(row, { onConflict: 'channel' }));
+          ({ error } = await sbClient.from('store_data').upsert(row, { onConflict: 'store_id' }));
         }
 
         if(error){
@@ -5795,7 +6070,7 @@ async function testAndPullCloud(){
     }
     await initSupabase();
     if(sbClient){
-      const { data, error } = await sbClient.from('company_inventory').select('*').eq('channel', syncChannel).maybeSingle();
+      const { data, error } = await sbClient.from('store_data').select('*').eq('store_id', currentStoreId).maybeSingle();
       if(error){
         toast('e', 'Supabase Hatası', error.message);
       } else if(data){

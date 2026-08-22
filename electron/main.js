@@ -1,4 +1,4 @@
-// NE LAZIMSA — Electron masaüstü kabuğu
+// Stakip — Electron masaüstü kabuğu
 // index.html olduğu gibi yüklenir; uygulama mantığı değişmez.
 const { app, BrowserWindow, shell, Menu, session, dialog } = require('electron');
 const path = require('path');
@@ -42,7 +42,7 @@ function initUpdater() {
   autoUpdater.on('update-available', (info) => {
     updateUiState = 'downloading';
     if (mainWindow) {
-      mainWindow.setTitle('NE LAZIMSA — yeni sürüm indiriliyor (' + info.version + ')');
+      mainWindow.setTitle('Stakip — yeni sürüm indiriliyor (' + info.version + ')');
     }
   });
 
@@ -62,13 +62,13 @@ function initUpdater() {
 
   autoUpdater.on('download-progress', (p) => {
     if (mainWindow) {
-      mainWindow.setTitle('NE LAZIMSA — güncelleme indiriliyor %' + Math.round(p.percent));
+      mainWindow.setTitle('Stakip — güncelleme indiriliyor %' + Math.round(p.percent));
     }
   });
 
   autoUpdater.on('update-downloaded', (info) => {
     updateUiState = 'ready';
-    if (mainWindow) mainWindow.setTitle('NE LAZIMSA');
+    if (mainWindow) mainWindow.setTitle('Stakip');
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: 'Güncelleme Hazır',
@@ -88,7 +88,7 @@ function initUpdater() {
 
   autoUpdater.on('error', (err) => {
     updateUiState = 'idle';
-    if (mainWindow) mainWindow.setTitle('NE LAZIMSA');
+    if (mainWindow) mainWindow.setTitle('Stakip');
     console.error('Güncelleme hatası:', err);
     if (manualCheck) {
       manualCheck = false;
@@ -143,7 +143,7 @@ function createWindow() {
     show: false,
     backgroundColor: '#0b1220',           // ilk boyamada beyaz parlama olmasın
     autoHideMenuBar: true,
-    title: 'NE LAZIMSA',
+    title: 'Stakip',
     webPreferences: {
       // Sayfanın Node'a ihtiyacı yok; kapalı tutmak güvenli
       nodeIntegration: false,
